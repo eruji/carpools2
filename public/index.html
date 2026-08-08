@@ -623,7 +623,7 @@ function renderHistory(history) {
         <strong>${phaseNames[h.event] || h.event}</strong>
         <span class="text-sm text-muted">${new Date(h.created_at).toLocaleString()}</span>
         ${h.driver_name ? `<span class="text-sm"> | Driver: ${esc(h.driver_name)}</span>` : ''}
-        ${h.mileage > 0 ? `<span class="text-sm"> | ${h.mileage.toFixed(1)} km</span>` : ''}
+        ${h.mileage > 0 ? `<span class="text-sm"> | ${h.mileage.toFixed(1)} mi</span>` : ''}
         ${coinsStr}
         ${h.details ? `<div class="text-sm text-muted">${esc(h.details)}</div>` : ''}
       </div>
@@ -730,8 +730,8 @@ function renderMemberStatus(session) {
     if (m.location_lat && m.location_lng && activeSession) {
       const dist = haversine(m.location_lat, m.location_lng,
         activeSession.meetup_lat, activeSession.meetup_lng);
-      const etaMin = Math.round(dist / 50 * 60); // 50 km/h avg speed
-      etaStr = ` | ${dist.toFixed(1)} km away, ETA: ~${etaMin} min`;
+      const etaMin = Math.round(dist / 31 * 60); // 31 mph avg speed
+      etaStr = ` | ${dist.toFixed(1)} mi away, ETA: ~${etaMin} min`;
     }
     return `
       <div class="member-row">
@@ -797,7 +797,7 @@ function fetchRoute(lat1, lng1, lat2, lng2, callback) {
         const route = data.routes[0];
         const result = {
           coords: route.geometry.coordinates.map(c => [c[1], c[0]]), // GeoJSON lng,lat -> Leaflet lat,lng
-          distance: route.distance / 1000, // km
+          distance: route.distance / 1609.34, // meters to miles
           duration: route.duration // seconds
         };
         routeCache[key] = result;
@@ -859,12 +859,12 @@ function updateMap(data) {
       let coords, distanceText;
       if (route) {
         coords = route.coords;
-        distanceText = `${route.distance.toFixed(1)} km • ~${formatDuration(route.duration)}`;
+        distanceText = `${route.distance.toFixed(1)} mi • ~${formatDuration(route.duration)}`;
       } else {
         // Fallback to straight line
         coords = [[carpool.meetup_lat, carpool.meetup_lng], [carpool.destination_lat, carpool.destination_lng]];
         const dist = haversine(carpool.meetup_lat, carpool.meetup_lng, carpool.destination_lat, carpool.destination_lng);
-        distanceText = `${dist.toFixed(1)} km (straight line)`;
+        distanceText = `${dist.toFixed(1)} mi (straight line)`;
       }
 
       // Update info tab
@@ -1219,7 +1219,7 @@ function esc(str) {
 
 function haversine(lat1, lng1, lat2, lng2) {
   if (!lat1 || !lng1 || !lat2 || !lng2) return 0;
-  const R = 6371;
+  const R = 3959; // Earth radius in miles
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
   const a = Math.sin(dLat / 2) ** 2 +
