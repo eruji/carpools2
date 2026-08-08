@@ -1,6 +1,6 @@
 services:
   carpool:
-    image: ghcr.io/YOUR_GITHUB_USER/YOUR_REPO:latest
+    image: ghcr.io/eruji/carpools2:latest
     # Uncomment the line below to build locally instead of pulling from ghcr:
     # build: .
     container_name: carpool
