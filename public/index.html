@@ -252,14 +252,11 @@
 
   <!-- Settings Tab -->
   <div id="tab-settings" class="card tab-content hidden">
-    <h3>Update Locations</h3>
+    <h3>Edit Carpool</h3>
     <form onsubmit="handleUpdateCarpool(event)">
       <div class="form-group">
-        <label>Meetup Address</label>
-        <div class="autocomplete-wrapper">
-          <input type="text" id="edit-meetup-address" placeholder="Search address..." autocomplete="off" oninput="autocompleteAddress(this, 'meetup-edit')" onfocus="this.select()">
-          <div class="autocomplete-dropdown hidden" id="ac-dropdown-meetup-edit"></div>
-        </div>
+        <label>Carpool Name</label>
+        <input type="text" id="edit-carpool-name" required>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -267,27 +264,35 @@
           <input type="text" id="edit-meetup-name">
         </div>
       </div>
-      <input type="hidden" id="edit-meetup-lat" value="0">
-      <input type="hidden" id="edit-meetup-lng" value="0">
       <div class="form-group">
-        <label>Destination Address</label>
+        <label>Meetup Address <span class="text-sm text-muted">(search to auto-fill)</span></label>
         <div class="autocomplete-wrapper">
-          <input type="text" id="edit-dest-address" placeholder="Search address..." autocomplete="off" oninput="autocompleteAddress(this, 'dest-edit')" onfocus="this.select()">
-          <div class="autocomplete-dropdown hidden" id="ac-dropdown-dest-edit"></div>
+          <input type="text" id="edit-meetup-address" placeholder="Start typing an address..." autocomplete="off" oninput="autocompleteAddress(this, 'meetup-edit')" onfocus="this.select()">
+          <div class="autocomplete-dropdown hidden" id="ac-dropdown-meetup-edit"></div>
         </div>
       </div>
+      <input type="hidden" id="edit-meetup-lat" value="0">
+      <input type="hidden" id="edit-meetup-lng" value="0">
       <div class="form-row">
         <div class="form-group">
           <label>Location Name</label>
           <input type="text" id="edit-dest-name">
         </div>
       </div>
+      <div class="form-group">
+        <label>Destination Address <span class="text-sm text-muted">(search to auto-fill)</span></label>
+        <div class="autocomplete-wrapper">
+          <input type="text" id="edit-dest-address" placeholder="Start typing an address..." autocomplete="off" oninput="autocompleteAddress(this, 'dest-edit')" onfocus="this.select()">
+          <div class="autocomplete-dropdown hidden" id="ac-dropdown-dest-edit"></div>
+        </div>
+      </div>
       <input type="hidden" id="edit-dest-lat" value="0">
       <input type="hidden" id="edit-dest-lng" value="0">
-      <button type="submit" class="btn btn-primary">Update</button>
+      <div class="btn-group">
+        <button type="submit" class="btn btn-primary">Update</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="deleteCarpool()">Delete</button>
+      </div>
     </form>
-    <hr style="margin:16px 0;">
-    <button class="btn btn-danger btn-sm" onclick="deleteCarpool()">Delete Carpool</button>
   </div>
 </div>
 
@@ -562,6 +567,7 @@ async function loadCarpoolView(carpoolId) {
   document.getElementById('add-member-section').classList.toggle('hidden', !data.isOwner);
 
   // Settings tab
+  document.getElementById('edit-carpool-name').value = data.carpool.name || '';
   document.getElementById('edit-meetup-address').value = data.carpool.meetup_name || '';
   document.getElementById('edit-meetup-name').value = data.carpool.meetup_name || '';
   document.getElementById('edit-meetup-lat').value = data.carpool.meetup_lat || '';
@@ -824,13 +830,16 @@ function updateMap(data) {
   const carpool = data.carpool;
   const session = data.activeSession;
   const bounds = [];
+  const inTransit = session && (session.phase === 'destination' || session.phase === 'back_to_meetup');
+  const inMeetup = session && session.phase === 'meetup';
 
   // Meetup marker (blue)
   if (carpool.meetup_lat && carpool.meetup_lng) {
+    const label = inMeetup ? '🎯 Meetup' : 'Meetup';
     const marker = L.marker([carpool.meetup_lat, carpool.meetup_lng], {
       icon: L.divIcon({
         className: '',
-        html: '<div style="background:#2563eb;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:12px;">Meetup</div>',
+        html: `<div style="background:#2563eb;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:12px;">${label}</div>`,
         iconAnchor: [30, 10]
       })
     }).addTo(map).bindPopup('Meetup: ' + (carpool.meetup_name || ''));
@@ -843,7 +852,7 @@ function updateMap(data) {
     const marker = L.marker([carpool.destination_lat, carpool.destination_lng], {
       icon: L.divIcon({
         className: '',
-        html: '<div style="background:#dc2626;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:12px;">Dest</div>',
+        html: '<div style="background:#dc2626;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:12px;">📍 Dest</div>',
         iconAnchor: [30, 10]
       })
     }).addTo(map).bindPopup('Destination: ' + (carpool.destination_name || ''));
@@ -851,66 +860,67 @@ function updateMap(data) {
     bounds.push([carpool.destination_lat, carpool.destination_lng]);
   }
 
-  // Always draw the best route between meetup and destination
-  if (carpool.meetup_lat && carpool.meetup_lng && carpool.destination_lat && carpool.destination_lng) {
+  // Phase 2/3: draw route + carpool indicator
+  if (inTransit && carpool.meetup_lat && carpool.meetup_lng && carpool.destination_lat && carpool.destination_lng) {
     fetchRoute(carpool.meetup_lat, carpool.meetup_lng, carpool.destination_lat, carpool.destination_lng, (route) => {
-      if (!map) return; // map destroyed
+      if (!map) return;
 
       let coords, distanceText;
       if (route) {
         coords = route.coords;
         distanceText = `${route.distance.toFixed(1)} mi • ~${formatDuration(route.duration)}`;
       } else {
-        // Fallback to straight line
         coords = [[carpool.meetup_lat, carpool.meetup_lng], [carpool.destination_lat, carpool.destination_lng]];
         const dist = haversine(carpool.meetup_lat, carpool.meetup_lng, carpool.destination_lat, carpool.destination_lng);
         distanceText = `${dist.toFixed(1)} mi (straight line)`;
       }
 
-      // Update info tab
       const el = document.getElementById('info-distance');
-      if (el) el.textContent = `Best route: ${distanceText}`;
+      if (el) el.textContent = `Route: ${distanceText}`;
 
-      // Only draw route if not already drawn in this refresh (async callback might be stale)
-      if (mapPolylines.route) map.removeLayer(mapPolylines.route);
       const line = L.polyline(coords, {
         color: '#2563eb', weight: 3, opacity: 0.8
       }).addTo(map);
       mapPolylines.route = line;
 
-      // If in transit, add carpool position marker
-      if (session && (session.phase === 'destination' || session.phase === 'back_to_meetup')) {
-        const mid = Math.floor(coords.length / 2);
-        const phaseLabel = session.phase === 'destination' ? '→ Dest' : '← Meetup';
-        if (mapMarkers.carpoolUnit) map.removeLayer(mapMarkers.carpoolUnit);
-        const marker = L.marker(coords[mid], {
-          icon: L.divIcon({
-            className: '',
-            html: `<div style="background:#f59e0b;color:#000;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:12px;">🚗 Carpool ${phaseLabel}</div>`,
-            iconAnchor: [35, 10]
-          })
-        }).addTo(map).bindPopup(`In transit • ${distanceText}`);
-        mapMarkers.carpoolUnit = marker;
-      }
+      // Carpool position indicator on route
+      const mid = Math.floor(coords.length / 2);
+      const phaseLabel = session.phase === 'destination' ? '→ Dest' : '← Meetup';
+      const marker = L.marker(coords[mid], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="background:#f59e0b;color:#000;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:12px;">🚗 ${phaseLabel}</div>`,
+          iconAnchor: [35, 10]
+        })
+      }).addTo(map).bindPopup(`In transit • ${distanceText}`);
+      mapMarkers.carpoolUnit = marker;
     });
+  } else if (!inTransit) {
+    // No session or phase 1: just show straight-line preview (lightweight)
+    const el = document.getElementById('info-distance');
+    if (carpool.meetup_lat && carpool.destination_lat) {
+      const dist = haversine(carpool.meetup_lat, carpool.meetup_lng, carpool.destination_lat, carpool.destination_lng);
+      if (el) el.textContent = `Straight-line: ${dist.toFixed(1)} mi one-way`;
+    } else {
+      if (el) el.textContent = '';
+    }
   }
 
-  // Session members locations (phase 1)
-  if (session && session.phase === 'meetup' && session.members) {
+  // Phase 1: member locations with dashed lines to meetup
+  if (inMeetup && session.members) {
     session.members.forEach(m => {
       if (m.location_lat && m.location_lng && m.status !== 'skip') {
-        const statusEmoji = m.status === 'driving' ? '🚗' : m.status === 'riding' ? '🚶' : '📍';
+        const emoji = m.status === 'driving' ? '🚗' : m.status === 'riding' ? '🚶' : '📍';
         const marker = L.marker([m.location_lat, m.location_lng], {
           icon: L.divIcon({
             className: '',
-            html: `<div style="background:#16a34a;color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;white-space:nowrap;">${statusEmoji} ${esc(m.username)}</div>`,
+            html: `<div style="background:#16a34a;color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;white-space:nowrap;">${emoji} ${esc(m.username)}</div>`,
             iconAnchor: [20, 8]
           })
         }).addTo(map).bindPopup(`${esc(m.username)} (${m.status})`);
         mapMarkers['member_' + m.user_id] = marker;
         bounds.push([m.location_lat, m.location_lng]);
 
-        // Draw straight line from member to meetup (dashed, lightweight)
         if (carpool.meetup_lat && carpool.meetup_lng) {
           const line = L.polyline([[m.location_lat, m.location_lng], [carpool.meetup_lat, carpool.meetup_lng]], {
             color: '#16a34a', weight: 1.5, dashArray: '5,5', opacity: 0.6
@@ -1040,6 +1050,7 @@ async function removeMember(userId) {
 async function handleUpdateCarpool(e) {
   e.preventDefault();
   const body = {
+    name: document.getElementById('edit-carpool-name').value.trim(),
     meetup_name: document.getElementById('edit-meetup-address').value.trim() || document.getElementById('edit-meetup-name').value.trim(),
     meetup_lat: parseFloat(document.getElementById('edit-meetup-lat').value) || 0,
     meetup_lng: parseFloat(document.getElementById('edit-meetup-lng').value) || 0,
