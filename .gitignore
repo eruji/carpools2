@@ -1,0 +1,5 @@
+node_modules/
+carpool.db
+carpool.db-shm
+carpool.db-wal
+.env
