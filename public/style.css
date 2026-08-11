@@ -227,14 +227,6 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   border-radius: 8px;
 }
 .subway-stop[onclick]:hover { background: var(--accent-soft); }
-.subway-stop[onclick] .stop-name::after {
-  content: '⌄';
-  margin-left: 5px;
-  font-size: 0.8em;
-  color: var(--text-3);
-  vertical-align: 1px;
-}
-.subway-stop[onclick]:hover .stop-name::after { color: var(--accent-deep); }
 
 .subway-stop .dot {
   position: absolute;
