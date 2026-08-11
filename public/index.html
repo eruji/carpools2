@@ -321,7 +321,7 @@
       <h3>Carpool Setup</h3>
       <button class="btn btn-outline btn-sm" onclick="closeSetupModal()">Close</button>
     </div>
-    <form onsubmit="handleUpdateCarpool(event)">
+    <form id="carpool-update-form" onsubmit="handleUpdateCarpool(event)">
       <div class="form-group">
         <label>Carpool Name</label>
         <input type="text" id="edit-carpool-name" required>
@@ -332,24 +332,9 @@
         <p class="text-xs text-muted">How close GPS must be to auto-arrive. 400m covers a block or two (parking garages).</p>
       </div>
       <p class="text-xs text-muted mb-1">Meetup and destination are set from the subway stops.</p>
-      <div class="btn-group">
-        <button type="submit" class="btn btn-primary">Update</button>
-        <button type="button" class="btn btn-danger btn-sm" onclick="deleteCarpool()">Delete</button>
-      </div>
     </form>
 
-    <h4 class="mt-2">Add Member</h4>
-    <div id="add-member-section" class="hidden">
-      <div class="form-row">
-        <div class="form-group">
-          <input type="text" id="add-member-username" placeholder="Search username...">
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="addMember()">Add</button>
-      </div>
-      <div id="add-member-result" class="text-xs text-muted mt-1"></div>
-    </div>
-
-    <h4 class="mt-2">Members</h4>
+    <h4>Members</h4>
     <div id="setup-members-list">
       <p class="text-xs text-muted">Loading...</p>
     </div>
@@ -367,6 +352,11 @@
         <button class="btn btn-outline btn-sm" onclick="rotateInviteCode()">Replace Link</button>
         <span id="invite-link-result" class="text-xs text-muted" style="align-self:center;"></span>
       </div>
+    </div>
+
+    <div class="btn-group" style="margin-top:14px;">
+      <button type="submit" form="carpool-update-form" class="btn btn-primary">Update</button>
+      <button type="button" class="btn btn-danger btn-sm" onclick="deleteCarpool()">Delete</button>
     </div>
   </div>
 </div>
@@ -863,9 +853,8 @@ async function loadCarpoolView(carpoolId) {
   // Gear menu (Setup/History) — owner only
   document.getElementById('btn-carpool-gear').classList.toggle('hidden', !data.isOwner);
 
-  // Setup tab: member management + add member + invite (owner only)
+  // Setup tab: member management + invite (owner only)
   renderSetupMembers(data.members, data.isOwner);
-  document.getElementById('add-member-section').classList.toggle('hidden', !data.isOwner);
   loadInviteLink(data.isOwner);
 
   // Settings tab
