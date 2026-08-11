@@ -36,49 +36,71 @@
 <!-- AUTH VIEW                                                      -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <div id="view-auth" class="app-container">
-  <div style="text-align:center;padding:30px 0;">
+  <div class="auth-hero">
     <h1>Carpool App</h1>
-    <p class="text-muted mt-1">Coordinate your daily carpool with real-time tracking</p>
+    <p class="text-muted">Coordinate your daily carpool with real-time tracking</p>
   </div>
 
-  <div style="display:flex;gap:16px;flex-wrap:wrap;">
-    <!-- Login -->
-    <div class="card" style="flex:1;min-width:280px;">
-      <h2>Login</h2>
-      <form id="login-form" onsubmit="handleLogin(event)">
-        <div class="form-group">
-          <label>Username</label>
-          <input type="text" id="login-username" required autocomplete="username">
-        </div>
-        <div class="form-group">
-          <label>Password</label>
-          <input type="password" id="login-password" required autocomplete="current-password">
-        </div>
-        <div id="login-error" class="alert alert-error hidden"></div>
-        <button type="submit" class="btn btn-primary btn-lg" style="width:100%;">Login</button>
-      </form>
-    </div>
+  <!-- Login -->
+  <div class="card auth-card" id="auth-login">
+    <h2>Login</h2>
+    <form id="login-form" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="login-username" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="login-password" required autocomplete="current-password">
+      </div>
+      <div style="text-align:right;margin-bottom:10px;">
+        <a href="#" class="auth-link" onclick="showForgotPassword(event)">Forgot password?</a>
+      </div>
+      <div id="login-error" class="alert alert-error hidden"></div>
+      <button type="submit" class="btn btn-primary btn-lg" style="width:100%;">Login</button>
+    </form>
+    <p class="auth-switch">New here? <a href="#" onclick="showAuthRegister(event)">Create an account</a></p>
+  </div>
 
-    <!-- Register -->
-    <div class="card" style="flex:1;min-width:280px;">
-      <h2>Register</h2>
-      <form id="register-form" onsubmit="handleRegister(event)">
-        <div class="form-group">
-          <label>Username</label>
-          <input type="text" id="reg-username" required autocomplete="username">
-        </div>
-        <div class="form-group">
-          <label>Email</label>
-          <input type="email" id="reg-email" required autocomplete="email">
-        </div>
-        <div class="form-group">
-          <label>Password</label>
-          <input type="password" id="reg-password" required minlength="4" autocomplete="new-password">
-        </div>
-        <div id="reg-error" class="alert alert-error hidden"></div>
-        <button type="submit" class="btn btn-success btn-lg" style="width:100%;">Register</button>
-      </form>
-    </div>
+  <!-- Register -->
+  <div class="card auth-card hidden" id="auth-register">
+    <h2>Register</h2>
+    <form id="register-form" onsubmit="handleRegister(event)">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="reg-username" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="reg-email" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="reg-password" required minlength="4" autocomplete="new-password">
+      </div>
+      <div id="reg-error" class="alert alert-error hidden"></div>
+      <button type="submit" class="btn btn-success btn-lg" style="width:100%;">Register</button>
+    </form>
+    <p class="auth-switch">Already have an account? <a href="#" onclick="showAuthLogin(event)">Log in</a></p>
+  </div>
+
+  <!-- Forgot Password -->
+  <div class="card auth-card hidden" id="auth-forgot">
+    <h2>Reset Password</h2>
+    <p class="text-xs text-muted mb-1">Enter your username and the email on the account. We'll give you a temporary password to log in with — change it once you're in.</p>
+    <form onsubmit="handleForgotPassword(event)">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="forgot-username" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="forgot-email" required autocomplete="email">
+      </div>
+      <div id="forgot-result" class="alert hidden"></div>
+      <button type="submit" class="btn btn-primary btn-lg" style="width:100%;">Reset Password</button>
+    </form>
+    <p class="auth-switch"><a href="#" onclick="showAuthLogin(event)">Back to login</a></p>
   </div>
 </div>
 
@@ -568,6 +590,57 @@ function showCarpool(carpoolId) {
 }
 
 // ── Auth Handlers ───────────────────────────────────────────────────────────
+function showAuthLogin(e) {
+  if (e) e.preventDefault();
+  document.getElementById('auth-login').classList.remove('hidden');
+  document.getElementById('auth-register').classList.add('hidden');
+  document.getElementById('auth-forgot').classList.add('hidden');
+  document.getElementById('login-error').classList.add('hidden');
+}
+
+function showAuthRegister(e) {
+  if (e) e.preventDefault();
+  document.getElementById('auth-login').classList.add('hidden');
+  document.getElementById('auth-register').classList.remove('hidden');
+  document.getElementById('auth-forgot').classList.add('hidden');
+  document.getElementById('reg-error').classList.add('hidden');
+}
+
+function showForgotPassword(e) {
+  if (e) e.preventDefault();
+  document.getElementById('auth-login').classList.add('hidden');
+  document.getElementById('auth-register').classList.add('hidden');
+  document.getElementById('auth-forgot').classList.remove('hidden');
+  const result = document.getElementById('forgot-result');
+  result.classList.add('hidden');
+}
+
+async function handleForgotPassword(e) {
+  e.preventDefault();
+  const username = document.getElementById('forgot-username').value.trim();
+  const email = document.getElementById('forgot-email').value.trim();
+  const result = document.getElementById('forgot-result');
+  const res = await fetch('/api/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, email })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    result.textContent = data.error || 'Reset failed';
+    result.className = 'alert alert-error';
+    result.classList.remove('hidden');
+    return;
+  }
+  result.innerHTML = `<div>Your temporary password is:</div>
+    <div class="temp-pw">${esc(data.tempPassword)}</div>
+    <div class="text-xs mt-1">Log in with it, then change it from the profile menu.</div>`;
+  result.className = 'alert alert-success';
+  result.classList.remove('hidden');
+  document.getElementById('forgot-username').value = '';
+  document.getElementById('forgot-email').value = '';
+}
+
 async function handleLogin(e) {
   e.preventDefault();
   const username = document.getElementById('login-username').value.trim();

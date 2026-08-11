@@ -297,6 +297,23 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
+// Forgot password — verifies username + email, then issues a temporary password
+app.post('/api/forgot-password', (req, res) => {
+  try {
+    const { username, email } = req.body;
+    if (!username || !email) return res.status(400).json({ error: 'Username and email required' });
+    const user = stmts.userByUsername.get(username.trim());
+    if (!user || user.email.toLowerCase() !== email.trim().toLowerCase()) {
+      return res.status(404).json({ error: 'No account matches that username and email' });
+    }
+    const temp = Math.random().toString(36).slice(2, 10); // 8-char temporary password
+    db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(bcrypt.hashSync(temp, 10), user.id);
+    res.json({ ok: true, username: user.username, tempPassword: temp });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/me', (req, res) => {
   if (!req.session.userId) return res.json({ user: null });
   const user = stmts.userById.get(req.session.userId);

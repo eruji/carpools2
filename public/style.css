@@ -777,11 +777,34 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   margin: 0 auto;
   padding: 20px 16px;
 }
-#view-auth h1 {
-  font-size: 1.8rem;
+.auth-hero {
   text-align: center;
-  margin-bottom: 4px;
+  padding: 20px 0 16px;
 }
-#view-auth .card {
-  margin-bottom: 16px;
+.auth-hero h1 {
+  font-size: 1.9rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.auth-hero p { font-size: 0.95rem; }
+.auth-card { margin-bottom: 14px; }
+.auth-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-deep);
+}
+.auth-switch {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--text-3);
+}
+.auth-switch a { font-weight: 600; }
+.temp-pw {
+  font-family: monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent-deep);
+  margin: 6px 0 2px;
 }
