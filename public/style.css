@@ -95,6 +95,9 @@ header nav span { opacity: 0.7; font-size: 0.9rem; max-width: 100px; overflow: h
   gap: 10px;
 }
 
+/* ── Carpool menu ────────────────────────────────────────────── */
+.carpool-menu { position: relative; }
+
 /* ── Profile menu ───────────────────────────────────────────── */
 .profile-menu { position: relative; }
 .profile-icon {

@@ -175,6 +175,13 @@
     <div style="display:flex;gap:6px;align-items:center;">
       <span id="carpool-owner-badge" class="badge badge-blue hidden">Owner</span>
       <span id="carpool-coins-badge" class="badge badge-yellow">0</span>
+      <div class="carpool-menu">
+        <button class="btn btn-outline btn-sm" onclick="toggleCarpoolMenu()" title="Carpool menu">⋯</button>
+        <div class="profile-dropdown hidden" id="carpool-menu-dropdown">
+          <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openHistoryModal()">History</button>
+          <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openSetupModal()">Setup</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -296,24 +303,32 @@
     <h3>Members</h3>
     <div id="member-status-list" class="member-list"></div>
   </div>
+</div>
 
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab active" data-tab="tab-history" onclick="switchTab('tab-history')">History</button>
-    <button class="tab" data-tab="tab-settings" onclick="switchTab('tab-settings')">Setup</button>
-  </div>
-
-  <!-- History Tab -->
-  <div id="tab-history" class="card tab-content">
-    <h3>Session History</h3>
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- HISTORY MODAL                                                 -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="history-modal" class="loc-modal hidden">
+  <div class="loc-modal-card">
+    <div class="flex-between">
+      <h3>Session History</h3>
+      <button class="btn btn-outline btn-sm" onclick="closeHistoryModal()">Close</button>
+    </div>
     <div id="history-list">
       <p class="text-muted">No history yet.</p>
     </div>
   </div>
+</div>
 
-  <!-- Setup Tab -->
-  <div id="tab-settings" class="card tab-content hidden">
-    <h3>Carpool Setup</h3>
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SETUP MODAL                                                   -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="setup-modal" class="loc-modal hidden">
+  <div class="loc-modal-card">
+    <div class="flex-between">
+      <h3>Carpool Setup</h3>
+      <button class="btn btn-outline btn-sm" onclick="closeSetupModal()">Close</button>
+    </div>
     <form onsubmit="handleUpdateCarpool(event)">
       <div class="form-group">
         <label>Carpool Name</label>
@@ -1053,6 +1068,23 @@ function positionSubwayProgress() {
   bar.style.opacity = 1;
 }
 
+// Road-based ETA for a pair of points, cached 60s to avoid hammering the router
+const roadEtaCache = {};
+function roadEta(lat1, lng1, lat2, lng2, cb) {
+  if (!lat1 || !lng1 || !lat2 || !lng2) { cb(null, null); return; }
+  const key = `${lat1.toFixed(4)},${lng1.toFixed(4)}-${lat2.toFixed(4)},${lng2.toFixed(4)}`;
+  const c = roadEtaCache[key];
+  if (c && Date.now() - c.ts < 60000) { cb(c.dist, c.dur); return; }
+  fetchRoute(lat1, lng1, lat2, lng2, (route) => {
+    if (route) {
+      roadEtaCache[key] = { dist: route.distance, dur: route.duration, ts: Date.now() };
+      cb(route.distance, route.duration);
+    } else {
+      cb(null, null);
+    }
+  });
+}
+
 function updateSubwayETAs(data) {
   const session = data.activeSession;
   const carpool = data.carpool;
@@ -1063,11 +1095,6 @@ function updateSubwayETAs(data) {
 
   if (!session || session.phase === 'completed' || session.phase === 'idle') return;
 
-  const fullDist = (carpool.meetup_lat && carpool.destination_lat)
-    ? haversine(carpool.meetup_lat, carpool.meetup_lng, carpool.destination_lat, carpool.destination_lng)
-    : 0;
-  const legEta = Math.round(fullDist / 0.5);
-
   // "(24mi 10:10PM)" — distance + arrival clock time
   const fmt = (mi, min) => {
     const miTxt = Math.round(mi);
@@ -1077,31 +1104,56 @@ function updateSubwayETAs(data) {
   };
   const show = (el, txt) => { el.textContent = txt; el.classList.remove('hidden'); };
   const done = (el) => show(el, 'Departed');
+  // Prefer road routing (matches the live map); fall back to straight-line estimate
+  const pair = (lat1, lng1, lat2, lng2, cb) => {
+    roadEta(lat1, lng1, lat2, lng2, (dist, dur) => {
+      if (dist != null) {
+        cb({ dist, min: dur / 60 });
+      } else {
+        const d = haversine(lat1, lng1, lat2, lng2);
+        cb({ dist: d, min: d / 0.5 });
+      }
+    });
+  };
+
+  const has = (lat, lng) => lat && lng;
+  const mL = myLocation, mk = carpool.meetup_lat, ml = carpool.meetup_lng, dk = carpool.destination_lat, dl = carpool.destination_lng;
 
   if (session.phase === 'meetup') {
     show(startEta, 'Now');
-    if (myLocation && carpool.meetup_lat) {
-      const d = haversine(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng);
-      const m = Math.round(d / 0.5);
-      show(meetupEta, fmt(d, m));
-      show(destEta, fmt(d + fullDist, m + legEta));
-      show(returnEta, fmt(d + fullDist * 2, m + legEta * 2));
+    if (mL && has(mk, ml)) {
+      pair(mL.lat, mL.lng, mk, ml, (a) => {
+        show(meetupEta, fmt(a.dist, a.min));
+        if (has(dk, dl)) {
+          pair(mk, ml, dk, dl, (leg) => {
+            show(destEta, fmt(a.dist + leg.dist, a.min + leg.min));
+            show(returnEta, fmt(a.dist + leg.dist * 2, a.min + leg.min * 2));
+          });
+        } else {
+          show(destEta, fmt(a.dist, a.min));
+          show(returnEta, fmt(a.dist, a.min));
+        }
+      });
     }
   } else if (session.phase === 'destination') {
     done(meetupEta);
-    if (myLocation && carpool.destination_lat) {
-      const d = haversine(myLocation.lat, myLocation.lng, carpool.destination_lat, carpool.destination_lng);
-      const m = Math.round(d / 0.5);
-      show(destEta, fmt(d, m));
-      show(returnEta, fmt(d + fullDist, m + legEta));
+    if (mL && has(dk, dl)) {
+      pair(mL.lat, mL.lng, dk, dl, (a) => {
+        show(destEta, fmt(a.dist, a.min));
+        if (has(mk, ml)) {
+          pair(dk, dl, mk, ml, (leg) => {
+            show(returnEta, fmt(a.dist + leg.dist, a.min + leg.min));
+          });
+        }
+      });
     }
   } else if (session.phase === 'back_to_meetup') {
     done(meetupEta);
     done(destEta);
-    if (myLocation && carpool.meetup_lat) {
-      const d = haversine(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng);
-      const m = Math.round(d / 0.5);
-      show(returnEta, fmt(d, m));
+    if (mL && has(mk, ml)) {
+      pair(mL.lat, mL.lng, mk, ml, (a) => {
+        show(returnEta, fmt(a.dist, a.min));
+      });
     }
   }
 }
@@ -1390,13 +1442,30 @@ function clearMapMarkers() {
   mapPolylines = {};
 }
 
-// ── OSRM Routing (actual roads) ────────────────────────────────────────────
+// ── Road Routing (actual roads) ─────────────────────────────────────────────
 const routeCache = {};
-// Try multiple public OSRM instances — the main one is often rate-limited.
+// Try multiple public OSRM instances, then Valhalla as a final fallback.
 const ROUTE_ENDPOINTS = [
-  'https://router.project-osrm.org',
-  'https://routing.openstreetmap.de/routed-car'
+  { type: 'osrm', base: 'https://router.project-osrm.org' },
+  { type: 'osrm', base: 'https://routing.openstreetmap.de/routed-car' },
+  { type: 'valhalla' }
 ];
+
+// Decode a Valhalla polyline6 (precision 1e6) encoded shape
+function decodePolyline6(encoded) {
+  const points = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < encoded.length) {
+    let result = 1, shift = 0, b;
+    do { b = encoded.charCodeAt(index++) - 63; result += (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+    result = 1; shift = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result += (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+    points.push([lat / 1e6, lng / 1e6]);
+  }
+  return points;
+}
 
 function fetchRoute(lat1, lng1, lat2, lng2, callback) {
   const key = `${lat1},${lng1}-${lat2},${lng2}`;
@@ -1405,27 +1474,54 @@ function fetchRoute(lat1, lng1, lat2, lng2, callback) {
   let idx = 0;
   function tryNext() {
     if (idx >= ROUTE_ENDPOINTS.length) { callback(null); return; }
-    const base = ROUTE_ENDPOINTS[idx++];
-    fetch(`${base}/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson&steps=false`)
-      .then(r => {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      })
-      .then(data => {
-        if (data.code === 'Ok' && data.routes.length > 0) {
+    const ep = ROUTE_ENDPOINTS[idx++];
+    const done = (data) => {
+      let result = null;
+      if (ep.type === 'osrm') {
+        if (data && data.code === 'Ok' && data.routes.length > 0) {
           const route = data.routes[0];
-          const result = {
+          result = {
             coords: route.geometry.coordinates.map(c => [c[1], c[0]]),
             distance: route.distance / 1609.34,
             duration: route.duration
           };
-          routeCache[key] = result;
-          callback(result);
-        } else {
-          tryNext();
         }
+      } else if (ep.type === 'valhalla') {
+        if (data && data.trip && data.trip.summary && data.trip.legs && data.trip.legs[0]) {
+          result = {
+            coords: decodePolyline6(data.trip.legs[0].shape),
+            distance: data.trip.summary.length, // miles (units=miles)
+            duration: data.trip.summary.time  // seconds
+          };
+        }
+      }
+      if (result) {
+        routeCache[key] = result;
+        callback(result);
+      } else {
+        tryNext();
+      }
+    };
+
+    if (ep.type === 'osrm') {
+      fetch(`${ep.base}/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson&steps=false`)
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(done)
+        .catch(() => tryNext());
+    } else { // valhalla
+      fetch('https://valhalla1.openstreetmap.de/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          locations: [{ lat: lat1, lon: lng1 }, { lat: lat2, lon: lng2 }],
+          costing: 'auto',
+          units: 'miles'
+        })
       })
-      .catch(() => tryNext());
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(done)
+        .catch(() => tryNext());
+    }
   }
   tryNext();
 }
@@ -1987,13 +2083,28 @@ async function deleteCarpool() {
   }
 }
 
-// ── Tabs ────────────────────────────────────────────────────────────────────
-function switchTab(tabId) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-  document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
-  document.getElementById(tabId).classList.remove('hidden');
-  if (map) setTimeout(() => map.invalidateSize(), 100);
+// ── Carpool menu (History / Setup) ──────────────────────────────────────────
+function toggleCarpoolMenu() {
+  document.getElementById('carpool-menu-dropdown').classList.toggle('hidden');
+}
+
+function openHistoryModal() {
+  document.getElementById('carpool-menu-dropdown').classList.add('hidden');
+  document.getElementById('history-modal').classList.remove('hidden');
+}
+function closeHistoryModal() {
+  document.getElementById('history-modal').classList.add('hidden');
+}
+
+function openSetupModal() {
+  document.getElementById('carpool-menu-dropdown').classList.add('hidden');
+  document.getElementById('setup-modal').classList.remove('hidden');
+  if (currentCarpoolData) {
+    renderSetupMembers(currentCarpoolData.members, currentCarpoolData.isOwner);
+  }
+}
+function closeSetupModal() {
+  document.getElementById('setup-modal').classList.add('hidden');
 }
 
 // ── Location Tracking ───────────────────────────────────────────────────────
@@ -2388,9 +2499,10 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('.autocomplete-wrapper')) {
     document.querySelectorAll('.autocomplete-dropdown').forEach(d => d.classList.add('hidden'));
   }
-  // Close the profile dropdown when clicking outside it
-  if (!e.target.closest('.profile-menu')) {
+  // Close the profile/carpool dropdowns when clicking outside them
+  if (!e.target.closest('.profile-menu') && !e.target.closest('.carpool-menu')) {
     document.getElementById('profile-dropdown').classList.add('hidden');
+    document.getElementById('carpool-menu-dropdown').classList.add('hidden');
   }
 });
 
