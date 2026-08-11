@@ -767,11 +767,14 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   letter-spacing: -0.02em;
 }
 
-/* ── Mobile: slim top bar ─────────────────────────────────────── */
+/* ── Mobile: minimal top bar ─────────────────────────────────── */
 @media (max-width: 480px) {
   header { padding: 8px 10px; }
   header h1 { font-size: 1.1rem; }
   .profile-menu-name { display: none; }
+  /* Dashboard moves into the profile dropdown on mobile */
+  #btn-dashboard { display: none !important; }
+  .mobile-dashboard { display: flex !important; }
 }
 
 /* ── Desktop adjustments ─────────────────────────────────────── */
