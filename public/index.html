@@ -217,6 +217,7 @@
         </div>
       </div>
       <!-- Member avatars removed — the line and stop icons represent the route -->
+      <div id="subway-progress" class="subway-progress"></div>
     </div>
   </div>
 
@@ -899,7 +900,6 @@ function updateSubwayMap(data) {
     const arrivedMeetup = myMember && myMember.status === 'arrived';
     subwayLine.classList.add('phase-meetup');
     if (arrivedMeetup) {
-      subwayLine.classList.add('arrived');
       stopStart.classList.add('is-past');
       stopMeetup.classList.add('is-current');
       stopDest.classList.add('is-future');
@@ -929,6 +929,46 @@ function updateSubwayMap(data) {
 
   // ETAs
   updateSubwayETAs(data);
+
+  // Solid green progress bar for the current leg
+  requestAnimationFrame(positionSubwayProgress);
+}
+
+function positionSubwayProgress() {
+  const line = document.getElementById('subway-line');
+  const bar = document.getElementById('subway-progress');
+  if (!line || !bar) return;
+  const session = activeSession;
+
+  let fromId = null, toId = null;
+  if (session && session.members) {
+    if (session.phase === 'meetup') {
+      const myMember = session.members.find(m => m.user_id === currentUser.id);
+      if (myMember && myMember.status === 'arrived') { fromId = 'subway-stop-start'; toId = 'subway-stop-meetup'; }
+    } else if (session.phase === 'destination') {
+      fromId = 'subway-stop-meetup'; toId = 'subway-stop-dest';
+    } else if (session.phase === 'back_to_meetup') {
+      fromId = 'subway-stop-dest'; toId = 'subway-stop-return';
+    }
+  }
+
+  if (!fromId || !toId) { bar.style.opacity = 0; return; }
+
+  const fromEl = document.getElementById(fromId);
+  const toEl = document.getElementById(toId);
+  if (!fromEl || !toEl) return;
+
+  const lineRect = line.getBoundingClientRect();
+  const fromDot = fromEl.querySelector('.dot').getBoundingClientRect();
+  const toDot = toEl.querySelector('.dot').getBoundingClientRect();
+  const x = (fromDot.left + fromDot.width / 2) - lineRect.left - 2; // center minus half the 4px bar
+  const top = (fromDot.top + fromDot.height / 2) - lineRect.top;
+  const bottom = (toDot.top + toDot.height / 2) - lineRect.top;
+
+  bar.style.left = x + 'px';
+  bar.style.top = top + 'px';
+  bar.style.height = Math.max(0, bottom - top) + 'px';
+  bar.style.opacity = 1;
 }
 
 function updateSubwayETAs(data) {

@@ -319,12 +319,24 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 
 /* Phase track coloring (4 segments: start→meetup→dest→return) */
-/* During meetup, the leg is gray until the user arrives, then green */
+/* The current leg is drawn solid by #subway-progress (measured between dots);
+   base track stays gray during meetup until arrival */
 .subway-line.phase-meetup::before     { background: var(--border-strong); }
-.subway-line.phase-meetup.arrived::before { background: linear-gradient(to bottom, var(--accent) 0%, var(--accent) 25%, var(--border-strong) 25%); }
 .subway-line.phase-destination::before { background: linear-gradient(to bottom, var(--accent) 0%, var(--accent) 50%, var(--border-strong) 50%); }
 .subway-line.phase-return::before      { background: linear-gradient(to bottom, var(--accent) 0%, var(--accent) 50%, var(--warn) 50%, var(--warn) 75%, var(--border-strong) 75%); }
 .subway-line.phase-completed::before   { background: linear-gradient(to bottom, var(--accent) 100%); }
+
+/* Solid green progress bar for the current leg (measured between the dots) */
+.subway-progress {
+  position: absolute;
+  left: 19px;
+  width: 4px;
+  border-radius: 2px;
+  background: var(--accent-dark);
+  opacity: 0;
+  transition: opacity 0.3s ease, height 0.4s ease, top 0.4s ease;
+  z-index: 1;
+}
 
 /* ── Stops ────────────────────────────────────────────────── */
 .subway-stop {
