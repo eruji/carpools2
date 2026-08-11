@@ -101,8 +101,10 @@ header nav span { opacity: 0.7; font-size: 0.9rem; max-width: 100px; overflow: h
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
+  border: 1px solid rgba(201,201,191,0.7);
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--text-2);
   display: flex;
   align-items: center;
@@ -863,9 +865,10 @@ tr:hover td { background: rgba(0,0,0,0.015); }
     right: 10px;
     z-index: 900;
     margin: 0;
-    background: rgba(255,255,255,0.94);
-    backdrop-filter: blur(8px);
-    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(201,201,191,0.6);
     border-radius: 12px;
     padding: 6px 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.12);
