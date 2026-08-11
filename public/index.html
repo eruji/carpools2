@@ -170,14 +170,6 @@
     </div>
   </div>
 
-  <!-- Phase Indicator Bar -->
-  <div class="phase-bar" id="phase-indicator">
-    <div class="phase-step" data-phase="meetup">1. Meetup</div>
-    <div class="phase-step" data-phase="destination">2. En Route</div>
-    <div class="phase-step" data-phase="back_to_meetup">3. Return</div>
-    <div class="phase-step" data-phase="completed">4. Done</div>
-  </div>
-
   <!-- ═══════ REALTIME MAP ═══════ -->
   <div id="map-container"><div id="map"></div></div>
 
@@ -1078,14 +1070,12 @@ function renderSessionUI(session) {
     idleDiv.classList.remove('hidden');
     activeDiv.classList.add('hidden');
     memberPanel.classList.add('hidden');
-    updatePhaseIndicator(null);
     return;
   }
 
   idleDiv.classList.add('hidden');
   activeDiv.classList.remove('hidden');
   memberPanel.classList.remove('hidden');
-  updatePhaseIndicator(session.phase);
 
   const phaseDotColors = {
     meetup: '#8FAE8B', destination: '#C0A46A', back_to_meetup: '#B07166', completed: '#7C9A77'
@@ -1200,16 +1190,8 @@ function renderMemberStatus(session) {
   }).join('');
 }
 
-function updatePhaseIndicator(phase) {
-  const steps = document.querySelectorAll('.phase-step');
-  const phases = ['meetup', 'destination', 'back_to_meetup', 'completed'];
-  steps.forEach((step, i) => {
-    step.classList.remove('active', 'done');
-    if (!phase) return;
-    const currentIdx = phases.indexOf(phase);
-    if (i < currentIdx) step.classList.add('done');
-    if (i === currentIdx) step.classList.add('active');
-  });
+function updatePhaseIndicator() {
+  // Phase indicator removed — the subway stops represent the phases
 }
 
 // ── Map ─────────────────────────────────────────────────────────────────────

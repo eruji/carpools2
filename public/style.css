@@ -405,21 +405,6 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   color: var(--text-3);
 }
 
-/* ── Phase Indicator (compact horizontal) ───────────────────── */
-.phase-bar {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-.phase-step {
-  flex: 1; text-align: center; padding: 10px 4px; border-radius: 8px;
-  font-size: 0.8rem; font-weight: 700; background: var(--surface);
-  color: var(--text-3); border: 1px solid var(--border);
-  letter-spacing: 0.03em;
-}
-.phase-step.active { background: var(--accent-dark); color: #fff; border-color: var(--accent-dark); }
-.phase-step.done { background: var(--accent-soft); color: var(--accent-deep); border-color: rgba(143,174,139,0.35); }
-
 /* ── Location Switcher panel ───────────────────────────────── */
 .loc-slot {
   display: flex;
