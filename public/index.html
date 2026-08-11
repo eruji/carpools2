@@ -297,7 +297,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="tab-members" onclick="switchTab('tab-members')">Members</button>
     <button class="tab" data-tab="tab-history" onclick="switchTab('tab-history')">History</button>
-    <button class="tab" data-tab="tab-settings" onclick="switchTab('tab-settings')">Settings</button>
+    <button class="tab" data-tab="tab-settings" onclick="switchTab('tab-settings')">Setup</button>
   </div>
 
   <!-- Members Tab -->
@@ -309,8 +309,33 @@
         <tbody id="members-tbody"></tbody>
       </table>
     </div>
-    <div id="add-member-section" class="mt-2 hidden">
-      <h4>Add Member</h4>
+  </div>
+
+  <!-- History Tab -->
+  <div id="tab-history" class="card tab-content hidden">
+    <h3>Session History</h3>
+    <div id="history-list">
+      <p class="text-muted">No history yet.</p>
+    </div>
+  </div>
+
+  <!-- Setup Tab -->
+  <div id="tab-settings" class="card tab-content hidden">
+    <h3>Carpool Setup</h3>
+    <form onsubmit="handleUpdateCarpool(event)">
+      <div class="form-group">
+        <label>Carpool Name</label>
+        <input type="text" id="edit-carpool-name" required>
+      </div>
+      <p class="text-xs text-muted mb-1">Meetup and destination are set from the subway stops.</p>
+      <div class="btn-group">
+        <button type="submit" class="btn btn-primary">Update</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="deleteCarpool()">Delete</button>
+      </div>
+    </form>
+
+    <h4 class="mt-2">Add Member</h4>
+    <div id="add-member-section" class="hidden">
       <div class="form-row">
         <div class="form-group">
           <input type="text" id="add-member-username" placeholder="Search username...">
@@ -320,9 +345,8 @@
       <div id="add-member-result" class="text-xs text-muted mt-1"></div>
     </div>
 
-    <!-- Invite Link (owner only) -->
-    <div id="invite-section" class="mt-2 hidden">
-      <h4>Invite Link</h4>
+    <h4 class="mt-2">Invite Link</h4>
+    <div id="invite-section" class="hidden">
       <p class="text-xs text-muted mb-1">Share this link — anyone who opens it and logs in will join automatically.</p>
       <div class="form-row">
         <div class="form-group">
@@ -335,30 +359,6 @@
         <span id="invite-link-result" class="text-xs text-muted" style="align-self:center;"></span>
       </div>
     </div>
-  </div>
-
-  <!-- History Tab -->
-  <div id="tab-history" class="card tab-content hidden">
-    <h3>Session History</h3>
-    <div id="history-list">
-      <p class="text-muted">No history yet.</p>
-    </div>
-  </div>
-
-  <!-- Settings Tab -->
-  <div id="tab-settings" class="card tab-content hidden">
-    <h3>Edit Carpool</h3>
-    <form onsubmit="handleUpdateCarpool(event)">
-      <div class="form-group">
-        <label>Carpool Name</label>
-        <input type="text" id="edit-carpool-name" required>
-      </div>
-      <p class="text-xs text-muted mb-1">Meetup and destination are set from the subway stops.</p>
-      <div class="btn-group">
-        <button type="submit" class="btn btn-primary">Update</button>
-        <button type="button" class="btn btn-danger btn-sm" onclick="deleteCarpool()">Delete</button>
-      </div>
-    </form>
   </div>
 </div>
 
