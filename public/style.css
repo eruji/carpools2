@@ -272,11 +272,21 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   50% { box-shadow: 0 0 0 10px rgba(143,174,139,0.12); }
 }
 
+.subway-stop .stop-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
 .subway-stop .stop-name {
   font-weight: 700;
   font-size: 0.85rem;
   color: var(--text);
   transition: color 0.3s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .subway-stop .stop-detail {
   font-size: 0.7rem;
@@ -285,10 +295,11 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   transition: color 0.3s;
 }
 .subway-stop .stop-eta {
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.68rem;
+  font-weight: 700;
   color: var(--accent-deep);
-  margin-top: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ── Member rows between stops ─────────────────────────────── */
