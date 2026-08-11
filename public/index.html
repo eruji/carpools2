@@ -160,7 +160,10 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <div id="view-carpool" class="app-container hidden">
   <div class="flex-between mb-2">
-    <h2 id="carpool-title">Carpool</h2>
+    <div class="carpool-switcher">
+      <select id="carpool-switcher" onchange="switchCarpool(this.value)" aria-label="Switch carpool"></select>
+      <span id="carpool-count-badge" class="badge badge-gray hidden"></span>
+    </div>
     <div style="display:flex;gap:6px;align-items:center;">
       <span id="carpool-owner-badge" class="badge badge-blue hidden">Owner</span>
       <span id="carpool-coins-badge" class="badge badge-yellow">0</span>
@@ -415,6 +418,11 @@ let locationWatchId = null;
 let locationInterval = null;
 let myLocation = null; // { lat, lng }
 let pendingInviteCode = null; // invite code from URL, joined after auth
+let myCarpools = []; // carpool list for the switcher
+
+// Remember the last carpool the user opened
+function saveLastCarpool(id) { localStorage.setItem('carpoolLast', String(id)); }
+function getLastCarpool() { return localStorage.getItem('carpoolLast'); }
 
 // ── Init ────────────────────────────────────────────────────────────────────
 async function init() {
@@ -439,7 +447,7 @@ async function init() {
       await joinCarpoolByCode(pendingInviteCode);
       pendingInviteCode = null;
     }
-    await loadDashboard();
+    await loadDashboard(true);
   } else {
     showAuth();
   }
@@ -492,6 +500,8 @@ function showCarpool(carpoolId) {
   document.getElementById('view-carpool').classList.remove('hidden');
   document.getElementById('btn-dashboard').classList.remove('hidden');
   currentCarpoolId = carpoolId;
+  saveLastCarpool(carpoolId);
+  populateCarpoolSwitcher();
   if (socket) {
     socket.emit('join-carpool', carpoolId);
   }
@@ -523,7 +533,7 @@ async function handleLogin(e) {
       await joinCarpoolByCode(pendingInviteCode);
       pendingInviteCode = null;
     }
-    await loadDashboard();
+    await loadDashboard(true);
   }
 }
 
@@ -551,7 +561,7 @@ async function handleRegister(e) {
       await joinCarpoolByCode(pendingInviteCode);
       pendingInviteCode = null;
     }
-    await loadDashboard();
+    await loadDashboard(true);
   }
 }
 
@@ -565,12 +575,40 @@ async function logout() {
 }
 
 // ── Dashboard ───────────────────────────────────────────────────────────────
-async function loadDashboard() {
+async function loadDashboard(redirectToLast) {
   showDashboard();
   const res = await fetch('/api/carpools');
   const data = await res.json();
-  renderCarpoolsList(data.carpools);
+  myCarpools = data.carpools || [];
+  renderCarpoolsList(myCarpools);
   loadInvitations();
+
+  // On login/init only: jump straight to the last carpool they opened
+  if (redirectToLast) {
+    const lastId = getLastCarpool();
+    if (lastId && myCarpools.some(c => String(c.id) === lastId)) {
+      goToCarpool(parseInt(lastId));
+      return;
+    }
+  }
+  populateCarpoolSwitcher();
+}
+
+// Fill the carpool dropdown in the carpool view header
+function populateCarpoolSwitcher() {
+  const sel = document.getElementById('carpool-switcher');
+  if (!sel) return;
+  sel.innerHTML = myCarpools.map(c =>
+    `<option value="${c.id}" ${String(c.id) === String(currentCarpoolId) ? 'selected' : ''}>${esc(c.name)}</option>`
+  ).join('');
+  const badge = document.getElementById('carpool-count-badge');
+  badge.textContent = myCarpools.length;
+  badge.classList.toggle('hidden', myCarpools.length <= 1);
+}
+
+function switchCarpool(id) {
+  if (!id) return;
+  goToCarpool(parseInt(id));
 }
 
 function renderCarpoolsList(carpools) {
@@ -681,8 +719,7 @@ async function loadCarpoolView(carpoolId) {
   const data = await res.json();
   currentCarpoolData = data;
   activeSession = data.activeSession;
-
-  document.getElementById('carpool-title').textContent = data.carpool.name;
+  populateCarpoolSwitcher();
 
   // Owner badge
   const ownerBadge = document.getElementById('carpool-owner-badge');
