@@ -33,9 +33,11 @@ db.exec(`
     meetup_name TEXT DEFAULT '',
     meetup_lat REAL DEFAULT 0,
     meetup_lng REAL DEFAULT 0,
+    meetup_nickname TEXT DEFAULT '',
     destination_name TEXT DEFAULT '',
     destination_lat REAL DEFAULT 0,
     destination_lng REAL DEFAULT 0,
+    destination_nickname TEXT DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -98,6 +100,15 @@ db.exec(`
   );
 `);
 
+// ── Migrations (existing databases) ────────────────────────────────────────
+const carpoolCols = db.prepare('PRAGMA table_info(carpools)').all().map(c => c.name);
+if (!carpoolCols.includes('meetup_nickname')) {
+  db.exec("ALTER TABLE carpools ADD COLUMN meetup_nickname TEXT DEFAULT ''");
+}
+if (!carpoolCols.includes('destination_nickname')) {
+  db.exec("ALTER TABLE carpools ADD COLUMN destination_nickname TEXT DEFAULT ''");
+}
+
 // ── Prepared Statements ─────────────────────────────────────────────────────
 const stmts = {
   // Users
@@ -108,7 +119,7 @@ const stmts = {
   searchUsers: db.prepare('SELECT id, username, email FROM users WHERE (username LIKE ? OR email LIKE ?) AND id != ? LIMIT 20'),
 
   // Carpools
-  createCarpool: db.prepare('INSERT INTO carpools (name, owner_id, meetup_name, meetup_lat, meetup_lng, destination_name, destination_lat, destination_lng) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
+  createCarpool: db.prepare('INSERT INTO carpools (name, owner_id, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
   carpoolById: db.prepare('SELECT * FROM carpools WHERE id = ?'),
   carpoolsByUser: db.prepare(`
     SELECT c.*, cm.coins_balance FROM carpools c
@@ -116,7 +127,7 @@ const stmts = {
     WHERE cm.user_id = ?
     ORDER BY c.created_at DESC
   `),
-  updateCarpool: db.prepare('UPDATE carpools SET name=?, meetup_name=?, meetup_lat=?, meetup_lng=?, destination_name=?, destination_lat=?, destination_lng=? WHERE id=?'),
+  updateCarpool: db.prepare('UPDATE carpools SET name=?, meetup_name=?, meetup_lat=?, meetup_lng=?, meetup_nickname=?, destination_name=?, destination_lat=?, destination_lng=?, destination_nickname=? WHERE id=?'),
   deleteCarpool: db.prepare('DELETE FROM carpools WHERE id=?'),
 
   // Members
@@ -254,12 +265,14 @@ app.get('/api/carpools', requireAuth, (req, res) => {
 
 app.post('/api/carpools', requireAuth, (req, res) => {
   try {
-    const { name, meetup_name, meetup_lat, meetup_lng, destination_name, destination_lat, destination_lng } = req.body;
+    const { name, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname } = req.body;
     if (!name) return res.status(400).json({ error: 'Carpool name required' });
     const result = stmts.createCarpool.run(
       name, req.session.userId,
       meetup_name || '', meetup_lat || 0, meetup_lng || 0,
-      destination_name || '', destination_lat || 0, destination_lng || 0
+      meetup_nickname || '',
+      destination_name || '', destination_lat || 0, destination_lng || 0,
+      destination_nickname || ''
     );
     const carpoolId = result.lastInsertRowid;
     stmts.addMember.run(carpoolId, req.session.userId);
@@ -292,22 +305,32 @@ app.put('/api/carpools/:id', requireAuth, (req, res) => {
   const carpool = stmts.carpoolById.get(req.params.id);
   if (!carpool) return res.status(404).json({ error: 'Not found' });
   if (carpool.owner_id !== req.session.userId) return res.status(403).json({ error: 'Only owner can edit' });
-  const { name, meetup_name, meetup_lat, meetup_lng, destination_name, destination_lat, destination_lng } = req.body;
+  const { name, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname } = req.body;
   stmts.updateCarpool.run(
     name || carpool.name,
     meetup_name ?? carpool.meetup_name, meetup_lat ?? carpool.meetup_lat, meetup_lng ?? carpool.meetup_lng,
+    meetup_nickname ?? carpool.meetup_nickname,
     destination_name ?? carpool.destination_name, destination_lat ?? carpool.destination_lat, destination_lng ?? carpool.destination_lng,
+    destination_nickname ?? carpool.destination_nickname,
     carpool.id
   );
   res.json({ ok: true, carpool: stmts.carpoolById.get(carpool.id) });
 });
 
 app.delete('/api/carpools/:id', requireAuth, (req, res) => {
-  const carpool = stmts.carpoolById.get(req.params.id);
-  if (!carpool) return res.status(404).json({ error: 'Not found' });
-  if (carpool.owner_id !== req.session.userId) return res.status(403).json({ error: 'Only owner can delete' });
-  stmts.deleteCarpool.run(carpool.id);
-  res.json({ ok: true });
+  try {
+    const carpool = stmts.carpoolById.get(req.params.id);
+    if (!carpool) return res.status(404).json({ error: 'Not found' });
+    if (carpool.owner_id !== req.session.userId) return res.status(403).json({ error: 'Only owner can delete' });
+    // Delete dependent records first (history, sessions, members) before the carpool
+    db.prepare('DELETE FROM carpool_history WHERE carpool_id = ?').run(carpool.id);
+    db.prepare('DELETE FROM session_members WHERE session_id IN (SELECT id FROM carpool_sessions WHERE carpool_id = ?)').run(carpool.id);
+    db.prepare('DELETE FROM carpool_sessions WHERE carpool_id = ?').run(carpool.id);
+    stmts.deleteCarpool.run(carpool.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── Member Routes ───────────────────────────────────────────────────────────
@@ -686,6 +709,6 @@ io.on('connection', (socket) => {
 
 // ── Start Server ────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Carpool server running at http://localhost:${PORT}`);
 });
