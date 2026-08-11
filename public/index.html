@@ -1121,7 +1121,7 @@ function renderMemberStatus(session) {
         <div class="member-info">
           <span class="member-avatar" style="background:${memberDotColor(m.status)};">${esc(getInitials(m.username))}</span>
           <span class="member-name">${esc(m.username)}</span>
-          <span class="badge ${statusColors[m.status] || 'badge-gray'}">${statusLabels[m.status] || m.status}</span>
+          <span class="badge ${statusColors[m.status] || 'badge-gray'}">${statusLabels[m.status] || statusLabels.pending}</span>
           <span class="text-xs text-muted">${etaStr}</span>
         </div>
         <div class="member-actions">

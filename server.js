@@ -122,6 +122,8 @@ if (!carpoolCols.includes('destination_nickname')) {
 if (!carpoolCols.includes('invite_code')) {
   db.exec("ALTER TABLE carpools ADD COLUMN invite_code TEXT DEFAULT ''");
 }
+// Repair any member statuses that were accidentally set to NULL by old location updates
+db.exec("UPDATE session_members SET status='pending' WHERE status IS NULL");
 
 // ── Invite code generator ───────────────────────────────────────────────────
 function generateInviteCode() {
@@ -179,7 +181,7 @@ const stmts = {
 
   // Session Members
   addSessionMember: db.prepare('INSERT OR IGNORE INTO session_members (session_id, user_id, status) VALUES (?, ?, ?)'),
-  updateSessionMember: db.prepare('UPDATE session_members SET status=?, location_lat=?, location_lng=?, updated_at=datetime(\'now\') WHERE session_id=? AND user_id=?'),
+  updateSessionMember: db.prepare('UPDATE session_members SET status=COALESCE(?, status), location_lat=COALESCE(?, location_lat), location_lng=COALESCE(?, location_lng), updated_at=datetime(\'now\') WHERE session_id=? AND user_id=?'),
   sessionMembers: db.prepare(`
     SELECT sm.*, u.username FROM session_members sm
     JOIN users u ON u.id = sm.user_id
