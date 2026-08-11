@@ -264,7 +264,7 @@
     </div>
   </div>
 
-  <!-- Session Controls -->
+  <!-- Session Controls + Members (combined) -->
   <div id="session-panel" class="phase-panel">
     <div id="session-idle">
       <p class="text-muted mb-1 text-sm">No active session. Start one to begin tracking!</p>
@@ -279,27 +279,24 @@
       <p id="session-info" class="text-sm text-muted mb-1"></p>
 
       <!-- Phase 1: Meetup Controls -->
-      <div id="phase-meetup-controls" class="btn-group">
-        <button id="btn-driving" class="btn btn-primary" onclick="respondToSession('driving')">I'll Drive</button>
-        <button id="btn-riding" class="btn btn-success" onclick="respondToSession('riding')">I'll Ride</button>
-        <button id="btn-skip" class="btn btn-outline" onclick="respondToSession('skip')">Skip</button>
-        <button id="btn-arrived" class="btn btn-success" onclick="respondToSession('arrived')">Arrived</button>
+      <div id="phase-meetup-controls" class="btn-group hidden">
+        <button id="btn-driving" class="btn btn-primary btn-sm" onclick="respondToSession('driving')">I'll Drive</button>
+        <button id="btn-riding" class="btn btn-success btn-sm" onclick="respondToSession('riding')">I'll Ride</button>
+        <button id="btn-arrived" class="btn btn-success btn-sm" onclick="respondToSession('arrived')">Arrived</button>
       </div>
 
       <!-- Phase 2-3 Controls -->
       <div id="phase-advance-controls" class="btn-group hidden">
-        <button id="btn-leaving-dest" class="btn btn-primary hidden" onclick="advancePhase('destination')" style="width:100%;">Leaving for Destination</button>
-        <button id="btn-back-to-meetup" class="btn btn-warning hidden" onclick="advancePhase('back_to_meetup')" style="width:100%;">Back to Meetup</button>
-        <button id="btn-complete" class="btn btn-success hidden" onclick="advancePhase('completed')" style="width:100%;">Complete Carpool</button>
+        <button id="btn-leaving-dest" class="btn btn-primary btn-sm hidden" onclick="advancePhase('destination')" style="width:100%;">Leaving for Destination</button>
+        <button id="btn-back-to-meetup" class="btn btn-warning btn-sm hidden" onclick="advancePhase('back_to_meetup')" style="width:100%;">Back to Meetup</button>
+        <button id="btn-complete" class="btn btn-success btn-sm hidden" onclick="advancePhase('completed')" style="width:100%;">Complete Carpool</button>
       </div>
 
       <div id="session-alert" class="hidden"></div>
     </div>
-  </div>
 
-  <!-- Member Status during session -->
-  <div id="member-status-panel" class="card hidden">
-    <h3>Members</h3>
+    <!-- Members (always visible — skip handled here) -->
+    <h4>Members</h4>
     <div id="member-status-list" class="member-list"></div>
   </div>
 </div>
@@ -1161,7 +1158,6 @@ function updateSubwayETAs(data) {
 function renderSessionUI(session) {
   const idleDiv = document.getElementById('session-idle');
   const activeDiv = document.getElementById('session-active');
-  const memberPanel = document.getElementById('member-status-panel');
   const phaseMeetup = document.getElementById('phase-meetup-controls');
   const phaseAdvance = document.getElementById('phase-advance-controls');
   const btnLeaving = document.getElementById('btn-leaving-dest');
@@ -1171,14 +1167,12 @@ function renderSessionUI(session) {
   if (!session || session.phase === 'completed') {
     idleDiv.classList.remove('hidden');
     activeDiv.classList.add('hidden');
-    memberPanel.classList.remove('hidden');
     renderMemberStatus(session); // shows the roster when there's no active session
     return;
   }
 
   idleDiv.classList.add('hidden');
   activeDiv.classList.remove('hidden');
-  memberPanel.classList.remove('hidden');
 
   const phaseDotColors = {
     meetup: '#8FAE8B', destination: '#C0A46A', back_to_meetup: '#B07166', completed: '#7C9A77'
@@ -1240,25 +1234,18 @@ function renderSessionUI(session) {
     const myStatus = myMember ? myMember.status : 'pending';
     const btnDriving = document.getElementById('btn-driving');
     const btnRiding = document.getElementById('btn-riding');
-    const btnSkip = document.getElementById('btn-skip');
     const btnArrived = document.getElementById('btn-arrived');
 
     const someoneElseDriving = session.driver_id && session.driver_id !== currentUser.id;
 
+    // Skipped members: no role buttons (skip is handled in the member list below)
     if (myStatus === 'skip') {
-      // Skipped: hide everything else, offer to change your mind
       btnDriving.classList.add('hidden');
       btnRiding.classList.add('hidden');
       btnArrived.classList.add('hidden');
-      btnSkip.classList.remove('hidden');
-      btnSkip.textContent = "Changed my mind";
-      btnSkip.onclick = () => respondToSession('pending');
       phaseAdvance.classList.add('hidden');
     } else {
-      btnSkip.textContent = 'Skip';
-      btnSkip.onclick = () => respondToSession('skip');
-
-      // The current driver never sees the claim button — just Arrived + Skip
+      // The current driver never sees the claim button — just Arrived
       if (myStatus === 'driving' || session.driver_id === currentUser.id) {
         btnDriving.classList.add('hidden');
       } else {
@@ -1269,10 +1256,6 @@ function renderSessionUI(session) {
       btnRiding.classList.toggle('hidden', myStatus !== 'pending');
       // Arrive: once you've picked a role
       btnArrived.classList.toggle('hidden', myStatus === 'pending');
-      // Skip: available until everyone has arrived
-      const activeNow = session.members.filter(m => m.status !== 'skip');
-      const allArrived = activeNow.length > 0 && activeNow.every(m => m.status === 'arrived');
-      btnSkip.classList.toggle('hidden', allArrived);
     }
 
     const ready = session.members.filter(m => m.status !== 'skip' && m.status !== 'pending');
@@ -1415,6 +1398,9 @@ function renderMemberStatus(session) {
         <div class="member-actions">
           ${!noSkip && m.status !== 'skip' && m.user_id !== currentUser.id
             ? `<button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip</button>`
+            : ''}
+          ${m.user_id === currentUser.id && m.status === 'skip'
+            ? `<button class="btn btn-outline btn-sm" onclick="respondToSession('pending')">Changed my mind</button>`
             : ''}
           ${!noSkip && m.status !== 'skip' && m.user_id === currentUser.id && m.status !== 'pending'
             ? `<button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip Me</button>`
