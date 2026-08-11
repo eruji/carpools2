@@ -262,7 +262,7 @@
   <div id="session-panel" class="phase-panel">
     <div id="session-idle">
       <p class="text-muted mb-1 text-sm">No active session. Start one to begin tracking!</p>
-      <button class="btn btn-primary btn-lg" onclick="startSession()" style="width:100%;">I'm Driving!</button>
+      <button class="btn btn-primary btn-lg" onclick="startSession()" style="width:100%;">Start Carpool</button>
     </div>
 
     <div id="session-active" class="hidden">
@@ -427,6 +427,7 @@ let locationInterval = null;
 let myLocation = null; // { lat, lng }
 let pendingInviteCode = null; // invite code from URL, joined after auth
 let myCarpools = []; // carpool list for the switcher
+let lastDriverId = null; // for driver-change toasts
 
 // Remember the last carpool the user opened
 function saveLastCarpool(id) { localStorage.setItem('carpoolLast', String(id)); }
@@ -886,10 +887,15 @@ async function loadCarpoolView(carpoolId) {
 
 function renderMembers(members, isOwner) {
   const tbody = document.getElementById('members-tbody');
-  tbody.innerHTML = members.map((m, i) => `
+  // Lowest credits = next driver (ties broken alphabetically)
+  const sorted = [...members].sort((a, b) =>
+    (a.coins_balance - b.coins_balance) || a.username.localeCompare(b.username)
+  );
+  const nextDriverId = sorted.length ? sorted[0].id : null;
+  tbody.innerHTML = sorted.map((m, i) => `
     <tr>
       <td>${i + 1}</td>
-      <td>${esc(m.username)} ${m.id === currentCarpoolData.carpool.owner_id ? '<span class="badge badge-blue">Owner</span>' : ''}</td>
+      <td>${esc(m.username)} ${m.id === currentCarpoolData.carpool.owner_id ? '<span class="badge badge-blue">Owner</span>' : ''} ${m.id === nextDriverId ? '<span class="badge badge-yellow">Next Driver</span>' : ''}</td>
       <td><span class="badge ${m.coins_balance >= 0 ? 'badge-green' : 'badge-red'}">${m.coins_balance}</span></td>
       <td class="text-xs text-muted">${new Date(m.joined_at).toLocaleDateString()}</td>
       <td>
@@ -1139,14 +1145,26 @@ function renderSessionUI(session) {
   document.getElementById('session-phase-icon').style.background = phaseDotColors[session.phase] || '#8FAE8B';
   document.getElementById('session-phase-title').textContent = phaseTitles[session.phase] || session.phase;
 
-  // Driver info
-  const driverMember = session.members.find(m => m.status === 'driving');
-  if (driverMember) {
+  // Driver info — everyone sees who's driving and where they're headed
+  const driver = session.members.find(m => m.user_id === session.driver_id);
+  const phaseTarget = session.phase === 'destination' ? 'the destination'
+    : session.phase === 'back_to_meetup' ? 'the meetup' : 'the meetup';
+  if (driver) {
     document.getElementById('session-info').textContent =
-      `Driver: ${esc(driverMember.username)}`;
+      `Driver: ${esc(driver.username)} — en route to ${phaseTarget}`;
   } else {
-    document.getElementById('session-info').textContent = '';
+    document.getElementById('session-info').textContent =
+      'No driver yet — tap Driving to claim it';
   }
+
+  // Toast when the driver changes (someone else claimed driving)
+  if (session.driver_id && session.driver_id !== lastDriverId) {
+    lastDriverId = session.driver_id;
+    if (driver && driver.user_id !== currentUser.id) {
+      showToast(esc(driver.username) + ' is driving — en route to ' + phaseTarget);
+    }
+  }
+  if (!session.driver_id) lastDriverId = null;
 
   if (session.phase === 'meetup') {
     phaseMeetup.classList.remove('hidden');
@@ -1213,9 +1231,27 @@ function renderSessionUI(session) {
 
 function renderMemberStatus(session) {
   const container = document.getElementById('member-status-list');
-  const isDriver = session.driver_id === currentUser.id;
 
-  container.innerHTML = session.members.map(m => {
+  // Credits per member from the carpool roster
+  const coins = {};
+  if (currentCarpoolData) {
+    currentCarpoolData.members.forEach(m => coins[m.id] = m.coins_balance);
+  }
+
+  // Sort: driver first, then lowest credits (ties → alphabetical)
+  const sorted = [...session.members].sort((a, b) => {
+    const aDrv = a.user_id === session.driver_id ? -1 : 0;
+    const bDrv = b.user_id === session.driver_id ? -1 : 0;
+    if (aDrv !== bDrv) return aDrv - bDrv;
+    const ca = coins[a.user_id] || 0, cb = coins[b.user_id] || 0;
+    if (ca !== cb) return ca - cb;
+    return a.username.localeCompare(b.username);
+  });
+  // Next driver = lowest credits, excluding the current driver
+  const nonDrivers = sorted.filter(m => m.user_id !== session.driver_id);
+  const nextDriverId = nonDrivers.length ? nonDrivers[0].user_id : null;
+
+  container.innerHTML = sorted.map(m => {
     const statusLabels = {
       driving: 'Driving',
       riding: 'Riding',
@@ -1230,6 +1266,9 @@ function renderMemberStatus(session) {
       arrived: 'badge-green',
       pending: 'badge-purple'
     };
+    const myCoins = coins[m.user_id] || 0;
+    const isDriver = m.user_id === session.driver_id;
+    const isNext = m.user_id === nextDriverId;
     let etaStr = '';
     if (m.location_lat && m.location_lng && activeSession && currentCarpoolData) {
       const carpool = currentCarpoolData.carpool;
@@ -1245,16 +1284,22 @@ function renderMemberStatus(session) {
       etaStr = `· ${dist.toFixed(1)} mi · ~${etaMin} min · ${clock}`;
     }
     return `
-      <div class="member-row">
+      <div class="member-row ${isDriver ? 'is-driver' : ''}">
         <div class="member-info">
           <span class="member-avatar" style="background:${memberColor(m.user_id)};">${esc(getInitials(m.username))}</span>
           <span class="member-name">${esc(m.username)}</span>
+          ${isDriver ? '<span class="badge badge-yellow">Driving Now</span>' : ''}
+          ${isNext ? '<span class="badge badge-blue">Next Driver</span>' : ''}
           <span class="badge ${statusColors[m.status] || 'badge-gray'}">${statusLabels[m.status] || statusLabels.pending}</span>
+          <span class="badge badge-gray">${myCoins} pts</span>
           <span class="text-xs text-muted">${etaStr}</span>
         </div>
         <div class="member-actions">
-          ${isDriver && m.status === 'pending' && m.user_id !== currentUser.id
-            ? `<button class="btn btn-warning btn-sm" onclick="skipMember(${m.user_id})">Skip</button>`
+          ${m.status !== 'skip' && m.user_id !== currentUser.id
+            ? `<button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip</button>`
+            : ''}
+          ${m.status !== 'skip' && m.user_id === currentUser.id && m.status !== 'pending'
+            ? `<button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip Me</button>`
             : ''}
           ${m.user_id === currentUser.id && (m.status === 'driving' || m.status === 'riding')
             ? '<span class="badge badge-green text-xs">Sharing</span>'
@@ -1549,7 +1594,7 @@ async function startSession() {
     updateMap({ carpool: currentCarpoolData.carpool, activeSession });
     updateSubwayMap({ carpool: currentCarpoolData.carpool, activeSession });
   }
-  startLocationTracking();
+  // Location tracking starts once someone claims Driving/Riding (see respondToSession)
 }
 
 async function respondToSession(status) {

@@ -598,6 +598,11 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   transition: border-color 0.2s;
 }
 .member-row:hover { border-color: var(--border-strong); }
+.member-row.is-driver {
+  border-color: rgba(192,164,106,0.6);
+  background: rgba(192,164,106,0.08);
+  border-left: 4px solid #C0A46A;
+}
 .member-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .member-info .member-name { font-weight: 600; font-size: 1.05rem; }
 .member-actions { display: flex; gap: 6px; flex-shrink: 0; }

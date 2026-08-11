@@ -177,7 +177,7 @@ const stmts = {
     FROM carpool_members cm
     JOIN users u ON u.id = cm.user_id
     WHERE cm.carpool_id = ?
-    ORDER BY cm.coins_balance ASC, cm.joined_at ASC
+    ORDER BY cm.coins_balance ASC, u.username COLLATE NOCASE ASC
   `),
   isMember: db.prepare('SELECT * FROM carpool_members WHERE carpool_id=? AND user_id=?'),
   updateCoins: db.prepare('UPDATE carpool_members SET coins_balance = coins_balance + ? WHERE carpool_id=? AND user_id=?'),
@@ -650,19 +650,18 @@ app.post('/api/carpools/:id/sessions/start', requireAuth, (req, res) => {
     const existing = stmts.activeSession.get(carpool.id);
     if (existing) return res.status(409).json({ error: 'Active session already exists', sessionId: existing.id });
 
-    // Create session with current carpool meetup/destination
+    // Create session with current carpool meetup/destination (no driver yet)
     const result = stmts.createSession.run(
-      carpool.id, req.session.userId, 'meetup',
+      carpool.id, null, 'meetup',
       carpool.meetup_lat, carpool.meetup_lng, carpool.meetup_name,
       carpool.destination_lat, carpool.destination_lng, carpool.destination_name
     );
     const sessionId = result.lastInsertRowid;
 
-    // Add all carpool members to session
+    // Everyone starts pending — the session doesn't begin until someone claims driving
     const members = stmts.carpoolMembers.all(carpool.id);
     for (const m of members) {
-      const status = m.id === req.session.userId ? 'driving' : 'pending';
-      stmts.addSessionMember.run(sessionId, m.id, status);
+      stmts.addSessionMember.run(sessionId, m.id, 'pending');
     }
 
     const session = { ...stmts.latestSession.get(carpool.id), members: stmts.sessionMembers.all(sessionId) };
@@ -699,8 +698,13 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
       sm = stmts.sessionMemberByUser.get(activeSession.id, req.session.userId);
     }
 
-    // If setting to 'driving', update the session driver
+    // If claiming driving, update the session driver and demote the previous driver
     if (status === 'driving') {
+      const prevDriver = stmts.sessionMembers.all(activeSession.id)
+        .find(m => m.status === 'driving' && m.user_id !== req.session.userId);
+      if (prevDriver) {
+        stmts.updateSessionMember.run('riding', null, null, activeSession.id, prevDriver.user_id);
+      }
       stmts.updateSessionDriver.run(req.session.userId, activeSession.id);
     }
 
@@ -727,7 +731,9 @@ app.post('/api/carpools/:id/sessions/skip-member', requireAuth, (req, res) => {
 
     const activeSession = stmts.activeSession.get(carpool.id);
     if (!activeSession) return res.status(400).json({ error: 'No active session' });
-    if (activeSession.driver_id !== req.session.userId) return res.status(403).json({ error: 'Only driver can skip members' });
+    // Any session member may skip themselves or any other member
+    const skipper = stmts.sessionMemberByUser.get(activeSession.id, req.session.userId);
+    if (!skipper) return res.status(403).json({ error: 'Not in session' });
 
     stmts.updateSessionMember.run('skip', null, null, activeSession.id, userId);
 
