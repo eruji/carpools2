@@ -363,6 +363,11 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- TOAST                                                          -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- PROFILE MODAL                                                -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <div id="profile-modal" class="loc-modal hidden">
@@ -1923,6 +1928,8 @@ function startLocationTracking() {
           lat: myLocation.lat,
           lng: myLocation.lng
         });
+        // Geo-fence: auto-arrive when close to the current target
+        checkGeoFence();
         // Refresh subway ETA
         if (currentCarpoolData) {
           updateSubwayETAs({ carpool: currentCarpoolData.carpool, activeSession });
@@ -1949,12 +1956,74 @@ function startLocationTracking() {
             lat: myLocation.lat,
             lng: myLocation.lng
           });
+          checkGeoFence();
         },
         () => {},
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
       );
     }
   }, 10000);
+}
+
+// ── Geo-fenced arrivals ─────────────────────────────────────────────────────
+const GEO_FENCE_M = 150; // meters — within this of the target = arrived
+let lastAutoArriveAt = 0;
+
+function checkGeoFence() {
+  if (!activeSession || !currentCarpoolData || !myLocation) return;
+  const carpool = currentCarpoolData.carpool;
+  const myMember = activeSession.members.find(m => m.user_id === currentUser.id);
+  // Only auto-arrive for people actively driving/riding, once
+  if (!myMember || (myMember.status !== 'driving' && myMember.status !== 'riding')) return;
+
+  let targetLat, targetLng, targetName;
+  if (activeSession.phase === 'meetup') {
+    targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'the meetup';
+  } else if (activeSession.phase === 'destination') {
+    targetLat = carpool.destination_lat; targetLng = carpool.destination_lng; targetName = 'the destination';
+  } else if (activeSession.phase === 'back_to_meetup') {
+    targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'the meetup';
+  } else {
+    return;
+  }
+  if (!targetLat || !targetLng) return;
+
+  const distM = haversine(myLocation.lat, myLocation.lng, targetLat, targetLng) * 1609.34;
+  if (distM <= GEO_FENCE_M) {
+    autoArrive(targetName);
+  }
+}
+
+async function autoArrive(targetName) {
+  // Debounce so we don't spam the server while inside the fence
+  if (Date.now() - lastAutoArriveAt < 20000) return;
+  lastAutoArriveAt = Date.now();
+
+  const res = await fetch(`/api/carpools/${currentCarpoolId}/sessions/respond`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'arrived' })
+  });
+  if (!res.ok) return;
+  const data = await res.json();
+  activeSession = data.session;
+  renderSessionUI(activeSession);
+  if (currentCarpoolData) {
+    updateMap({ carpool: currentCarpoolData.carpool, activeSession });
+    updateSubwayMap({ carpool: currentCarpoolData.carpool, activeSession });
+  }
+  showToast('You have arrived at ' + targetName + '!');
+}
+
+// ── Toast ───────────────────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 3000);
 }
 
 function stopLocationTracking() {
