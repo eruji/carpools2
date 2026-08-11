@@ -146,7 +146,9 @@ const stmts = {
   createCarpool: db.prepare('INSERT INTO carpools (name, owner_id, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname, invite_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
   carpoolById: db.prepare('SELECT * FROM carpools WHERE id = ?'),
   carpoolsByUser: db.prepare(`
-    SELECT c.*, cm.coins_balance FROM carpools c
+    SELECT c.*, cm.coins_balance,
+      (SELECT COUNT(*) FROM carpool_members WHERE carpool_id = c.id) AS member_count
+    FROM carpools c
     JOIN carpool_members cm ON cm.carpool_id = c.id
     WHERE cm.user_id = ?
     ORDER BY c.created_at DESC

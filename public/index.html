@@ -117,34 +117,7 @@
         <label>Carpool Name</label>
         <input type="text" id="new-carpool-name" required placeholder="e.g., Work Commute">
       </div>
-      <div class="form-group">
-        <label>Meetup Address <span class="text-xs text-muted">(search to auto-fill)</span></label>
-        <div class="autocomplete-wrapper">
-          <input type="text" id="new-meetup-address" placeholder="Start typing an address..." autocomplete="off" oninput="autocompleteAddress(this, 'meetup')" onfocus="this.select()">
-          <div class="autocomplete-dropdown hidden" id="ac-dropdown-meetup"></div>
-        </div>
-      </div>
-      <input type="hidden" id="new-meetup-lat" value="0">
-      <input type="hidden" id="new-meetup-lng" value="0">
-      <input type="hidden" id="new-meetup-name" value="">
-      <div class="form-group">
-        <label>Meetup Nickname <span class="text-xs text-muted">(optional, short name)</span></label>
-        <input type="text" id="new-meetup-nickname" placeholder="e.g., Sarah's House">
-      </div>
-      <div class="form-group">
-        <label>Destination Address <span class="text-xs text-muted">(search to auto-fill)</span></label>
-        <div class="autocomplete-wrapper">
-          <input type="text" id="new-dest-address" placeholder="Start typing an address..." autocomplete="off" oninput="autocompleteAddress(this, 'dest')" onfocus="this.select()">
-          <div class="autocomplete-dropdown hidden" id="ac-dropdown-dest"></div>
-        </div>
-      </div>
-      <input type="hidden" id="new-dest-lat" value="0">
-      <input type="hidden" id="new-dest-lng" value="0">
-      <input type="hidden" id="new-dest-name" value="">
-      <div class="form-group">
-        <label>Destination Nickname <span class="text-xs text-muted">(optional, short name)</span></label>
-        <input type="text" id="new-dest-nickname" placeholder="e.g., Office">
-      </div>
+      <p class="text-xs text-muted mb-1">Add meetup and destination locations once inside the carpool.</p>
       <div class="btn-group">
         <button type="submit" class="btn btn-success">Create</button>
         <button type="button" class="btn btn-outline" onclick="hideCreateCarpool()">Cancel</button>
@@ -734,13 +707,10 @@ function renderCarpoolsList(carpools) {
     <div class="carpool-card" onclick="goToCarpool(${c.id})">
       <div>
         <strong>${esc(c.name)}</strong>
-        <div class="text-sm text-muted">
-          ${meetupLabel(c)} → ${destLabel(c)}
-        </div>
       </div>
       <div style="text-align:right;">
-        <span class="badge badge-yellow">${c.coins_balance}</span>
-        <div class="text-xs text-muted">${c.owner_id === currentUser.id ? 'Owner' : 'Member'}</div>
+        <span class="badge badge-gray">${c.member_count} member${c.member_count === 1 ? '' : 's'}</span>
+        <div class="text-xs text-muted">${c.owner_id === currentUser.id ? 'Owner' : 'Member'} · ${c.coins_balance} coins</div>
       </div>
     </div>
   `).join('');
@@ -765,24 +735,20 @@ function hideCreateCarpool() {
 async function handleCreateCarpool(e) {
   e.preventDefault();
   const name = document.getElementById('new-carpool-name').value.trim();
-  const meetup_name = document.getElementById('new-meetup-address').value.trim() || document.getElementById('new-meetup-name').value.trim();
-  const meetup_lat = parseFloat(document.getElementById('new-meetup-lat').value) || 0;
-  const meetup_lng = parseFloat(document.getElementById('new-meetup-lng').value) || 0;
-  const meetup_nickname = document.getElementById('new-meetup-nickname').value.trim();
-  const destination_name = document.getElementById('new-dest-address').value.trim() || document.getElementById('new-dest-name').value.trim();
-  const destination_lat = parseFloat(document.getElementById('new-dest-lat').value) || 0;
-  const destination_lng = parseFloat(document.getElementById('new-dest-lng').value) || 0;
-  const destination_nickname = document.getElementById('new-dest-nickname').value.trim();
 
   const res = await fetch('/api/carpools', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname })
+    body: JSON.stringify({ name })
   });
+  const data = await res.json();
   if (res.ok) {
     hideCreateCarpool();
     document.getElementById('new-carpool-name').value = '';
-    await loadDashboard();
+    await refreshMyCarpools();
+    goToCarpool(data.carpool.id);
+  } else {
+    alert(data.error || 'Failed to create carpool');
   }
 }
 
@@ -932,17 +898,19 @@ function updateSubwayMap(data) {
   const carpool = data.carpool;
   const session = data.activeSession;
 
-  // Stop names (nickname if set, else first comma part)
-  const meetupName = meetupLabel(carpool);
-  const destName = destLabel(carpool);
+  // Stop names: nickname if set, else first comma part; prompt when unset
+  const hasMeetup = carpool.meetup_lat && carpool.meetup_lng;
+  const hasDest = carpool.destination_lat && carpool.destination_lng;
+  const meetupName = hasMeetup ? meetupLabel(carpool) : 'Click to add meetup';
+  const destName = hasDest ? destLabel(carpool) : 'Click to add destination';
 
   document.getElementById('subway-start-name').textContent = 'Start';
   document.getElementById('subway-start-addr').textContent = 'Your location';
   document.getElementById('subway-meetup-name').textContent = meetupName;
-  document.getElementById('subway-meetup-addr').textContent = '';
+  document.getElementById('subway-meetup-addr').textContent = hasMeetup ? '' : 'Tap to set the pickup point';
   document.getElementById('subway-dest-name').textContent = destName;
-  document.getElementById('subway-dest-addr').textContent = '';
-  document.getElementById('subway-return-name').textContent = meetupName;
+  document.getElementById('subway-dest-addr').textContent = hasDest ? '' : 'Tap to set the drop-off';
+  document.getElementById('subway-return-name').textContent = hasMeetup ? meetupName : 'Return';
   document.getElementById('subway-return-addr').textContent = 'Return';
 
   // Reset all stops
@@ -1370,13 +1338,13 @@ function updateMap(data) {
       icon: L.divIcon({
         className: '',
         html: `<div style="display:flex;flex-direction:column;align-items:center;">
-          <svg width="30" height="40" viewBox="0 0 24 32" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
+          <svg width="22" height="26" viewBox="0 0 24 32" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
             <path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/>
             <circle cx="12" cy="11" r="4" fill="#fff"/>
           </svg>
           <div style="background:#fff;color:#3F5F3B;padding:3px 10px;border-radius:10px;font-weight:800;font-size:13px;white-space:nowrap;border:1.5px solid #8FAE8B;box-shadow:0 2px 8px rgba(0,0,0,0.2);margin-top:2px;">${esc(label)}</div>
         </div>`,
-        iconAnchor: [15, 40]
+        iconAnchor: [11, 26]
       })
     }).addTo(map).bindPopup('<b>Meetup:</b> ' + (carpool.meetup_name || ''));
     mapMarkers.meetup = marker;
@@ -1389,13 +1357,13 @@ function updateMap(data) {
       icon: L.divIcon({
         className: '',
         html: `<div style="display:flex;flex-direction:column;align-items:center;">
-          <svg width="30" height="36" viewBox="0 0 24 28" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
+          <svg width="22" height="24" viewBox="0 0 24 28" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
             <path d="M5 2v24" stroke="#8A5248" stroke-width="2.5" stroke-linecap="round"/>
             <path d="M5 4h13l-3.5 4L18 12H5z" fill="#B07166" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/>
           </svg>
           <div style="background:#fff;color:#8A5248;padding:3px 10px;border-radius:10px;font-weight:800;font-size:13px;white-space:nowrap;border:1.5px solid #B07166;box-shadow:0 2px 8px rgba(0,0,0,0.2);margin-top:2px;">${esc(destLabel(carpool))}</div>
         </div>`,
-        iconAnchor: [15, 36]
+        iconAnchor: [11, 24]
       })
     }).addTo(map).bindPopup('<b>Destination:</b> ' + (carpool.destination_name || ''));
     mapMarkers.destination = marker;
