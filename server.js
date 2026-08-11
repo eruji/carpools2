@@ -413,7 +413,7 @@ app.get('/admin/logout', (req, res) => {
 
 app.get('/admin', (req, res) => {
   if (req.session.isAdmin) return renderAdminPage(res);
-  res.send(`<!DOCTYPE html><html><head><title>Vroommates Admin</title>
+  res.send(`<!DOCTYPE html><html><head><title>VroomMates Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>body{font-family:system-ui;background:#F5F5F1;color:#333;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
     form{background:#fff;border:1px solid #ddd;border-radius:12px;padding:24px;width:280px;box-shadow:0 4px 16px rgba(0,0,0,0.08)}
@@ -422,7 +422,7 @@ app.get('/admin', (req, res) => {
     button{width:100%;padding:12px;background:#7C9A77;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer}
     .err{color:#B07166;font-size:0.85rem}</style></head>
     <body><form method="POST" action="/admin">
-      <h2>Vroommates Admin</h2>
+      <h2>VroomMates Admin</h2>
       <p style="color:#888;font-size:0.85rem;margin:0">Database debug</p>
       <input type="password" name="password" placeholder="Admin password" autofocus required>
       <button type="submit">Login</button>
@@ -439,7 +439,7 @@ app.post('/admin', (req, res) => {
 });
 
 function renderAdminPage(res) {
-  let html = `<!DOCTYPE html><html><head><title>Vroommates Admin</title>
+  let html = `<!DOCTYPE html><html><head><title>VroomMates Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>body{font-family:system-ui;background:#F5F5F1;color:#333;padding:16px;max-width:1100px;margin:auto}
     h1{font-size:1.3rem;display:flex;justify-content:space-between;align-items:center}
@@ -450,7 +450,7 @@ function renderAdminPage(res) {
     tr:nth-child(even){background:#FAFAF8}
     a{color:#B07166;font-size:0.8rem}
     .meta{color:#888;font-size:0.75rem}</style></head><body>
-    <h1>Vroommates Admin <a href="/admin/logout">logout</a></h1>
+    <h1>VroomMates Admin <a href="/admin/logout">logout</a></h1>
     <p class="meta">version ${pkg.version}</p>`;
   for (const t of ADMIN_TABLES) {
     const rows = db.prepare('SELECT * FROM ' + t).all();
