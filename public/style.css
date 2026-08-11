@@ -192,15 +192,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   white-space: nowrap;
 }
 .legend-sub { font-weight: 500; color: var(--text-3); }
-.legend-pill {
-  padding: 1px 8px;
-  border-radius: 8px;
-  font-size: 0.68rem;
-  font-weight: 800;
-  border: 1.5px solid;
-}
-.legend-meetup { background: #fff; color: #3F5F3B; border-color: #8FAE8B; }
-.legend-dest { background: #fff; color: #8A5248; border-color: #B07166; }
+.legend-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
 .legend-you-dot {
   width: 12px; height: 12px;
   border-radius: 50%;

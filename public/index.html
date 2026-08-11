@@ -176,8 +176,8 @@
     <div id="map-legend" class="map-legend">
       <div class="map-legend-title" onclick="toggleMapLegend()">Map Key <span class="legend-caret">▾</span></div>
       <div id="map-legend-body" class="map-legend-body">
-        <div class="legend-item"><span class="legend-pill legend-meetup">Meetup</span></div>
-        <div class="legend-item"><span class="legend-pill legend-dest">Destination</span></div>
+        <div class="legend-item"><span class="legend-icon"><svg width="14" height="18" viewBox="0 0 24 32"><path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="#fff"/></svg></span>Meetup</div>
+        <div class="legend-item"><span class="legend-icon"><svg width="14" height="17" viewBox="0 0 24 28"><path d="M5 2v24" stroke="#8A5248" stroke-width="2.5"/><path d="M5 4h13l-3.5 4L18 12H5z" fill="#B07166" stroke="#fff" stroke-width="1.2"/></svg></span>Destination</div>
         <div class="legend-item"><span class="legend-you-dot"></span>You <span class="legend-sub">(pulsing, shows ETA)</span></div>
         <div class="legend-item"><span class="legend-avatar">AB</span>Member <span class="legend-sub">(initials)</span></div>
         <div class="legend-item"><span class="legend-line"></span>Route <span class="legend-sub">(dashed = member paths)</span></div>
@@ -1232,27 +1232,39 @@ function updateMap(data) {
     map.fitBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: maxZ || 15 });
   };
 
-  // Meetup marker (green pin)
+  // Meetup marker (location pin icon)
   if (carpool.meetup_lat && carpool.meetup_lng) {
-    const label = inMeetup ? meetupLabel(carpool) : meetupLabel(carpool);
+    const label = meetupLabel(carpool);
     const marker = L.marker([carpool.meetup_lat, carpool.meetup_lng], {
       icon: L.divIcon({
         className: '',
-        html: `<div style="background:#FFFFFF;color:#3F5F3B;padding:8px 18px;border-radius:14px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,0.25);border:2px solid #8FAE8B;">${esc(label)}</div>`,
-        iconAnchor: [40, 20]
+        html: `<div style="display:flex;flex-direction:column;align-items:center;">
+          <svg width="30" height="40" viewBox="0 0 24 32" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
+            <path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="12" cy="11" r="4" fill="#fff"/>
+          </svg>
+          <div style="background:#fff;color:#3F5F3B;padding:3px 10px;border-radius:10px;font-weight:800;font-size:13px;white-space:nowrap;border:1.5px solid #8FAE8B;box-shadow:0 2px 8px rgba(0,0,0,0.2);margin-top:2px;">${esc(label)}</div>
+        </div>`,
+        iconAnchor: [15, 40]
       })
     }).addTo(map).bindPopup('<b>Meetup:</b> ' + (carpool.meetup_name || ''));
     mapMarkers.meetup = marker;
     addPoint(carpool.meetup_lat, carpool.meetup_lng);
   }
 
-  // Destination marker (muted terracotta pin)
+  // Destination marker (flag icon)
   if (carpool.destination_lat && carpool.destination_lng) {
     const marker = L.marker([carpool.destination_lat, carpool.destination_lng], {
       icon: L.divIcon({
         className: '',
-        html: `<div style="background:#FFFFFF;color:#8A5248;padding:8px 18px;border-radius:14px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,0.25);border:2px solid #B07166;">${esc(destLabel(carpool))}</div>`,
-        iconAnchor: [40, 20]
+        html: `<div style="display:flex;flex-direction:column;align-items:center;">
+          <svg width="30" height="36" viewBox="0 0 24 28" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
+            <path d="M5 2v24" stroke="#8A5248" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M5 4h13l-3.5 4L18 12H5z" fill="#B07166" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/>
+          </svg>
+          <div style="background:#fff;color:#8A5248;padding:3px 10px;border-radius:10px;font-weight:800;font-size:13px;white-space:nowrap;border:1.5px solid #B07166;box-shadow:0 2px 8px rgba(0,0,0,0.2);margin-top:2px;">${esc(destLabel(carpool))}</div>
+        </div>`,
+        iconAnchor: [15, 36]
       })
     }).addTo(map).bindPopup('<b>Destination:</b> ' + (carpool.destination_name || ''));
     mapMarkers.destination = marker;
