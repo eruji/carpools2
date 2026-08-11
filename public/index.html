@@ -1668,8 +1668,11 @@ async function addSavedLocation() {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: name || address.split(',')[0], address, lat, lng })
   });
+  const data = await res.json();
   if (!res.ok) { alert('Failed to add location'); return; }
-  await loadLocConfig();
+  // Save AND use it as the active meetup/destination
+  savedLocations.push(data.location);
+  await useSavedLocation(data.location.id);
 }
 
 async function editSavedLocation(locId) {
