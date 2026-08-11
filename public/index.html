@@ -155,6 +155,7 @@
   <!-- ═══════ REALTIME MAP ═══════ -->
   <div id="map-container">
     <div id="map"></div>
+    <button class="map-recenter" onclick="recenterMap()" title="Recenter map"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
     <div id="map-legend" class="map-legend">
       <div id="map-legend-body" class="map-legend-body hidden">
         <div class="legend-item"><span class="legend-icon"><svg width="14" height="18" viewBox="0 0 24 32"><path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="#fff"/></svg></span>Meetup</div>
@@ -1123,6 +1124,24 @@ function updatePhaseIndicator() {
 }
 
 // ── Map ─────────────────────────────────────────────────────────────────────
+let lastMapData = null;
+let recenterTimer = null;
+const RECENTER_PAUSE = 2500; // ms after the user stops interacting
+
+function recenterMap() {
+  if (!map || !lastMapData) return;
+  updateMap(lastMapData);
+}
+
+function scheduleRecenter() {
+  if (!lastMapData) return;
+  if (recenterTimer) clearTimeout(recenterTimer);
+  recenterTimer = setTimeout(() => {
+    recenterTimer = null;
+    recenterMap();
+  }, RECENTER_PAUSE);
+}
+
 function toggleMapLegend() {
   const body = document.getElementById('map-legend-body');
   const caret = document.querySelector('.legend-caret');
@@ -1142,6 +1161,14 @@ function initMap() {
     maxZoom: 19
   }).addTo(map);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  // Auto-recenter after a short pause in panning/zooming
+  map.on('dragstart zoomstart', () => {
+    if (recenterTimer) { clearTimeout(recenterTimer); recenterTimer = null; }
+  });
+  map.on('dragend zoomend', () => {
+    scheduleRecenter();
+  });
 }
 
 function clearMapMarkers() {
@@ -1201,6 +1228,7 @@ function formatDuration(seconds) {
 
 function updateMap(data) {
   if (!map) return;
+  lastMapData = data;
   clearMapMarkers();
 
   const carpool = data.carpool;
