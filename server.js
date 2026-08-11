@@ -228,9 +228,9 @@ const stmts = {
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 app.use(express.json());
-// Never cache the HTML shell so UI updates appear immediately
+// Never cache the HTML shell or styles so UI updates appear immediately
 app.use((req, res, next) => {
-  if (req.path === '/' || req.path.endsWith('.html')) {
+  if (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js')) {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   }
   next();
