@@ -1660,16 +1660,16 @@ async function loadLocConfig() {
 
   document.getElementById('loc-config-body').innerHTML = `
     <p class="text-xs text-muted mb-1">Active ${locConfigSlot}: <strong>${esc(activeName)}</strong></p>
+    <div class="form-group">
+      <label>Nickname</label>
+      <input type="text" id="loc-add-name" placeholder="e.g., Erics House" autocomplete="off">
+    </div>
     <div class="loc-add-row">
       <div class="autocomplete-wrapper" style="flex:1;">
         <input type="text" id="loc-add-address" placeholder="Search a place to add..." autocomplete="off" oninput="autocompleteAddress(this, 'loc-add')" onfocus="this.select()">
         <div class="autocomplete-dropdown hidden" id="ac-dropdown-loc-add"></div>
       </div>
       <button class="btn btn-success btn-sm" onclick="addSavedLocation()">Add</button>
-    </div>
-    <div class="form-group">
-      <label>Nickname (optional)</label>
-      <input type="text" id="loc-add-name" placeholder="e.g., Erics House" autocomplete="off">
     </div>
     <input type="hidden" id="loc-add-lat">
     <input type="hidden" id="loc-add-lng">
