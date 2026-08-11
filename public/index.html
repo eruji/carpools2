@@ -272,10 +272,6 @@
     </div>
 
     <div id="session-active" class="hidden">
-      <div class="phase-status">
-        <span class="phase-dot" id="session-phase-icon"></span>
-        <span class="phase-text" id="session-phase-title">Phase: Meetup</span>
-      </div>
       <p id="session-info" class="text-sm text-muted mb-1"></p>
 
       <!-- Phase 1: Meetup Controls -->
@@ -1173,19 +1169,6 @@ function renderSessionUI(session) {
 
   idleDiv.classList.add('hidden');
   activeDiv.classList.remove('hidden');
-
-  const phaseDotColors = {
-    meetup: '#8FAE8B', destination: '#C0A46A', back_to_meetup: '#B07166', completed: '#7C9A77'
-  };
-  const phaseTitles = {
-    meetup: 'Phase 1 · Heading to Meetup',
-    destination: 'Phase 2 · En Route to Destination',
-    back_to_meetup: 'Phase 3 · Returning to Meetup',
-    completed: 'Phase 4 · Complete'
-  };
-
-  document.getElementById('session-phase-icon').style.background = phaseDotColors[session.phase] || '#8FAE8B';
-  document.getElementById('session-phase-title').textContent = phaseTitles[session.phase] || session.phase;
 
   // Driver info — everyone sees who's driving and where they're headed
   const driver = session.members.find(m => m.user_id === session.driver_id);
