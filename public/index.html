@@ -199,23 +199,25 @@
         </div>
       </div>
       <!-- Stop 2: Meetup (name only) — clickable to edit/swap -->
-      <div class="subway-stop" id="subway-stop-meetup" onclick="openLocationSwitcher('meetup')">
+      <div class="subway-stop" id="subway-stop-meetup" onclick="openLocConfig('meetup')">
         <div class="dot"></div>
         <div class="stop-content">
           <div class="stop-row">
             <div class="stop-name" id="subway-meetup-name">Meetup</div>
             <div class="stop-eta hidden" id="subway-meetup-eta"></div>
+            <span class="stop-chevron">›</span>
           </div>
           <div class="stop-detail" id="subway-meetup-addr"></div>
         </div>
       </div>
       <!-- Stop 3: Destination (name only) — clickable to edit/swap -->
-      <div class="subway-stop" id="subway-stop-dest" onclick="openLocationSwitcher('destination')">
+      <div class="subway-stop" id="subway-stop-dest" onclick="openLocConfig('destination')">
         <div class="dot"></div>
         <div class="stop-content">
           <div class="stop-row">
             <div class="stop-name" id="subway-dest-name">Destination</div>
             <div class="stop-eta hidden" id="subway-dest-eta"></div>
+            <span class="stop-chevron">›</span>
           </div>
           <div class="stop-detail" id="subway-dest-addr"></div>
         </div>
@@ -236,41 +238,14 @@
     </div>
   </div>
 
-  <!-- ═══════ LOCATION SWITCHER (tap a stop to open) ═══════ -->
-  <div id="location-switcher" class="card hidden">
-    <div class="flex-between">
-      <h3>Location Switcher</h3>
-      <button class="btn btn-outline btn-sm" onclick="closeLocationSwitcher()">Close</button>
-    </div>
-    <p class="text-xs text-muted mb-1">Tap a saved location to make it the active Meetup or Destination, or add a new one.</p>
-
-    <!-- Active slots -->
-    <div class="loc-slot">
-      <span class="loc-slot-label">Meetup</span>
-      <select id="loc-active-meetup" class="loc-slot-select" onchange="setActiveFromSlot('meetup', this.value)"></select>
-    </div>
-    <div class="loc-slot">
-      <span class="loc-slot-label">Destination</span>
-      <select id="loc-active-dest" class="loc-slot-select" onchange="setActiveFromSlot('destination', this.value)"></select>
-    </div>
-
-    <!-- Saved locations list -->
-    <h4 class="mt-1">Saved Locations</h4>
-    <div id="saved-locations-list">
-      <p class="text-xs text-muted">Loading...</p>
-    </div>
-
-    <!-- Add new -->
-    <h4 class="mt-1">Add Location</h4>
-    <div class="autocomplete-wrapper">
-      <input type="text" id="loc-add-address" placeholder="Search a place..." autocomplete="off" oninput="autocompleteAddress(this, 'loc-add')" onfocus="this.select()">
-      <div class="autocomplete-dropdown hidden" id="ac-dropdown-loc-add"></div>
-    </div>
-    <input type="hidden" id="loc-add-name">
-    <input type="hidden" id="loc-add-lat">
-    <input type="hidden" id="loc-add-lng">
-    <div class="btn-group">
-      <button class="btn btn-success btn-sm" onclick="addSavedLocation()">Add</button>
+  <!-- ═══════ LOCATION CONFIG (tap the chevron on a stop) ═══════ -->
+  <div id="loc-config" class="loc-modal hidden">
+    <div class="loc-modal-card">
+      <div class="flex-between">
+        <h3 id="loc-config-title">Location</h3>
+        <button class="btn btn-outline btn-sm" onclick="closeLocConfig()">Close</button>
+      </div>
+      <div id="loc-config-body"></div>
     </div>
   </div>
 
@@ -1656,45 +1631,60 @@ async function rotateInviteCode() {
   }
 }
 
-// ── Location Switcher (tap subway stops to edit/swap) ───────────────────────
+// ── Location Config (tap the › on a subway stop) ────────────────────────────
 let savedLocations = [];
+let locConfigSlot = null; // 'meetup' | 'destination'
 
-function openLocationSwitcher(slot) {
-  document.getElementById('location-switcher').classList.remove('hidden');
-  loadSavedLocations();
+function openLocConfig(slot) {
+  locConfigSlot = slot;
+  document.getElementById('loc-config-title').textContent = slot === 'meetup' ? 'Meetup' : 'Destination';
+  document.getElementById('loc-config').classList.remove('hidden');
+  loadLocConfig();
 }
 
-function closeLocationSwitcher() {
-  document.getElementById('location-switcher').classList.add('hidden');
+function closeLocConfig() {
+  document.getElementById('loc-config').classList.add('hidden');
 }
 
-async function loadSavedLocations() {
-  if (!currentCarpoolId) return;
+async function loadLocConfig() {
+  if (!currentCarpoolId || !locConfigSlot) return;
   const res = await fetch(`/api/carpools/${currentCarpoolId}/locations`);
   const data = await res.json();
   savedLocations = data.locations || [];
-  renderSavedLocations();
-}
 
-function renderSavedLocations() {
-  const opts = savedLocations.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
-  document.getElementById('loc-active-meetup').innerHTML = '<option value="">— saved —</option>' + opts;
-  document.getElementById('loc-active-dest').innerHTML = '<option value="">— saved —</option>' + opts;
+  const c = currentCarpoolData.carpool;
+  const activeName = locConfigSlot === 'meetup' ? meetupLabel(c) : destLabel(c);
+  const isMeetup = locConfigSlot === 'meetup';
 
-  const list = document.getElementById('saved-locations-list');
+  document.getElementById('loc-config-body').innerHTML = `
+    <p class="text-xs text-muted mb-1">Active ${locConfigSlot}: <strong>${esc(activeName)}</strong></p>
+    <div class="loc-add-row">
+      <div class="autocomplete-wrapper" style="flex:1;">
+        <input type="text" id="loc-add-address" placeholder="Search a place to add..." autocomplete="off" oninput="autocompleteAddress(this, 'loc-add')" onfocus="this.select()">
+        <div class="autocomplete-dropdown hidden" id="ac-dropdown-loc-add"></div>
+      </div>
+      <button class="btn btn-success btn-sm" onclick="addSavedLocation()">Add</button>
+    </div>
+    <input type="hidden" id="loc-add-name">
+    <input type="hidden" id="loc-add-lat">
+    <input type="hidden" id="loc-add-lng">
+    <h4 class="mt-1">Saved</h4>
+    <div id="loc-config-saved"></div>
+  `;
+
+  const savedBox = document.getElementById('loc-config-saved');
   if (savedLocations.length === 0) {
-    list.innerHTML = '<p class="text-xs text-muted">No saved locations yet. Add one below.</p>';
+    savedBox.innerHTML = '<p class="text-xs text-muted">No saved locations yet.</p>';
     return;
   }
-  list.innerHTML = savedLocations.map(l => `
+  savedBox.innerHTML = savedLocations.map(l => `
     <div class="loc-row">
       <div class="loc-info">
         <span class="loc-name">${esc(l.name)}</span>
         <span class="loc-addr">${esc(l.address)}</span>
       </div>
       <div class="loc-actions">
-        <button class="btn btn-outline btn-sm" onclick="setActiveFromSlot('meetup', ${l.id})">Meetup</button>
-        <button class="btn btn-outline btn-sm" onclick="setActiveFromSlot('destination', ${l.id})">Dest</button>
+        <button class="btn btn-primary btn-sm" onclick="useSavedLocation(${l.id})">Use</button>
         <button class="btn btn-outline btn-sm" onclick="editSavedLocation(${l.id})">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteSavedLocation(${l.id})">Del</button>
       </div>
@@ -1702,11 +1692,11 @@ function renderSavedLocations() {
   `).join('');
 }
 
-// Apply a saved location as the active meetup or destination
-async function setActiveFromSlot(slot, locId) {
-  if (!locId) return;
+// Apply a saved location as the active slot's location
+async function useSavedLocation(locId) {
   const loc = savedLocations.find(l => l.id == locId);
-  if (!loc) return;
+  if (!loc || !locConfigSlot) return;
+  const slot = locConfigSlot;
   const body = slot === 'meetup'
     ? { meetup_name: loc.address || loc.name, meetup_nickname: loc.name, meetup_lat: loc.lat, meetup_lng: loc.lng }
     : { destination_name: loc.address || loc.name, destination_nickname: loc.name, destination_lat: loc.lat, destination_lng: loc.lng };
@@ -1720,7 +1710,7 @@ async function setActiveFromSlot(slot, locId) {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
   }
-  closeLocationSwitcher();
+  closeLocConfig();
   await refreshMyCarpools();
   await loadCarpoolView(currentCarpoolId);
 }
@@ -1736,10 +1726,7 @@ async function addSavedLocation() {
     body: JSON.stringify({ name: name || address.split(',')[0], address, lat, lng })
   });
   if (!res.ok) { alert('Failed to add location'); return; }
-  ['loc-add-address', 'loc-add-name', 'loc-add-lat', 'loc-add-lng'].forEach(id => {
-    document.getElementById(id).value = '';
-  });
-  await loadSavedLocations();
+  await loadLocConfig();
 }
 
 async function editSavedLocation(locId) {
@@ -1751,14 +1738,14 @@ async function editSavedLocation(locId) {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: newName.trim() || loc.name })
   });
-  if (res.ok) await loadSavedLocations();
+  if (res.ok) await loadLocConfig();
 }
 
 async function deleteSavedLocation(locId) {
   const loc = savedLocations.find(l => l.id == locId);
   if (!confirm('Delete "' + (loc ? loc.name : 'this location') + '"? The active carpool location is not changed.')) return;
   await fetch(`/api/carpools/${currentCarpoolId}/locations/${locId}`, { method: 'DELETE' });
-  await loadSavedLocations();
+  await loadLocConfig();
 }
 
 // ── Carpool Settings ────────────────────────────────────────────────────────

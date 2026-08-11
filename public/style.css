@@ -308,6 +308,16 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   white-space: nowrap;
   flex-shrink: 0;
 }
+.subway-stop .stop-chevron {
+  margin-left: auto;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-3);
+  flex-shrink: 0;
+  padding-left: 8px;
+}
+.subway-stop[onclick]:hover .stop-chevron { color: var(--accent-deep); }
 .subway-stop .stop-eta::before {
   content: '· ';
   color: var(--text-3);
@@ -405,30 +415,35 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   color: var(--text-3);
 }
 
-/* ── Location Switcher panel ───────────────────────────────── */
-.loc-slot {
+/* ── Location Config modal ───────────────────────────────────── */
+.loc-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
 }
-.loc-slot-label {
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: var(--text-2);
-  width: 90px;
-  flex-shrink: 0;
-}
-.loc-slot-select {
-  flex: 1;
-  padding: 9px 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  font-size: 0.95rem;
+.loc-modal-card {
   background: var(--surface);
-  color: var(--text);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  padding: 16px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 85vh;
+  overflow-y: auto;
 }
-.loc-slot-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.loc-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.loc-modal .loc-add-row input { padding: 9px 12px; font-size: 0.95rem; }
 
 .loc-row {
   display: flex;
