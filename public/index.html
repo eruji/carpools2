@@ -1208,8 +1208,10 @@ function renderSessionUI(session) {
     btnRiding.classList.toggle('hidden', myStatus !== 'pending');
     // Arrive: once you've picked a role
     btnArrived.classList.toggle('hidden', myStatus === 'pending');
-    // Skip: always available
-    btnSkip.classList.remove('hidden');
+    // Skip: available until everyone has arrived
+    const activeNow = session.members.filter(m => m.status !== 'skip');
+    const allArrived = activeNow.length > 0 && activeNow.every(m => m.status === 'arrived');
+    btnSkip.classList.toggle('hidden', allArrived);
 
     const ready = session.members.filter(m => m.status !== 'skip' && m.status !== 'pending');
     const allReady = ready.length > 0 && ready.every(m => m.status === 'arrived' || m.status === 'driving');
@@ -1269,6 +1271,10 @@ function renderMemberStatus(session) {
   // Next driver = lowest credits, excluding the current driver
   const nonDrivers = sorted.filter(m => m.user_id !== session.driver_id);
   const nextDriverId = nonDrivers.length ? nonDrivers[0].user_id : null;
+  // No skipping once everyone has arrived at the meetup
+  const active = session.members.filter(m => m.status !== 'skip');
+  const allArrived = active.length > 0 && active.every(m => m.status === 'arrived');
+  const noSkip = session.phase === 'meetup' && allArrived;
 
   container.innerHTML = sorted.map(m => {
     const statusLabels = {
@@ -1314,10 +1320,10 @@ function renderMemberStatus(session) {
           <span class="text-xs text-muted">${etaStr}</span>
         </div>
         <div class="member-actions">
-          ${m.status !== 'skip' && m.user_id !== currentUser.id
+          ${!noSkip && m.status !== 'skip' && m.user_id !== currentUser.id
             ? `<button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip</button>`
             : ''}
-          ${m.status !== 'skip' && m.user_id === currentUser.id && m.status !== 'pending'
+          ${!noSkip && m.status !== 'skip' && m.user_id === currentUser.id && m.status !== 'pending'
             ? `<button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip Me</button>`
             : ''}
           ${m.user_id === currentUser.id && (m.status === 'driving' || m.status === 'riding')
