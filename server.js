@@ -228,6 +228,7 @@ const stmts = {
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 // Never cache the HTML shell or styles so UI updates appear immediately
 app.use((req, res, next) => {
   if (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js')) {
@@ -370,6 +371,69 @@ app.put('/api/profile/password', requireAuth, (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── Admin debug page (password protected) ───────────────────────────────────
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_TABLES = ['users', 'carpools', 'carpool_members', 'carpool_sessions', 'session_members', 'carpool_history', 'carpool_locations', 'invitations'];
+
+app.get('/admin/logout', (req, res) => {
+  req.session.isAdmin = false;
+  res.redirect('/admin');
+});
+
+app.get('/admin', (req, res) => {
+  if (req.session.isAdmin) return renderAdminPage(res);
+  res.send(`<!DOCTYPE html><html><head><title>Vroommates Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>body{font-family:system-ui;background:#F5F5F1;color:#333;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+    form{background:#fff;border:1px solid #ddd;border-radius:12px;padding:24px;width:280px;box-shadow:0 4px 16px rgba(0,0,0,0.08)}
+    h2{margin:0 0 4px;font-size:1.2rem}
+    input{width:100%;padding:10px;margin:10px 0 14px;border:1px solid #ccc;border-radius:8px;font-size:1rem;box-sizing:border-box}
+    button{width:100%;padding:12px;background:#7C9A77;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer}
+    .err{color:#B07166;font-size:0.85rem}</style></head>
+    <body><form method="POST" action="/admin">
+      <h2>Vroommates Admin</h2>
+      <p style="color:#888;font-size:0.85rem;margin:0">Database debug</p>
+      <input type="password" name="password" placeholder="Admin password" autofocus required>
+      <button type="submit">Login</button>
+      ${req.query.err ? '<p class="err">Wrong password</p>' : ''}
+    </form></body></html>`);
+});
+
+app.post('/admin', (req, res) => {
+  if (req.body.password === ADMIN_PASSWORD) {
+    req.session.isAdmin = true;
+    return res.redirect('/admin');
+  }
+  res.redirect('/admin?err=1');
+});
+
+function renderAdminPage(res) {
+  let html = `<!DOCTYPE html><html><head><title>Vroommates Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>body{font-family:system-ui;background:#F5F5F1;color:#333;padding:16px;max-width:1100px;margin:auto}
+    h1{font-size:1.3rem;display:flex;justify-content:space-between;align-items:center}
+    h2{font-size:1rem;margin:22px 0 6px;border-bottom:1px solid #ccc;padding-bottom:4px}
+    table{border-collapse:collapse;width:100%;font-size:0.75rem;background:#fff}
+    th,td{border:1px solid #ddd;padding:4px 6px;text-align:left;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+    th{background:#EFEFEA}
+    tr:nth-child(even){background:#FAFAF8}
+    a{color:#B07166;font-size:0.8rem}
+    .meta{color:#888;font-size:0.75rem}</style></head><body>
+    <h1>Vroommates Admin <a href="/admin/logout">logout</a></h1>
+    <p class="meta">version ${pkg.version}</p>`;
+  for (const t of ADMIN_TABLES) {
+    const rows = db.prepare('SELECT * FROM ' + t).all();
+    const keys = rows.length ? Object.keys(rows[0]) : [];
+    html += `<h2>${t} (${rows.length})</h2>`;
+    if (!rows.length) { html += '<p class="meta">(empty)</p>'; continue; }
+    html += `<table><tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr>` +
+      rows.map(r => `<tr>${keys.map(k => `<td>${r[k] == null ? '' : String(r[k])}</td>`).join('')}</tr>`).join('') +
+      `</table>`;
+  }
+  html += '</body></html>';
+  res.send(html);
+}
 
 // ── Carpool Routes ──────────────────────────────────────────────────────────
 app.get('/api/carpools', requireAuth, (req, res) => {

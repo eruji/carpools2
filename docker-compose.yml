@@ -10,6 +10,7 @@ services:
       - carpool_data:/data
     environment:
       - SESSION_SECRET=change-this-to-a-random-string
+      - ADMIN_PASSWORD=change-me
       - DB_PATH=/data/carpool.db
     restart: unless-stopped
 

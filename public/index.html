@@ -18,7 +18,7 @@
 <!-- HEADER                                                        -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <header id="app-header" class="hidden">
-  <h1>Vroommates <span id="app-version" class="app-version"></span></h1>
+  <h1 id="app-title" title="">Vroommates</h1>
   <nav>
     <button class="btn btn-outline btn-sm" onclick="goToDashboard()" id="btn-dashboard" style="color:#6F6F66;border-color:#C9C9BF;">Dashboard</button>
     <div class="profile-menu">
@@ -459,17 +459,15 @@ async function init() {
 
 // Show app version + build info in the header so you can verify the running build
 async function loadVersion() {
-  const el = document.getElementById('app-version');
   try {
     const res = await fetch('/api/version');
     const data = await res.json();
-    // Build number increments with every CI build so the badge always changes
     const buildNum = data.buildNum ? ' · b' + data.buildNum : '';
     const sha = data.build ? ' · ' + data.build.slice(0, 7) : '';
-    el.textContent = 'v' + data.version + buildNum + sha;
-    el.title = 'Built: ' + (data.builtAt || 'unknown');
+    // Shown as a hover tooltip on the app title, not in the layout
+    document.getElementById('app-title').title = 'v' + data.version + buildNum + sha + (data.builtAt ? ' · ' + data.builtAt : '');
   } catch (e) {
-    el.textContent = 'v?';
+    document.getElementById('app-title').title = 'version unavailable';
   }
 }
 
