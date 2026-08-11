@@ -274,7 +274,7 @@
 
       <!-- Phase 1: Meetup Controls -->
       <div id="phase-meetup-controls" class="btn-group">
-        <button id="btn-driving" class="btn btn-primary" onclick="respondToSession('driving')">Driving</button>
+        <button id="btn-driving" class="btn btn-primary" onclick="respondToSession('driving')">I'll Drive</button>
         <button id="btn-riding" class="btn btn-success" onclick="respondToSession('riding')">Riding</button>
         <button id="btn-skip" class="btn btn-outline" onclick="respondToSession('skip')">Skip</button>
         <button id="btn-arrived" class="btn btn-success" onclick="respondToSession('arrived')">Arrived</button>
@@ -1198,7 +1198,7 @@ function renderSessionUI(session) {
       btnDriving.classList.add('hidden');
     } else {
       btnDriving.classList.remove('hidden');
-      btnDriving.textContent = someoneElseDriving ? "I'll Drive Instead" : 'Driving';
+      btnDriving.textContent = someoneElseDriving ? "I'll Drive Instead" : "I'll Drive";
     }
     // Riding: only while undecided
     btnRiding.classList.toggle('hidden', myStatus !== 'pending');
