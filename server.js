@@ -228,6 +228,13 @@ const stmts = {
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 app.use(express.json());
+// Never cache the HTML shell so UI updates appear immediately
+app.use((req, res, next) => {
+  if (req.path === '/' || req.path.endsWith('.html')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'carpool-secret-change-in-production-' + Math.random().toString(36),
