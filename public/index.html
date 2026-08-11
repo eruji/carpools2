@@ -171,7 +171,19 @@
   </div>
 
   <!-- ═══════ REALTIME MAP ═══════ -->
-  <div id="map-container"><div id="map"></div></div>
+  <div id="map-container">
+    <div id="map"></div>
+    <div id="map-legend" class="map-legend">
+      <div class="map-legend-title" onclick="toggleMapLegend()">Map Key <span class="legend-caret">▾</span></div>
+      <div id="map-legend-body" class="map-legend-body">
+        <div class="legend-item"><span class="legend-pill legend-meetup">Meetup</span></div>
+        <div class="legend-item"><span class="legend-pill legend-dest">Destination</span></div>
+        <div class="legend-item"><span class="legend-you-dot"></span>You <span class="legend-sub">(pulsing, shows ETA)</span></div>
+        <div class="legend-item"><span class="legend-avatar">AB</span>Member <span class="legend-sub">(initials)</span></div>
+        <div class="legend-item"><span class="legend-line"></span>Route <span class="legend-sub">(dashed = member paths)</span></div>
+      </div>
+    </div>
+  </div>
 
   <!-- ═══════ SUBWAY-STYLE TRANSIT LINE ═══════ -->
   <div class="subway-map" id="subway-map">
@@ -1127,6 +1139,12 @@ function updatePhaseIndicator() {
 }
 
 // ── Map ─────────────────────────────────────────────────────────────────────
+function toggleMapLegend() {
+  const body = document.getElementById('map-legend-body');
+  const caret = document.querySelector('.legend-caret');
+  const hidden = body.classList.toggle('hidden');
+  caret.textContent = hidden ? '▸' : '▾';
+}
 function initMap() {
   if (map) {
     map.invalidateSize();
