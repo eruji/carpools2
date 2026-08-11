@@ -1364,13 +1364,12 @@ function updateMap(data) {
       const marker = L.marker([m.location_lat, m.location_lng], {
         icon: L.divIcon({
           className: '',
-          html: `<div style="display:flex;align-items:center;gap:8px;">
-              <div style="width:38px;height:38px;border-radius:50%;background:${avatarColor};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;letter-spacing:0.02em;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);flex-shrink:0;">${esc(getInitials(m.username))}</div>
-              <div style="background:rgba(255,255,255,0.95);border:1px solid #D8D8D0;border-radius:10px;padding:3px 10px;color:#33332D;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.18);">${esc(m.username)}</div>
-            </div>`,
-          iconAnchor: [24, 24]
+          html: `<div style="width:38px;height:38px;border-radius:50%;background:${avatarColor};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;letter-spacing:0.02em;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(m.username))}</div>`,
+          iconAnchor: [19, 19]
         })
-      }).addTo(map).bindPopup(`${esc(m.username)} (${m.status})`);
+      }).addTo(map)
+        .bindTooltip(`${esc(m.username)} (${m.status})`, { direction: 'top', offset: [0, -12] })
+        .bindPopup(`${esc(m.username)} (${m.status})`);
       mapMarkers['member_' + m.user_id] = marker;
       addPoint(m.location_lat, m.location_lng);
 
