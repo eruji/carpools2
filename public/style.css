@@ -319,7 +319,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .subway-stop[onclick]:hover .stop-chevron { color: var(--accent-deep); }
 .subway-stop .stop-eta::before {
-  content: '· ';
+  content: '- ';
   color: var(--text-3);
 }
 

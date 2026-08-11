@@ -887,10 +887,12 @@ function updateSubwayETAs(data) {
     : 0;
   const legEta = Math.round(fullDist / 0.5);
 
-  // Arrival clock time only (e.g., "9:45 PM")
-  const fmt = (min) => {
+  // "(24mi 10:10PM)" — distance + arrival clock time
+  const fmt = (mi, min) => {
+    const miTxt = Math.round(mi);
     const mins = Math.max(0, Math.round(min));
-    return new Date(Date.now() + mins * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const clock = new Date(Date.now() + mins * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return `(${miTxt}mi ${clock})`;
   };
   const show = (el, txt) => { el.textContent = txt; el.classList.remove('hidden'); };
   const done = (el) => show(el, 'Departed');
@@ -900,17 +902,17 @@ function updateSubwayETAs(data) {
     if (myLocation && carpool.meetup_lat) {
       const d = haversine(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng);
       const m = Math.round(d / 0.5);
-      show(meetupEta, fmt(m));
-      show(destEta, fmt(m + legEta));
-      show(returnEta, fmt(m + legEta * 2));
+      show(meetupEta, fmt(d, m));
+      show(destEta, fmt(d + fullDist, m + legEta));
+      show(returnEta, fmt(d + fullDist * 2, m + legEta * 2));
     }
   } else if (session.phase === 'destination') {
     done(meetupEta);
     if (myLocation && carpool.destination_lat) {
       const d = haversine(myLocation.lat, myLocation.lng, carpool.destination_lat, carpool.destination_lng);
       const m = Math.round(d / 0.5);
-      show(destEta, fmt(m));
-      show(returnEta, fmt(m + legEta));
+      show(destEta, fmt(d, m));
+      show(returnEta, fmt(d + fullDist, m + legEta));
     }
   } else if (session.phase === 'back_to_meetup') {
     done(meetupEta);
@@ -918,7 +920,7 @@ function updateSubwayETAs(data) {
     if (myLocation && carpool.meetup_lat) {
       const d = haversine(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng);
       const m = Math.round(d / 0.5);
-      show(returnEta, fmt(m));
+      show(returnEta, fmt(d, m));
     }
   }
 }
@@ -971,7 +973,7 @@ function renderSubwayMembers(data) {
     const dist = haversine(m.location_lat, m.location_lng, targetLat, targetLng);
     const progress = Math.min(1, Math.max(0, 1 - dist / denominator));
     const eta = Math.round(dist / 0.5);
-    const detail = m.status === 'arrived' ? 'Arrived' : `~${eta} min`;
+    const detail = m.status === 'arrived' ? 'Arrived' : `${dist.toFixed(1)} mi · ~${eta} min`;
     const bubble = document.createElement('div');
     bubble.className = 'subway-avatar-online';
     bubble.dataset.from = leg.from;
