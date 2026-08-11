@@ -151,9 +151,17 @@ header nav span { opacity: 0.7; font-size: 0.9rem; max-width: 100px; overflow: h
   font-weight: 600;
   letter-spacing: 0.03em;
   color: var(--text);
-  padding: 4px 8px 8px;
+  padding: 4px 8px 0;
+}
+.profile-menu-email {
+  font-size: 0.7rem;
+  color: var(--text-3);
+  padding: 0 8px 8px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Cards ───────────────────────────────────────────────────── */

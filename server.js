@@ -252,6 +252,28 @@ app.use(session({
   cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 } // 7 days
 }));
 
+// Cloudflare Access auto-login — trust the email header Cloudflare adds after
+// the user passes an Access policy. Safe because the origin is only reachable
+// through the tunnel (Cloudflare validates and strips these headers).
+app.use((req, res, next) => {
+  const cfEmail = req.headers['cf-access-authenticated-user-email'];
+  if (cfEmail && typeof cfEmail === 'string' && cfEmail.trim()) {
+    const email = cfEmail.trim().toLowerCase();
+    let user = stmts.userByEmail.get(email);
+    if (!user) {
+      // Auto-register: email local part as username, random password (Access handles auth)
+      let username = (email.split('@')[0] || 'user').replace(/[^a-zA-Z0-9_.-]/g, '_').slice(0, 20) || 'user';
+      let candidate = username, n = 2;
+      while (stmts.userByUsername.get(candidate)) { candidate = username + n; n++; }
+      const hash = bcrypt.hashSync(Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2), 10);
+      const result = stmts.createUser.run(candidate, email, hash);
+      user = stmts.userById.get(result.lastInsertRowid);
+    }
+    req.session.userId = user.id;
+  }
+  next();
+});
+
 function requireAuth(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ error: 'Not authenticated' });

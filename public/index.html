@@ -27,6 +27,7 @@
         <button class="profile-icon" id="profile-icon" onclick="toggleProfileMenu()" title="Profile"></button>
         <div class="profile-dropdown hidden" id="profile-dropdown">
           <div class="profile-menu-name" id="profile-menu-name"></div>
+          <div class="profile-menu-email" id="profile-menu-email"></div>
           <button class="btn btn-outline btn-sm mobile-dashboard hidden" style="width:100%;justify-content:flex-start;" onclick="goToDashboard()">Dashboard</button>
           <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openProfileModal()">Edit Profile</button>
           <button class="btn btn-danger btn-sm" style="width:100%;justify-content:flex-start;" onclick="logout()">Logout</button>
@@ -511,6 +512,8 @@ function renderProfileIcon() {
   }
   const name = document.getElementById('profile-menu-name');
   if (name) name.textContent = currentUser.username;
+  const email = document.getElementById('profile-menu-email');
+  if (email) email.textContent = currentUser.email || '';
 }
 
 function toggleProfileMenu() {
