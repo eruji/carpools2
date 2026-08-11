@@ -201,8 +201,6 @@
           <div class="stop-eta hidden" id="subway-start-eta"></div>
         </div>
       </div>
-      <!-- Members en route to meetup -->
-      <div id="subway-members-meetup" class="subway-members-section"></div>
       <!-- Stop 2: Meetup (name only) -->
       <div class="subway-stop" id="subway-stop-meetup">
         <div class="dot"></div>
@@ -212,8 +210,6 @@
           <div class="stop-eta hidden" id="subway-meetup-eta"></div>
         </div>
       </div>
-      <!-- Members en route to destination -->
-      <div id="subway-members-dest" class="subway-members-section"></div>
       <!-- Stop 3: Destination (name only) -->
       <div class="subway-stop" id="subway-stop-dest">
         <div class="dot"></div>
@@ -223,8 +219,6 @@
           <div class="stop-eta hidden" id="subway-dest-eta"></div>
         </div>
       </div>
-      <!-- Members en route back -->
-      <div id="subway-members-return" class="subway-members-section"></div>
       <!-- Stop 4: Meetup again (return) -->
       <div class="subway-stop" id="subway-stop-return">
         <div class="dot"></div>
@@ -234,6 +228,8 @@
           <div class="stop-eta hidden" id="subway-return-eta"></div>
         </div>
       </div>
+      <!-- Member avatars positioned along the transit line -->
+      <div id="subway-avatars-layer" class="subway-avatars-layer"></div>
     </div>
   </div>
 
@@ -888,61 +884,84 @@ function updateSubwayETAs(data) {
 function renderSubwayMembers(data) {
   const session = data.activeSession;
   const carpool = data.carpool;
-
-  // Clear all member sections first
-  ['subway-members-meetup', 'subway-members-dest', 'subway-members-return'].forEach(id => {
-    document.getElementById(id).innerHTML = '';
-  });
+  const layer = document.getElementById('subway-avatars-layer');
+  layer.innerHTML = '';
 
   if (!session || session.phase === 'completed' || session.phase === 'idle' || !session.members) {
     return;
   }
 
-  // Render members into the segment for the current phase
-  const sectionMap = {
-    meetup: 'subway-members-meetup',
-    destination: 'subway-members-dest',
-    back_to_meetup: 'subway-members-return'
+  // Which stops bound the current leg
+  const legMap = {
+    meetup:        { from: 'subway-stop-start',  to: 'subway-stop-meetup' },
+    destination:   { from: 'subway-stop-meetup', to: 'subway-stop-dest' },
+    back_to_meetup:{ from: 'subway-stop-dest',  to: 'subway-stop-return' }
   };
-  const container = document.getElementById(sectionMap[session.phase]);
-  if (!container) return;
+  const leg = legMap[session.phase];
+  if (!leg) return;
 
-  // Show each member's position along the subway line
-  container.innerHTML = session.members
-    .filter(m => m.location_lat && m.location_lng && m.status !== 'skip' && m.status !== 'pending')
-    .map(m => {
-      let positionLabel = '';
+  // Target coordinates for progress + ETA
+  let targetLat, targetLng;
+  if (session.phase === 'destination') {
+    targetLat = carpool.destination_lat; targetLng = carpool.destination_lng;
+  } else {
+    targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng;
+  }
+  const legTotal = (targetLat && targetLng)
+    ? haversine(leg.from === 'subway-stop-meetup' ? carpool.meetup_lat : (leg.from === 'subway-stop-dest' ? carpool.destination_lat : (myLocation ? myLocation.lat : targetLat)),
+                leg.from === 'subway-stop-meetup' ? carpool.meetup_lng : (leg.from === 'subway-stop-dest' ? carpool.destination_lng : (myLocation ? myLocation.lng : targetLng)),
+                targetLat, targetLng)
+    : 0;
 
-      if (m.status === 'arrived') {
-        positionLabel = session.phase === 'meetup' ? 'At Meetup' : 'At Destination';
-      } else if (m.status === 'driving' || m.status === 'riding') {
-        let targetLat, targetLng, targetName;
-        if (session.phase === 'meetup') {
-          targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'meetup';
-        } else if (session.phase === 'destination') {
-          targetLat = carpool.destination_lat; targetLng = carpool.destination_lng; targetName = 'dest';
-        } else {
-          targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'meetup';
-        }
-        if (targetLat && targetLng) {
-          const dist = haversine(m.location_lat, m.location_lng, targetLat, targetLng);
-          const eta = Math.round(dist / 0.5);
-          positionLabel = `${dist.toFixed(1)} mi · ~${eta} min to ${targetName}`;
-        } else {
-          positionLabel = 'En route';
-        }
-      }
+  const withLocation = session.members.filter(m => m.location_lat && m.location_lng && m.status !== 'skip' && m.status !== 'pending');
+  if (withLocation.length === 0) return;
 
-      return `
-        <div class="subway-member-row">
-          <div class="subway-member-avatar" style="background:${memberDotColor(m.status)};">${esc(getInitials(m.username))}</div>
-          <div class="subway-member-info">
-            <span class="subway-member-name">${esc(m.username)}</span>
-            <span class="subway-member-detail">${positionLabel}</span>
-          </div>
-        </div>
-      `;
-    }).join('');
+  // Denominator: use max distance to target during meetup (arbitrary start),
+  // otherwise the real leg distance
+  let denominator = legTotal;
+  if (session.phase === 'meetup') {
+    denominator = Math.max(...withLocation.map(m => haversine(m.location_lat, m.location_lng, targetLat, targetLng)));
+    if (!(denominator > 0)) denominator = 1;
+  }
+  if (!(denominator > 0)) denominator = 1;
+
+  withLocation.forEach(m => {
+    const dist = haversine(m.location_lat, m.location_lng, targetLat, targetLng);
+    const progress = Math.min(1, Math.max(0, 1 - dist / denominator));
+    const eta = Math.round(dist / 0.5);
+    const detail = m.status === 'arrived' ? 'Arrived' : `${dist.toFixed(1)} mi · ~${eta} min`;
+    const bubble = document.createElement('div');
+    bubble.className = 'subway-avatar-online';
+    bubble.dataset.from = leg.from;
+    bubble.dataset.to = leg.to;
+    bubble.dataset.progress = progress;
+    bubble.title = m.username + ' · ' + detail;
+    bubble.innerHTML = `<div class="subway-avatar-bubble" style="background:${memberDotColor(m.status)};">${esc(getInitials(m.username))}</div>`;
+    layer.appendChild(bubble);
+  });
+
+  // Position avatars along the track after layout
+  requestAnimationFrame(positionSubwayAvatars);
+}
+
+function positionSubwayAvatars() {
+  const line = document.getElementById('subway-line');
+  const layer = document.getElementById('subway-avatars-layer');
+  if (!line || !layer) return;
+  const lineRect = line.getBoundingClientRect();
+  layer.querySelectorAll('.subway-avatar-online').forEach(a => {
+    const fromEl = document.getElementById(a.dataset.from);
+    const toEl = document.getElementById(a.dataset.to);
+    if (!fromEl || !toEl) return;
+    const fromDot = fromEl.querySelector('.dot').getBoundingClientRect();
+    const toDot = toEl.querySelector('.dot').getBoundingClientRect();
+    const p = parseFloat(a.dataset.progress) || 0;
+    const x = (fromDot.left + fromDot.width / 2) - lineRect.left;
+    const y = (fromDot.top + fromDot.height / 2) - lineRect.top
+            + ((toDot.top + toDot.height / 2) - (fromDot.top + fromDot.height / 2)) * p;
+    a.style.left = x + 'px';
+    a.style.top = y + 'px';
+  });
 }
 
 // ── Route Info Bar ──────────────────────────────────────────────────────────
@@ -1322,40 +1341,43 @@ function updateMap(data) {
     });
   }
 
-  // Phase 1: member locations with road-routed lines to meetup
-  if (inMeetup && session.members) {
+  // Member locations with avatar bubbles + road-routed lines to the phase target
+  if (session && session.members && (inMeetup || inTransit)) {
+    const target = session.phase === 'destination'
+      ? { lat: carpool.destination_lat, lng: carpool.destination_lng, name: 'dest' }
+      : { lat: carpool.meetup_lat, lng: carpool.meetup_lng, name: 'meetup' };
+
     session.members.forEach(m => {
-      if (m.location_lat && m.location_lng && m.status !== 'skip') {
-        const avatarColor = memberDotColor(m.status);
-        let etaStr = '';
-        if (carpool.meetup_lat && carpool.meetup_lng) {
-          const dist = haversine(m.location_lat, m.location_lng, carpool.meetup_lat, carpool.meetup_lng);
-          etaStr = ' · ~' + Math.round(dist / 0.5) + 'min';
-        }
-        const marker = L.marker([m.location_lat, m.location_lng], {
-          icon: L.divIcon({
-            className: '',
-            html: `<div style="display:flex;align-items:center;gap:8px;">
+      if (!(m.location_lat && m.location_lng) || m.status === 'skip') return;
+      const avatarColor = memberDotColor(m.status);
+      let etaStr = '';
+      if (target.lat && target.lng) {
+        const dist = haversine(m.location_lat, m.location_lng, target.lat, target.lng);
+        etaStr = ' · ~' + Math.round(dist / 0.5) + 'min';
+      }
+      const marker = L.marker([m.location_lat, m.location_lng], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="display:flex;align-items:center;gap:8px;">
               <div style="width:38px;height:38px;border-radius:50%;background:${avatarColor};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;letter-spacing:0.02em;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);flex-shrink:0;">${esc(getInitials(m.username))}</div>
               <div style="background:rgba(255,255,255,0.95);border:1px solid #D8D8D0;border-radius:10px;padding:3px 10px;color:#33332D;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.18);">${esc(m.username)}${etaStr}</div>
             </div>`,
-            iconAnchor: [24, 24]
-          })
-        }).addTo(map).bindPopup(`${esc(m.username)} (${m.status})${etaStr}`);
-        mapMarkers['member_' + m.user_id] = marker;
-        addPoint(m.location_lat, m.location_lng);
+          iconAnchor: [24, 24]
+        })
+      }).addTo(map).bindPopup(`${esc(m.username)} (${m.status})${etaStr}`);
+      mapMarkers['member_' + m.user_id] = marker;
+      addPoint(m.location_lat, m.location_lng);
 
-        // Route each member to the meetup on actual roads (fallback to straight line)
-        if (carpool.meetup_lat && carpool.meetup_lng) {
-          fetchRoute(m.location_lat, m.location_lng, carpool.meetup_lat, carpool.meetup_lng, (r) => {
-            if (!map) return;
-            const coords = r ? r.coords : [[m.location_lat, m.location_lng], [carpool.meetup_lat, carpool.meetup_lng]];
-            const line = L.polyline(coords, {
-              color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75
-            }).addTo(map);
-            mapPolylines['line_' + m.user_id] = line;
-          });
-        }
+      // Route each member to the phase target on actual roads (fallback to straight line)
+      if (target.lat && target.lng) {
+        fetchRoute(m.location_lat, m.location_lng, target.lat, target.lng, (r) => {
+          if (!map) return;
+          const coords = r ? r.coords : [[m.location_lat, m.location_lng], [target.lat, target.lng]];
+          const line = L.polyline(coords, {
+            color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75
+          }).addTo(map);
+          mapPolylines['line_' + m.user_id] = line;
+        });
       }
     });
   }
