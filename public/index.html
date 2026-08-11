@@ -2111,6 +2111,13 @@ function connectSocket() {
     });
   });
 
+  // Once the server knows who we are, make sure we're in the carpool room.
+  // This fixes the race where join-carpool arrived before authenticate,
+  // and re-joins after every reconnect.
+  socket.on('authenticated', () => {
+    if (currentCarpoolId) socket.emit('join-carpool', currentCarpoolId);
+  });
+
   socket.on('session-started', (session) => {
     activeSession = session;
     renderSessionUI(session);

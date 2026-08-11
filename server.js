@@ -955,6 +955,12 @@ io.on('connection', (socket) => {
     user.currentCarpool = carpoolId;
     onlineUsers.set(socket.id, user);
     socket.emit('joined-carpool', { carpoolId });
+
+    // Push the current session state so late/re-joiners are instantly in sync
+    const active = stmts.activeSession.get(carpoolId);
+    if (active) {
+      socket.emit('session-updated', { ...active, members: stmts.sessionMembers.all(active.id) });
+    }
   });
 
   socket.on('leave-carpool', (carpoolId) => {
