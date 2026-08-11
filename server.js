@@ -137,6 +137,11 @@ if (!carpoolCols.includes('invite_code')) {
 }
 // Repair any member statuses that were accidentally set to NULL by old location updates
 db.exec("UPDATE session_members SET status='pending' WHERE status IS NULL");
+// Track geo-fence (automatic) arrivals
+const smCols = db.prepare('PRAGMA table_info(session_members)').all().map(c => c.name);
+if (!smCols.includes('auto_arrived')) {
+  db.exec('ALTER TABLE session_members ADD COLUMN auto_arrived INTEGER DEFAULT 0');
+}
 
 // ── Invite code generator ───────────────────────────────────────────────────
 function generateInviteCode() {
@@ -677,7 +682,7 @@ app.post('/api/carpools/:id/sessions/start', requireAuth, (req, res) => {
 
 app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
   try {
-    const { status } = req.body; // 'driving' | 'riding' | 'skip' | 'arrived'
+    const { status, auto } = req.body; // 'driving' | 'riding' | 'skip' | 'arrived'; auto = geo-fence arrival
     const validStatuses = ['driving', 'riding', 'skip', 'arrived'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status. Must be: ' + validStatuses.join(', ') });
@@ -709,6 +714,12 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
     }
 
     stmts.updateSessionMember.run(status, null, null, activeSession.id, req.session.userId);
+
+    // Mark geo-fence arrivals so the UI can show it
+    if (status === 'arrived' && auto) {
+      db.prepare('UPDATE session_members SET auto_arrived = 1 WHERE session_id = ? AND user_id = ?')
+        .run(activeSession.id, req.session.userId);
+    }
 
     // Broadcast updated session
     const updatedSession = {

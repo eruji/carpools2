@@ -1387,6 +1387,7 @@ function renderMemberStatus(session) {
           ${isDriver ? '<span class="badge badge-yellow">Driving Now</span>' : ''}
           ${isNext ? '<span class="badge badge-blue">Next Driver</span>' : ''}
           <span class="badge ${statusColors[m.status] || 'badge-gray'}">${statusLabels[m.status] || statusLabels.pending}</span>
+          ${m.status === 'arrived' && m.auto_arrived ? '<span class="badge badge-blue" title="Geo-fence arrival">Auto</span>' : ''}
           <span class="text-xs text-muted">${etaStr}</span>
         </div>
         <div class="member-actions">
@@ -2217,7 +2218,7 @@ async function autoArrive(targetName) {
   const res = await fetch(`/api/carpools/${currentCarpoolId}/sessions/respond`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status: 'arrived' })
+    body: JSON.stringify({ status: 'arrived', auto: true })
   });
   if (!res.ok) return;
   const data = await res.json();
@@ -2227,7 +2228,7 @@ async function autoArrive(targetName) {
     updateMap({ carpool: currentCarpoolData.carpool, activeSession });
     updateSubwayMap({ carpool: currentCarpoolData.carpool, activeSession });
   }
-  showToast('You have arrived at ' + targetName + '!');
+  showToast('Auto-arrived at ' + targetName + ' (GPS within 150m)');
 }
 
 // ── Toast ───────────────────────────────────────────────────────────────────
