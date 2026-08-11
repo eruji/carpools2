@@ -438,6 +438,33 @@ app.post('/admin', (req, res) => {
   res.redirect('/admin?err=1');
 });
 
+// Safe user deletion (admin) — cleans up all references before removing
+app.post('/admin/delete-user', (req, res) => {
+  if (!req.session.isAdmin) return res.status(403).send('Not authorized');
+  const userId = parseInt(req.body.userId);
+  if (!userId) return res.status(400).send('Bad request');
+  const user = stmts.userById.get(userId);
+  if (!user) return res.status(404).send('User not found');
+
+  const del = db.transaction(() => {
+    // History where they drove
+    db.prepare('DELETE FROM carpool_history WHERE driver_id = ?').run(userId);
+    // Carpools they own (clean history first — no cascade there)
+    const owned = db.prepare('SELECT id FROM carpools WHERE owner_id = ?').all(userId);
+    for (const c of owned) {
+      db.prepare('DELETE FROM carpool_history WHERE carpool_id = ?').run(c.id);
+      db.prepare('DELETE FROM carpools WHERE id = ?').run(c.id); // cascades sessions/members/locations/invites
+    }
+    // Their memberships / session rows / invitations
+    db.prepare('DELETE FROM carpool_members WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM session_members WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM invitations WHERE invited_user_id = ? OR invited_by = ?').run(userId, userId);
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  });
+  del();
+  res.redirect('/admin');
+});
+
 function renderAdminPage(res) {
   let html = `<!DOCTYPE html><html><head><title>VroomMates Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -457,9 +484,17 @@ function renderAdminPage(res) {
     const keys = rows.length ? Object.keys(rows[0]) : [];
     html += `<h2>${t} (${rows.length})</h2>`;
     if (!rows.length) { html += '<p class="meta">(empty)</p>'; continue; }
-    html += `<table><tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr>` +
-      rows.map(r => `<tr>${keys.map(k => `<td>${r[k] == null ? '' : String(r[k])}</td>`).join('')}</tr>`).join('') +
-      `</table>`;
+    if (t === 'users') {
+      html += `<table><tr>${keys.map(k => `<th>${k}</th>`).join('')}<th></th></tr>` +
+        rows.map(r => `<tr>${keys.map(k => `<td>${r[k] == null ? '' : String(r[k])}</td>`).join('')}` +
+          `<td><form method="POST" action="/admin/delete-user" onsubmit="return confirm('Delete user ${String(r.username || r.id)} and all their data?');">` +
+          `<input type="hidden" name="userId" value="${r.id}"><button type="submit" style="background:#B07166;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;">Delete</button></form></td></tr>`
+        ).join('') + `</table>`;
+    } else {
+      html += `<table><tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr>` +
+        rows.map(r => `<tr>${keys.map(k => `<td>${r[k] == null ? '' : String(r[k])}</td>`).join('')}</tr>`).join('') +
+        `</table>`;
+    }
   }
   html += '</body></html>';
   res.send(html);
