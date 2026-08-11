@@ -1245,21 +1245,35 @@ function renderSessionUI(session) {
 
     const someoneElseDriving = session.driver_id && session.driver_id !== currentUser.id;
 
-    // The current driver never sees the claim button — just Arrived + Skip
-    if (myStatus === 'driving' || session.driver_id === currentUser.id) {
+    if (myStatus === 'skip') {
+      // Skipped: hide everything else, offer to change your mind
       btnDriving.classList.add('hidden');
+      btnRiding.classList.add('hidden');
+      btnArrived.classList.add('hidden');
+      btnSkip.classList.remove('hidden');
+      btnSkip.textContent = "Changed my mind";
+      btnSkip.onclick = () => respondToSession('pending');
+      phaseAdvance.classList.add('hidden');
     } else {
-      btnDriving.classList.remove('hidden');
-      btnDriving.textContent = someoneElseDriving ? "I'll Drive Instead" : "I'll Drive";
+      btnSkip.textContent = 'Skip';
+      btnSkip.onclick = () => respondToSession('skip');
+
+      // The current driver never sees the claim button — just Arrived + Skip
+      if (myStatus === 'driving' || session.driver_id === currentUser.id) {
+        btnDriving.classList.add('hidden');
+      } else {
+        btnDriving.classList.remove('hidden');
+        btnDriving.textContent = someoneElseDriving ? "I'll Drive Instead" : "I'll Drive";
+      }
+      // Riding: only while undecided
+      btnRiding.classList.toggle('hidden', myStatus !== 'pending');
+      // Arrive: once you've picked a role
+      btnArrived.classList.toggle('hidden', myStatus === 'pending');
+      // Skip: available until everyone has arrived
+      const activeNow = session.members.filter(m => m.status !== 'skip');
+      const allArrived = activeNow.length > 0 && activeNow.every(m => m.status === 'arrived');
+      btnSkip.classList.toggle('hidden', allArrived);
     }
-    // Riding: only while undecided
-    btnRiding.classList.toggle('hidden', myStatus !== 'pending');
-    // Arrive: once you've picked a role
-    btnArrived.classList.toggle('hidden', myStatus === 'pending');
-    // Skip: available until everyone has arrived
-    const activeNow = session.members.filter(m => m.status !== 'skip');
-    const allArrived = activeNow.length > 0 && activeNow.every(m => m.status === 'arrived');
-    btnSkip.classList.toggle('hidden', allArrived);
 
     const ready = session.members.filter(m => m.status !== 'skip' && m.status !== 'pending');
     const allReady = ready.length > 0 && ready.every(m => m.status === 'arrived' || m.status === 'driving');

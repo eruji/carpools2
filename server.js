@@ -744,8 +744,8 @@ app.post('/api/carpools/:id/sessions/start', requireAuth, (req, res) => {
 
 app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
   try {
-    const { status, auto } = req.body; // 'driving' | 'riding' | 'skip' | 'arrived'; auto = geo-fence arrival
-    const validStatuses = ['driving', 'riding', 'skip', 'arrived'];
+    const { status, auto } = req.body; // 'driving' | 'riding' | 'skip' | 'arrived' | 'pending'; auto = geo-fence arrival
+    const validStatuses = ['driving', 'riding', 'skip', 'arrived', 'pending'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status. Must be: ' + validStatuses.join(', ') });
     }
