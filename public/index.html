@@ -504,7 +504,18 @@ function renderProfileIcon() {
 }
 
 function toggleProfileMenu() {
-  document.getElementById('profile-dropdown').classList.toggle('hidden');
+  const dd = document.getElementById('profile-dropdown');
+  positionDropdown(document.getElementById('profile-icon'), dd);
+  dd.classList.toggle('hidden');
+}
+
+// Anchor a fixed dropdown under its trigger button (any viewport size)
+function positionDropdown(trigger, dd) {
+  if (!trigger || !dd) return;
+  const r = trigger.getBoundingClientRect();
+  dd.style.top = (r.bottom + 8) + 'px';
+  dd.style.right = (window.innerWidth - r.right) + 'px';
+  dd.style.left = 'auto';
 }
 
 function openProfileModal() {
@@ -2102,7 +2113,9 @@ async function deleteCarpool() {
 
 // ── Carpool menu (History / Setup) ──────────────────────────────────────────
 function toggleCarpoolMenu() {
-  document.getElementById('carpool-menu-dropdown').classList.toggle('hidden');
+  const dd = document.getElementById('carpool-menu-dropdown');
+  positionDropdown(document.getElementById('btn-carpool-gear'), dd);
+  dd.classList.toggle('hidden');
 }
 
 function openHistoryModal() {
