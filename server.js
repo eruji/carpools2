@@ -288,6 +288,7 @@ app.get('/api/version', (req, res) => {
   res.json({
     version: pkg.version,
     build: process.env.BUILD_SHA || null,
+    buildNum: process.env.BUILD_NUM || null,
     builtAt: process.env.BUILD_TIME || null
   });
 });

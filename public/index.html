@@ -438,8 +438,10 @@ async function loadVersion() {
   try {
     const res = await fetch('/api/version');
     const data = await res.json();
+    // Build number increments with every CI build so the badge always changes
+    const buildNum = data.buildNum ? ' · b' + data.buildNum : '';
     const sha = data.build ? ' · ' + data.build.slice(0, 7) : '';
-    el.textContent = 'v' + data.version + sha;
+    el.textContent = 'v' + data.version + buildNum + sha;
     el.title = 'Built: ' + (data.builtAt || 'unknown');
   } catch (e) {
     el.textContent = 'v?';
