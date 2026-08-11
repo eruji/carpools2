@@ -299,7 +299,9 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 
 /* Phase track coloring (4 segments: start→meetup→dest→return) */
-.subway-line.phase-meetup::before     { background: linear-gradient(to bottom, var(--accent) 0%, var(--accent) 25%, var(--border-strong) 25%); }
+/* During meetup, the leg is gray until the user arrives, then green */
+.subway-line.phase-meetup::before     { background: var(--border-strong); }
+.subway-line.phase-meetup.arrived::before { background: linear-gradient(to bottom, var(--accent) 0%, var(--accent) 25%, var(--border-strong) 25%); }
 .subway-line.phase-destination::before { background: linear-gradient(to bottom, var(--accent) 0%, var(--accent) 50%, var(--border-strong) 50%); }
 .subway-line.phase-return::before      { background: linear-gradient(to bottom, var(--accent) 0%, var(--accent) 50%, var(--warn) 50%, var(--warn) 75%, var(--border-strong) 75%); }
 .subway-line.phase-completed::before   { background: linear-gradient(to bottom, var(--accent) 100%); }

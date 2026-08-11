@@ -893,11 +893,22 @@ function updateSubwayMap(data) {
     stopDest.classList.add('is-future');
     stopReturn.classList.add('is-future');
   } else if (session.phase === 'meetup') {
+    // When the user arrives at the meetup, the leg turns green and the dot fills in
+    const myMember = session.members ? session.members.find(m => m.user_id === currentUser.id) : null;
+    const arrivedMeetup = myMember && myMember.status === 'arrived';
     subwayLine.classList.add('phase-meetup');
-    stopStart.classList.add('is-current');
-    stopMeetup.classList.add('is-future');
-    stopDest.classList.add('is-future');
-    stopReturn.classList.add('is-future');
+    if (arrivedMeetup) {
+      subwayLine.classList.add('arrived');
+      stopStart.classList.add('is-past');
+      stopMeetup.classList.add('is-current');
+      stopDest.classList.add('is-future');
+      stopReturn.classList.add('is-future');
+    } else {
+      stopStart.classList.add('is-current');
+      stopMeetup.classList.add('is-future');
+      stopDest.classList.add('is-future');
+      stopReturn.classList.add('is-future');
+    }
   } else if (session.phase === 'destination') {
     subwayLine.classList.add('phase-destination');
     stopStart.classList.add('is-past');
