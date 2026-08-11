@@ -1998,19 +1998,12 @@ async function useSavedLocation(locId) {
   const loc = savedLocations.find(l => l.id == locId);
   if (!loc || !locConfigSlot) return;
   const slot = locConfigSlot;
-  const body = slot === 'meetup'
-    ? { meetup_name: loc.address || loc.name, meetup_nickname: loc.name, meetup_lat: loc.lat, meetup_lng: loc.lng }
-    : { destination_name: loc.address || loc.name, destination_nickname: loc.name, destination_lat: loc.lat, destination_lng: loc.lng };
-  const res = await fetch(`/api/carpools/${currentCarpoolId}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  // Any member can set the active location (updates carpool + active session)
+  const res = await fetch(`/api/carpools/${currentCarpoolId}/location`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slot, name: loc.name, address: loc.address, lat: loc.lat, lng: loc.lng })
   });
   if (!res.ok) { alert('Failed to apply location'); return; }
-  // Update the active session too so the live view moves immediately
-  if (activeSession) {
-    await fetch(`/api/carpools/${currentCarpoolId}/sessions/locations`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-    });
-  }
   closeLocConfig();
   await refreshMyCarpools();
   await loadCarpoolView(currentCarpoolId);
