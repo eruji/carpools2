@@ -1172,7 +1172,8 @@ function renderSessionUI(session) {
   if (!session || session.phase === 'completed') {
     idleDiv.classList.remove('hidden');
     activeDiv.classList.add('hidden');
-    memberPanel.classList.add('hidden');
+    memberPanel.classList.remove('hidden');
+    renderMemberStatus(session); // shows the roster when there's no active session
     return;
   }
 
@@ -1300,6 +1301,27 @@ function renderSessionUI(session) {
 
 function renderMemberStatus(session) {
   const container = document.getElementById('member-status-list');
+
+  // No active session — show the carpool roster with credits and next-driver
+  if (!session || session.phase === 'completed') {
+    const roster = currentCarpoolData ? currentCarpoolData.members : [];
+    const sorted = [...roster].sort((a, b) =>
+      (a.coins_balance - b.coins_balance) || a.username.localeCompare(b.username)
+    );
+    const nextDriverId = sorted.length ? sorted[0].id : null;
+    container.innerHTML = sorted.map(m => `
+      <div class="member-row">
+        <div class="member-info">
+          <span class="member-avatar" style="background:${memberColor(m.id)};">${esc(getInitials(m.username))}</span>
+          <span class="member-coin" title="${m.coins_balance} credits">${m.coins_balance}</span>
+          <span class="member-name">${esc(m.username)}</span>
+          ${m.id === currentCarpoolData.carpool.owner_id ? '<span class="badge badge-blue">Owner</span>' : ''}
+          ${m.id === nextDriverId ? '<span class="badge badge-yellow">Next Driver</span>' : ''}
+        </div>
+      </div>
+    `).join('');
+    return;
+  }
 
   // Credits per member from the carpool roster
   const coins = {};
