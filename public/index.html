@@ -172,15 +172,11 @@
       <select id="carpool-switcher" onchange="switchCarpool(this.value)" aria-label="Switch carpool"></select>
       <span id="carpool-count-badge" class="badge badge-gray hidden"></span>
     </div>
-    <div style="display:flex;gap:6px;align-items:center;">
-      <span id="carpool-owner-badge" class="badge badge-blue hidden">Owner</span>
-      <span id="carpool-coins-badge" class="badge badge-yellow">0</span>
-      <div class="carpool-menu">
-        <button class="btn btn-outline btn-sm" onclick="toggleCarpoolMenu()" title="Carpool menu">⋯</button>
-        <div class="profile-dropdown hidden" id="carpool-menu-dropdown">
-          <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openHistoryModal()">History</button>
-          <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openSetupModal()">Setup</button>
-        </div>
+    <div class="carpool-menu">
+      <button class="gear-btn hidden" id="btn-carpool-gear" onclick="toggleCarpoolMenu()" title="Carpool menu"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      <div class="profile-dropdown hidden" id="carpool-menu-dropdown">
+        <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openHistoryModal()">History</button>
+        <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openSetupModal()">Setup</button>
       </div>
     </div>
   </div>
@@ -866,16 +862,8 @@ async function loadCarpoolView(carpoolId) {
   activeSession = data.activeSession;
   populateCarpoolSwitcher();
 
-  // Owner badge
-  const ownerBadge = document.getElementById('carpool-owner-badge');
-  if (data.isOwner) {
-    ownerBadge.classList.remove('hidden');
-  } else {
-    ownerBadge.classList.add('hidden');
-  }
-
-  // Coins badge
-  document.getElementById('carpool-coins-badge').textContent = data.myMembership.coins_balance;
+  // Gear menu (Setup/History) — owner only
+  document.getElementById('btn-carpool-gear').classList.toggle('hidden', !data.isOwner);
 
   // Setup tab: member management + add member + invite (owner only)
   renderSetupMembers(data.members, data.isOwner);
