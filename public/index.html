@@ -1246,8 +1246,8 @@ function renderSessionUI(session) {
 
     const someoneElseDriving = session.driver_id && session.driver_id !== currentUser.id;
 
-    // Driving button: claim it, or offer to override if someone else is driving
-    if (myStatus === 'driving') {
+    // The current driver never sees the claim button — just Arrived + Skip
+    if (myStatus === 'driving' || session.driver_id === currentUser.id) {
       btnDriving.classList.add('hidden');
     } else {
       btnDriving.classList.remove('hidden');
