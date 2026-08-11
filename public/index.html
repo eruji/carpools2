@@ -182,8 +182,10 @@
   </div>
 
   <!-- ═══════ REALTIME MAP ═══════ -->
-  <div id="map-container">
-    <div id="map"></div>
+  <div class="map-wrap">
+    <div id="map-container">
+      <div id="map"></div>
+    </div>
     <button class="map-recenter" onclick="recenterMap()" title="Recenter map"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
     <div id="map-legend" class="map-legend">
       <div id="map-legend-body" class="map-legend-body hidden">
@@ -1449,6 +1451,11 @@ function initMap() {
   });
   map.on('dragend zoomend', () => {
     scheduleRecenter();
+  });
+
+  // Keep the full-bleed map sized correctly on orientation/resize
+  window.addEventListener('resize', () => {
+    if (map) map.invalidateSize();
   });
 }
 

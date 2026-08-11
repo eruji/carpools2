@@ -231,7 +231,11 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 #map { width: 100%; height: 100%; }
 
+/* The carpool view positions the floating map controls over the map area */
+#view-carpool { position: relative; }
+
 /* ── Recenter button ─────────────────────────────────────────── */
+.map-wrap { position: relative; }
 .map-recenter {
   position: absolute;
   top: 10px;
@@ -822,8 +826,38 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   letter-spacing: -0.02em;
 }
 
-/* ── Mobile: minimal top bar ─────────────────────────────────── */
+/* ── Mobile: immersive full-bleed map with floating content ──── */
 @media (max-width: 480px) {
+  /* The map fills the whole screen as a background layer */
+  #map-container {
+    position: fixed;
+    inset: 0;
+    height: auto;
+    border: none;
+    border-radius: 0;
+    margin: 0;
+    z-index: 1;
+  }
+  /* Content floats on top of the map */
+  #view-carpool {
+    position: relative;
+    z-index: 2;
+    padding: 8px 10px 40px;
+  }
+  /* Title row (carpool name + gear) floats over the map */
+  #view-carpool > .flex-between {
+    margin: 0 0 10px;
+    background: rgba(255,255,255,0.94);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+  /* Map controls stay accessible above the content */
+  .map-recenter { position: fixed; top: 62px; right: 12px; z-index: 950; }
+  .map-legend { position: fixed; left: 10px; bottom: 12px; z-index: 950; }
+
   header { padding: 8px 10px; }
   header h1 { font-size: 1.1rem; }
   .profile-menu-name { display: none; }
