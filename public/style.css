@@ -265,6 +265,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 
 /* ── Map legend overlay ─────────────────────────────────────── */
 .map-legend {
+  display: none; /* hidden for now — easy to restore */
   position: absolute;
   left: 10px;
   bottom: 10px;
