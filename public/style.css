@@ -655,9 +655,10 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .member-list { display: flex; flex-direction: column; gap: 8px; }
 .member-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px; background: var(--surface);
+  padding: 7px 9px; background: var(--surface);
   border: 1px solid var(--border); border-radius: 10px;
   transition: border-color 0.2s;
+  gap: 6px;
 }
 .member-row:hover { border-color: var(--border-strong); }
 .member-row.is-driver {
@@ -667,9 +668,9 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .age-warm { color: #9C8A4F; }
 .age-stale { color: #B07166; font-weight: 600; }
-.member-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.member-info .member-name { font-weight: 600; font-size: 1.05rem; }
-.member-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.member-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.member-info .member-name { font-weight: 600; font-size: 0.95rem; }
+.member-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
 /* ── Alerts ──────────────────────────────────────────────────── */
 .alert {
