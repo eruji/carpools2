@@ -275,8 +275,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .subway-stop .stop-row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
 }
 .subway-stop .stop-name {
   font-weight: 700;
@@ -300,6 +299,10 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   color: var(--accent-deep);
   white-space: nowrap;
   flex-shrink: 0;
+}
+.subway-stop .stop-eta::before {
+  content: '· ';
+  color: var(--text-3);
 }
 
 /* ── Member rows between stops ─────────────────────────────── */
