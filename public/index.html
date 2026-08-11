@@ -1573,7 +1573,10 @@ function updateMap(data) {
   const addPoint = (lat, lng) => { if (lat && lng) bounds.push([lat, lng]); };
   const fitBounds = (pts, maxZ) => {
     if (!pts || !pts.length) return;
-    map.fitBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: maxZ || 15 });
+    const opts = { padding: [50, 50], maxZoom: maxZ || 15 };
+    // On mobile, bias the fit toward the visible top area (above the floating cards)
+    if (window.innerWidth <= 480) opts.paddingBottomRight = [50, 420];
+    map.fitBounds(L.latLngBounds(pts), opts);
   };
 
   // Meetup marker (location pin icon)
