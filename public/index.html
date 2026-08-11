@@ -15,7 +15,7 @@
 <!-- HEADER                                                        -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <header id="app-header" class="hidden">
-  <h1>Carpool</h1>
+  <h1>Carpool <span id="app-version" class="app-version"></span></h1>
   <nav>
     <span id="header-user"></span>
     <button class="btn btn-outline btn-sm" onclick="goToDashboard()" id="btn-dashboard" style="color:#6F6F66;border-color:#C9C9BF;">Dashboard</button>
@@ -357,6 +357,7 @@ let myLocation = null; // { lat, lng }
 
 // ── Init ────────────────────────────────────────────────────────────────────
 async function init() {
+  loadVersion();
   const res = await fetch('/api/me');
   const data = await res.json();
   if (data.user) {
@@ -366,6 +367,20 @@ async function init() {
     await loadDashboard();
   } else {
     showAuth();
+  }
+}
+
+// Show app version + build info in the header so you can verify the running build
+async function loadVersion() {
+  const el = document.getElementById('app-version');
+  try {
+    const res = await fetch('/api/version');
+    const data = await res.json();
+    const sha = data.build ? ' · ' + data.build.slice(0, 7) : '';
+    el.textContent = 'v' + data.version + sha;
+    el.title = 'Built: ' + (data.builtAt || 'unknown');
+  } catch (e) {
+    el.textContent = 'v?';
   }
 }
 

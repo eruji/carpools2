@@ -64,6 +64,18 @@ header {
   z-index: 900;
 }
 header h1 { font-size: 1.1rem; font-weight: 700; }
+.app-version {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-3);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  vertical-align: middle;
+  letter-spacing: 0.02em;
+}
 header nav { display: flex; gap: 8px; align-items: center; }
 header nav span { opacity: 0.7; font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

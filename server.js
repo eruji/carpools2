@@ -5,6 +5,7 @@ const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const Database = require('better-sqlite3');
 const path = require('path');
+const pkg = require('./package.json');
 
 // ── App Setup ────────────────────────────────────────────────────────────────
 const app = express();
@@ -255,6 +256,15 @@ app.get('/api/me', (req, res) => {
   if (!req.session.userId) return res.json({ user: null });
   const user = stmts.userById.get(req.session.userId);
   res.json({ user });
+});
+
+// Version info — lets you verify the running build is up to date
+app.get('/api/version', (req, res) => {
+  res.json({
+    version: pkg.version,
+    build: process.env.BUILD_SHA || null,
+    builtAt: process.env.BUILD_TIME || null
+  });
 });
 
 // ── Carpool Routes ──────────────────────────────────────────────────────────
