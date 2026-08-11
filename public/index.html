@@ -2056,7 +2056,8 @@ function selectAutocomplete(key, item) {
   if (addrInput) addrInput.value = name;
 
   const nameInput = document.getElementById(`${prefix}-${type}-name`);
-  if (nameInput) nameInput.value = name.split(',')[0];
+  // Auto-fill the name only if the user hasn't already typed one (e.g., a nickname)
+  if (nameInput && !nameInput.value.trim()) nameInput.value = name.split(',')[0];
 
   const latInput = document.getElementById(`${prefix}-${type}-lat`);
   const lngInput = document.getElementById(`${prefix}-${type}-lng`);
