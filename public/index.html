@@ -1271,25 +1271,15 @@ function updateMap(data) {
     addPoint(carpool.destination_lat, carpool.destination_lng);
   }
 
-  // My location marker (pulsing dot + nickname + large ETA)
+  // My location marker (pulsing dot + heading name)
   if (myLocation) {
     let locTarget = 'You';
-    let locEta = '';
     if (session && session.phase === 'meetup' && carpool.meetup_lat && carpool.meetup_lng) {
-      const dist = haversine(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng);
-      const etaMin = Math.round(dist / 0.5);
       locTarget = meetupLabel(carpool);
-      locEta = etaMin + ' min';
     } else if (session && session.phase === 'destination' && carpool.destination_lat && carpool.destination_lng) {
-      const dist = haversine(myLocation.lat, myLocation.lng, carpool.destination_lat, carpool.destination_lng);
-      const etaMin = Math.round(dist / 0.5);
       locTarget = destLabel(carpool);
-      locEta = etaMin + ' min';
     } else if (session && session.phase === 'back_to_meetup' && carpool.meetup_lat && carpool.meetup_lng) {
-      const dist = haversine(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng);
-      const etaMin = Math.round(dist / 0.5);
       locTarget = meetupLabel(carpool);
-      locEta = etaMin + ' min';
     }
     const myMarker = L.marker([myLocation.lat, myLocation.lng], {
       icon: L.divIcon({
@@ -1298,12 +1288,11 @@ function updateMap(data) {
           <div class="pulse-location"></div>
           <div class="location-label-tag">
             <span class="loc-target">${esc(locTarget)}</span>
-            ${locEta ? `<span class="loc-eta">${esc(locEta)}</span>` : ''}
           </div>
         </div>`,
         iconAnchor: [11, 11]
       })
-    }).addTo(map).bindPopup('<b>You</b>: ' + locTarget + (locEta ? ' · ~' + locEta : ''));
+    }).addTo(map).bindPopup('<b>You</b> — heading to ' + locTarget);
     mapMarkers.myLocation = myMarker;
     // In transit we fit the whole route instead of zooming to the user
     if (!inTransit) addPoint(myLocation.lat, myLocation.lng);
@@ -1369,21 +1358,16 @@ function updateMap(data) {
     session.members.forEach(m => {
       if (!(m.location_lat && m.location_lng) || m.status === 'skip') return;
       const avatarColor = memberDotColor(m.status);
-      let etaStr = '';
-      if (target.lat && target.lng) {
-        const dist = haversine(m.location_lat, m.location_lng, target.lat, target.lng);
-        etaStr = ' · ~' + Math.round(dist / 0.5) + 'min';
-      }
       const marker = L.marker([m.location_lat, m.location_lng], {
         icon: L.divIcon({
           className: '',
           html: `<div style="display:flex;align-items:center;gap:8px;">
               <div style="width:38px;height:38px;border-radius:50%;background:${avatarColor};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;letter-spacing:0.02em;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);flex-shrink:0;">${esc(getInitials(m.username))}</div>
-              <div style="background:rgba(255,255,255,0.95);border:1px solid #D8D8D0;border-radius:10px;padding:3px 10px;color:#33332D;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.18);">${esc(m.username)}${etaStr}</div>
+              <div style="background:rgba(255,255,255,0.95);border:1px solid #D8D8D0;border-radius:10px;padding:3px 10px;color:#33332D;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.18);">${esc(m.username)}</div>
             </div>`,
           iconAnchor: [24, 24]
         })
-      }).addTo(map).bindPopup(`${esc(m.username)} (${m.status})${etaStr}`);
+      }).addTo(map).bindPopup(`${esc(m.username)} (${m.status})`);
       mapMarkers['member_' + m.user_id] = marker;
       addPoint(m.location_lat, m.location_lng);
 
