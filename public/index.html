@@ -1214,7 +1214,8 @@ function renderMemberStatus(session) {
       }
       const dist = haversine(m.location_lat, m.location_lng, targetLat, targetLng);
       const etaMin = Math.round(dist / 0.5);
-      etaStr = `· ${dist.toFixed(1)} mi · ~${etaMin} min`;
+      const clock = new Date(Date.now() + etaMin * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      etaStr = `· ${dist.toFixed(1)} mi · ~${etaMin} min · ${clock}`;
     }
     return `
       <div class="member-row">
@@ -1458,20 +1459,8 @@ function updateMap(data) {
       }).addTo(map);
       mapPolylines.route = line;
 
-      // Carpool position indicator only while in transit
+      // Zoom out to fit the whole road route for this phase
       if (active) {
-        const mid = Math.floor(coords.length / 2);
-        const phaseLabel = session.phase === 'destination' ? '→ Dest' : '← Meetup';
-        const indicator = L.marker(coords[mid], {
-          icon: L.divIcon({
-            className: '',
-            html: `<div style="background:#FFFFFF;color:#7A6530;padding:8px 18px;border-radius:14px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,0.25);border:2px solid #C0A46A;">${phaseLabel}</div>`,
-            iconAnchor: [40, 20]
-          })
-        }).addTo(map).bindPopup('In transit · ' + distanceText);
-        mapMarkers.carpoolUnit = indicator;
-
-        // Zoom out to fit the whole road route for this phase
         fitBounds(coords, 14);
       }
     });

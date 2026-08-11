@@ -768,6 +768,14 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   letter-spacing: -0.02em;
 }
 
+/* ── Mobile: slim top bar ─────────────────────────────────────── */
+@media (max-width: 480px) {
+  .app-version { display: none !important; }
+  header { padding: 8px 10px; }
+  header h1 { font-size: 1.1rem; }
+  .profile-menu-name { display: none; }
+}
+
 /* ── Desktop adjustments ─────────────────────────────────────── */
 @media (min-width: 768px) {
   .app-container {
