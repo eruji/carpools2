@@ -64,6 +64,11 @@ header {
   z-index: 900;
 }
 header h1 { font-size: 1.35rem; font-weight: 700; }
+.logo {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 3px;
+}
 .app-version {
   font-size: 0.7rem;
   font-weight: 600;
