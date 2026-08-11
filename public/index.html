@@ -519,7 +519,10 @@ function showApp() {
 // ── Profile ─────────────────────────────────────────────────────────────────
 function renderProfileIcon() {
   const icon = document.getElementById('profile-icon');
-  if (icon) icon.textContent = getInitials(currentUser.username);
+  if (icon) {
+    icon.textContent = getInitials(currentUser.username);
+    icon.style.background = memberColor(currentUser.id);
+  }
   const name = document.getElementById('profile-menu-name');
   if (name) name.textContent = currentUser.username;
 }
