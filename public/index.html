@@ -274,17 +274,17 @@
 
       <!-- Phase 1: Meetup Controls -->
       <div id="phase-meetup-controls" class="btn-group">
-        <button class="btn btn-primary" onclick="respondToSession('driving')">Driving</button>
-        <button class="btn btn-success" onclick="respondToSession('riding')">Riding</button>
-        <button class="btn btn-warning" onclick="respondToSession('skip')">Skip</button>
-        <button class="btn btn-outline" onclick="respondToSession('arrived')">Arrived</button>
+        <button id="btn-driving" class="btn btn-primary" onclick="respondToSession('driving')">Driving</button>
+        <button id="btn-riding" class="btn btn-success" onclick="respondToSession('riding')">Riding</button>
+        <button id="btn-skip" class="btn btn-outline" onclick="respondToSession('skip')">Skip</button>
+        <button id="btn-arrived" class="btn btn-success" onclick="respondToSession('arrived')">Arrived</button>
       </div>
 
       <!-- Phase 2-3 Controls -->
       <div id="phase-advance-controls" class="btn-group hidden">
-        <button id="btn-leaving-dest" class="btn btn-primary btn-lg hidden" onclick="advancePhase('destination')" style="width:100%;">Leaving for Destination</button>
-        <button id="btn-back-to-meetup" class="btn btn-warning btn-lg hidden" onclick="advancePhase('back_to_meetup')" style="width:100%;">Back to Meetup</button>
-        <button id="btn-complete" class="btn btn-success btn-lg hidden" onclick="advancePhase('completed')" style="width:100%;">Complete Carpool</button>
+        <button id="btn-leaving-dest" class="btn btn-primary hidden" onclick="advancePhase('destination')" style="width:100%;">Leaving for Destination</button>
+        <button id="btn-back-to-meetup" class="btn btn-warning hidden" onclick="advancePhase('back_to_meetup')" style="width:100%;">Back to Meetup</button>
+        <button id="btn-complete" class="btn btn-success hidden" onclick="advancePhase('completed')" style="width:100%;">Complete Carpool</button>
       </div>
 
       <div id="session-alert" class="hidden"></div>
@@ -1152,10 +1152,35 @@ function renderSessionUI(session) {
     phaseMeetup.classList.remove('hidden');
     phaseAdvance.classList.add('hidden');
 
+    // Only show buttons relevant to your current status
+    const myMember = session.members.find(m => m.user_id === currentUser.id);
+    const myStatus = myMember ? myMember.status : 'pending';
+    const btnDriving = document.getElementById('btn-driving');
+    const btnRiding = document.getElementById('btn-riding');
+    const btnSkip = document.getElementById('btn-skip');
+    const btnArrived = document.getElementById('btn-arrived');
+
+    if (myStatus === 'pending') {
+      // Choose your role
+      btnDriving.classList.remove('hidden');
+      btnRiding.classList.remove('hidden');
+      btnSkip.classList.remove('hidden');
+      btnArrived.classList.add('hidden');
+    } else {
+      // Active: arrive (auto via geo-fence) or skip
+      btnDriving.classList.add('hidden');
+      btnRiding.classList.add('hidden');
+      btnSkip.classList.remove('hidden');
+      btnArrived.classList.remove('hidden');
+    }
+
     const ready = session.members.filter(m => m.status !== 'skip' && m.status !== 'pending');
     const allReady = ready.length > 0 && ready.every(m => m.status === 'arrived' || m.status === 'driving');
+    const driver = session.members.find(m => m.user_id === session.driver_id);
+    const driverArrived = driver && driver.status === 'arrived';
 
-    if (allReady && session.driver_id === currentUser.id) {
+    // Only offer to leave once the driver is actually at the meetup
+    if (allReady && driverArrived && session.driver_id === currentUser.id) {
       phaseAdvance.classList.remove('hidden');
       btnLeaving.classList.remove('hidden');
       btnBack.classList.add('hidden');
