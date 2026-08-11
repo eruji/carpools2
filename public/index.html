@@ -19,18 +19,20 @@
 <!-- HEADER                                                        -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <header id="app-header" class="hidden">
-  <h1 id="app-title" title="">Vroommates</h1>
-  <nav>
-    <button class="btn btn-outline btn-sm" onclick="goToDashboard()" id="btn-dashboard" style="color:#6F6F66;border-color:#C9C9BF;">Dashboard</button>
-    <div class="profile-menu">
-      <button class="profile-icon" id="profile-icon" onclick="toggleProfileMenu()" title="Profile"></button>
-      <div class="profile-dropdown hidden" id="profile-dropdown">
-        <div class="profile-menu-name" id="profile-menu-name"></div>
-        <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openProfileModal()">Edit Profile</button>
-        <button class="btn btn-danger btn-sm" style="width:100%;justify-content:flex-start;" onclick="logout()">Logout</button>
+  <div class="header-inner">
+    <h1 id="app-title" title="">Vroommates</h1>
+    <nav>
+      <button class="btn btn-outline btn-sm" onclick="goToDashboard()" id="btn-dashboard" style="color:#6F6F66;border-color:#C9C9BF;">Dashboard</button>
+      <div class="profile-menu">
+        <button class="profile-icon" id="profile-icon" onclick="toggleProfileMenu()" title="Profile"></button>
+        <div class="profile-dropdown hidden" id="profile-dropdown">
+          <div class="profile-menu-name" id="profile-menu-name"></div>
+          <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openProfileModal()">Edit Profile</button>
+          <button class="btn btn-danger btn-sm" style="width:100%;justify-content:flex-start;" onclick="logout()">Logout</button>
+        </div>
       </div>
-    </div>
-  </nav>
+    </nav>
+  </div>
 </header>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->

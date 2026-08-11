@@ -84,6 +84,17 @@ header h1 { font-size: 1.35rem; font-weight: 700; }
 header nav { display: flex; gap: 8px; align-items: center; }
 header nav span { opacity: 0.7; font-size: 0.9rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Keep the header contents aligned with the page content width */
+.header-inner {
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
 /* ── Profile menu ───────────────────────────────────────────── */
 .profile-menu { position: relative; }
 .profile-icon {
@@ -768,6 +779,9 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   .app-container {
     max-width: 720px;
     padding: 20px;
+  }
+  .header-inner {
+    max-width: 720px;
   }
   #map-container {
     height: 360px;
