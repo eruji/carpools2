@@ -5,7 +5,20 @@ const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const Database = require('better-sqlite3');
 const path = require('path');
+const { execSync } = require('child_process');
 const pkg = require('./package.json');
+
+// In Docker these come from build args; locally derive them from git
+function gitBuildInfo() {
+  try {
+    return {
+      sha: execSync('git rev-parse HEAD', { cwd: __dirname }).toString().trim(),
+      num: execSync('git rev-list --count HEAD', { cwd: __dirname }).toString().trim()
+    };
+  } catch (e) {
+    return { sha: null, num: null };
+  }
+}
 
 // ── App Setup ────────────────────────────────────────────────────────────────
 const app = express();
@@ -285,10 +298,11 @@ app.get('/api/me', (req, res) => {
 
 // Version info — lets you verify the running build is up to date
 app.get('/api/version', (req, res) => {
+  const git = gitBuildInfo();
   res.json({
     version: pkg.version,
-    build: process.env.BUILD_SHA || null,
-    buildNum: process.env.BUILD_NUM || null,
+    build: process.env.BUILD_SHA || git.sha,
+    buildNum: process.env.BUILD_NUM || git.num,
     builtAt: process.env.BUILD_TIME || null
   });
 });
