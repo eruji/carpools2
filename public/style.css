@@ -535,15 +535,15 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 
 /* Coin badge: number on a gold coin */
 .member-coin {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 0.74rem;
+  font-size: 0.62rem;
   color: #5C4800;
   background: radial-gradient(circle at 35% 30%, #FBE68C, #F2C94C 55%, #DBAA1F);
   border: 2px solid #B98A14;
@@ -551,16 +551,16 @@ tr:hover td { background: rgba(0,0,0,0.015); }
     inset 0 0 0 2px rgba(255,244,200,0.9),     /* inner rim */
     inset 0 0 0 4px rgba(185,138,20,0.35),      /* groove */
     inset 0 -3px 6px rgba(0,0,0,0.25),          /* bottom shading */
-    0 2px 4px rgba(0,0,0,0.2);                  /* drop shadow */
+    0 1px 2px rgba(0,0,0,0.2);                  /* drop shadow */
   flex-shrink: 0;
 }
 .member-coin::after {
   content: '';
   position: absolute;
-  top: 4px;
-  left: 6px;
-  width: 7px;
-  height: 4px;
+  top: 3px;
+  left: 4px;
+  width: 5px;
+  height: 3px;
   border-radius: 50%;
   background: rgba(255,255,255,0.75);
   transform: rotate(-20deg);
