@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Carpool App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -174,7 +177,7 @@
   <div id="map-container">
     <div id="map"></div>
     <div id="map-legend" class="map-legend">
-      <div class="map-legend-title" onclick="toggleMapLegend()">Map Key <span class="legend-caret">▸</span></div>
+      <div class="map-legend-title" onclick="toggleMapLegend()">Key <span class="legend-caret">▸</span></div>
       <div id="map-legend-body" class="map-legend-body hidden">
         <div class="legend-item"><span class="legend-icon"><svg width="14" height="18" viewBox="0 0 24 32"><path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="#fff"/></svg></span>Meetup</div>
         <div class="legend-item"><span class="legend-icon"><svg width="14" height="17" viewBox="0 0 24 28"><path d="M5 2v24" stroke="#8A5248" stroke-width="2.5"/><path d="M5 4h13l-3.5 4L18 12H5z" fill="#B07166" stroke="#fff" stroke-width="1.2"/></svg></span>Destination</div>
