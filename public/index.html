@@ -1667,7 +1667,10 @@ async function loadLocConfig() {
       </div>
       <button class="btn btn-success btn-sm" onclick="addSavedLocation()">Add</button>
     </div>
-    <input type="hidden" id="loc-add-name">
+    <div class="form-group">
+      <label>Nickname (optional)</label>
+      <input type="text" id="loc-add-name" placeholder="e.g., Erics House" autocomplete="off">
+    </div>
     <input type="hidden" id="loc-add-lat">
     <input type="hidden" id="loc-add-lng">
     <h4 class="mt-1">Saved</h4>
@@ -1718,7 +1721,7 @@ async function useSavedLocation(locId) {
 }
 
 async function addSavedLocation() {
-  const name = document.getElementById('loc-add-name').value;
+  const name = document.getElementById('loc-add-name').value.trim();
   const address = document.getElementById('loc-add-address').value.trim();
   const lat = parseFloat(document.getElementById('loc-add-lat').value);
   const lng = parseFloat(document.getElementById('loc-add-lng').value);
