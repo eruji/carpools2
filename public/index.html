@@ -179,28 +179,7 @@
   </div>
 
   <!-- ═══════ REALTIME MAP ═══════ -->
-  <div style="display:flex;gap:8px;margin-bottom:8px;">
-    <button class="btn btn-outline btn-sm hidden" id="btn-adjust-meetup" onclick="toggleMeetupAdjust()">Adjust Meetup</button>
-  </div>
   <div id="map-container"><div id="map"></div></div>
-
-  <!-- ═══════ MEETUP QUICK-ADJUST ═══════ -->
-  <div id="meetup-adjust" class="card hidden">
-    <h3>Adjust Meetup</h3>
-    <p class="text-xs text-muted mb-1">Search a new meetup location — it updates the map, subway, and any active session instantly.</p>
-    <div class="autocomplete-wrapper">
-      <input type="text" id="adjust-meetup-address" placeholder="Search new meetup location..." autocomplete="off" oninput="autocompleteAddress(this, 'meetup-adjust')" onfocus="this.select()">
-      <div class="autocomplete-dropdown hidden" id="ac-dropdown-meetup-adjust"></div>
-    </div>
-    <input type="hidden" id="adjust-meetup-lat">
-    <input type="hidden" id="adjust-meetup-lng">
-    <input type="hidden" id="adjust-meetup-name">
-    <div class="btn-group">
-      <button class="btn btn-primary btn-sm" onclick="applyMeetupAdjust()">Apply</button>
-      <button class="btn btn-outline btn-sm hidden" id="btn-restore-meetup" onclick="restoreMeetup()">Back to Previous</button>
-      <button class="btn btn-outline btn-sm" onclick="toggleMeetupAdjust()">Close</button>
-    </div>
-  </div>
 
   <!-- Time/ETA Info Bar -->
   <div id="route-info-bar" class="card hidden" style="padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -227,8 +206,8 @@
           <div class="stop-detail" id="subway-start-addr">Your location</div>
         </div>
       </div>
-      <!-- Stop 2: Meetup (name only) -->
-      <div class="subway-stop" id="subway-stop-meetup">
+      <!-- Stop 2: Meetup (name only) — clickable to edit/swap -->
+      <div class="subway-stop" id="subway-stop-meetup" onclick="openLocationSwitcher('meetup')">
         <div class="dot"></div>
         <div class="stop-content">
           <div class="stop-row">
@@ -238,8 +217,8 @@
           <div class="stop-detail" id="subway-meetup-addr"></div>
         </div>
       </div>
-      <!-- Stop 3: Destination (name only) -->
-      <div class="subway-stop" id="subway-stop-dest">
+      <!-- Stop 3: Destination (name only) — clickable to edit/swap -->
+      <div class="subway-stop" id="subway-stop-dest" onclick="openLocationSwitcher('destination')">
         <div class="dot"></div>
         <div class="stop-content">
           <div class="stop-row">
@@ -262,6 +241,44 @@
       </div>
       <!-- Member avatars positioned along the transit line -->
       <div id="subway-avatars-layer" class="subway-avatars-layer"></div>
+    </div>
+  </div>
+
+  <!-- ═══════ LOCATION SWITCHER (tap a stop to open) ═══════ -->
+  <div id="location-switcher" class="card hidden">
+    <div class="flex-between">
+      <h3>Location Switcher</h3>
+      <button class="btn btn-outline btn-sm" onclick="closeLocationSwitcher()">Close</button>
+    </div>
+    <p class="text-xs text-muted mb-1">Tap a saved location to make it the active Meetup or Destination, or add a new one.</p>
+
+    <!-- Active slots -->
+    <div class="loc-slot">
+      <span class="loc-slot-label">Meetup</span>
+      <select id="loc-active-meetup" class="loc-slot-select" onchange="setActiveFromSlot('meetup', this.value)"></select>
+    </div>
+    <div class="loc-slot">
+      <span class="loc-slot-label">Destination</span>
+      <select id="loc-active-dest" class="loc-slot-select" onchange="setActiveFromSlot('destination', this.value)"></select>
+    </div>
+
+    <!-- Saved locations list -->
+    <h4 class="mt-1">Saved Locations</h4>
+    <div id="saved-locations-list">
+      <p class="text-xs text-muted">Loading...</p>
+    </div>
+
+    <!-- Add new -->
+    <h4 class="mt-1">Add Location</h4>
+    <div class="autocomplete-wrapper">
+      <input type="text" id="loc-add-address" placeholder="Search a place..." autocomplete="off" oninput="autocompleteAddress(this, 'loc-add')" onfocus="this.select()">
+      <div class="autocomplete-dropdown hidden" id="ac-dropdown-loc-add"></div>
+    </div>
+    <input type="hidden" id="loc-add-name">
+    <input type="hidden" id="loc-add-lat">
+    <input type="hidden" id="loc-add-lng">
+    <div class="btn-group">
+      <button class="btn btn-success btn-sm" onclick="addSavedLocation()">Add</button>
     </div>
   </div>
 
@@ -734,7 +751,6 @@ async function loadCarpoolView(carpoolId) {
   // Members tab
   renderMembers(data.members, data.isOwner);
   document.getElementById('add-member-section').classList.toggle('hidden', !data.isOwner);
-  document.getElementById('btn-adjust-meetup').classList.toggle('hidden', !data.isOwner);
   loadInviteLink(data.isOwner);
 
   // Settings tab
@@ -1658,77 +1674,109 @@ async function rotateInviteCode() {
   }
 }
 
-// ── Meetup Quick-Adjust ─────────────────────────────────────────────────────
-let prevMeetup = null; // last meetup (before the latest change) for toggling back
+// ── Location Switcher (tap subway stops to edit/swap) ───────────────────────
+let savedLocations = [];
 
-function toggleMeetupAdjust() {
-  const card = document.getElementById('meetup-adjust');
-  const wasHidden = card.classList.contains('hidden');
-  card.classList.toggle('hidden');
-  if (wasHidden) {
-    document.getElementById('adjust-meetup-address').value = '';
-    document.getElementById('adjust-meetup-name').value = '';
-    document.getElementById('adjust-meetup-lat').value = '';
-    document.getElementById('adjust-meetup-lng').value = '';
-    document.getElementById('adjust-meetup-address').focus();
-  }
+function openLocationSwitcher(slot) {
+  document.getElementById('location-switcher').classList.remove('hidden');
+  loadSavedLocations();
 }
 
-async function applyMeetupAdjust() {
-  const name = document.getElementById('adjust-meetup-name').value;
-  const lat = parseFloat(document.getElementById('adjust-meetup-lat').value);
-  const lng = parseFloat(document.getElementById('adjust-meetup-lng').value);
-  if (!name || !lat || !lng) {
-    alert('Search and pick a meetup location first');
+function closeLocationSwitcher() {
+  document.getElementById('location-switcher').classList.add('hidden');
+}
+
+async function loadSavedLocations() {
+  if (!currentCarpoolId) return;
+  const res = await fetch(`/api/carpools/${currentCarpoolId}/locations`);
+  const data = await res.json();
+  savedLocations = data.locations || [];
+  renderSavedLocations();
+}
+
+function renderSavedLocations() {
+  const opts = savedLocations.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
+  document.getElementById('loc-active-meetup').innerHTML = '<option value="">— saved —</option>' + opts;
+  document.getElementById('loc-active-dest').innerHTML = '<option value="">— saved —</option>' + opts;
+
+  const list = document.getElementById('saved-locations-list');
+  if (savedLocations.length === 0) {
+    list.innerHTML = '<p class="text-xs text-muted">No saved locations yet. Add one below.</p>';
     return;
   }
+  list.innerHTML = savedLocations.map(l => `
+    <div class="loc-row">
+      <div class="loc-info">
+        <span class="loc-name">${esc(l.name)}</span>
+        <span class="loc-addr">${esc(l.address)}</span>
+      </div>
+      <div class="loc-actions">
+        <button class="btn btn-outline btn-sm" onclick="setActiveFromSlot('meetup', ${l.id})">Meetup</button>
+        <button class="btn btn-outline btn-sm" onclick="setActiveFromSlot('destination', ${l.id})">Dest</button>
+        <button class="btn btn-outline btn-sm" onclick="editSavedLocation(${l.id})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSavedLocation(${l.id})">Del</button>
+      </div>
+    </div>
+  `).join('');
+}
 
-  const carpool = currentCarpoolData.carpool;
-  // Remember the current meetup so we can toggle back
-  prevMeetup = {
-    name: carpool.meetup_name,
-    lat: carpool.meetup_lat,
-    lng: carpool.meetup_lng,
-    nick: carpool.meetup_nickname
-  };
-
-  const body = { meetup_name: name, meetup_lat: lat, meetup_lng: lng };
-  await fetch(`/api/carpools/${currentCarpoolId}`, {
+// Apply a saved location as the active meetup or destination
+async function setActiveFromSlot(slot, locId) {
+  if (!locId) return;
+  const loc = savedLocations.find(l => l.id == locId);
+  if (!loc) return;
+  const body = slot === 'meetup'
+    ? { meetup_name: loc.address || loc.name, meetup_nickname: loc.name, meetup_lat: loc.lat, meetup_lng: loc.lng }
+    : { destination_name: loc.address || loc.name, destination_nickname: loc.name, destination_lat: loc.lat, destination_lng: loc.lng };
+  const res = await fetch(`/api/carpools/${currentCarpoolId}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
   });
-  // Also update the active session so the live view moves immediately
+  if (!res.ok) { alert('Failed to apply location'); return; }
+  // Update the active session too so the live view moves immediately
   if (activeSession) {
     await fetch(`/api/carpools/${currentCarpoolId}/sessions/locations`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
   }
-
-  document.getElementById('meetup-adjust').classList.add('hidden');
-  document.getElementById('btn-restore-meetup').classList.remove('hidden');
+  closeLocationSwitcher();
   await refreshMyCarpools();
   await loadCarpoolView(currentCarpoolId);
 }
 
-async function restoreMeetup() {
-  if (!prevMeetup) return;
-  const body = {
-    meetup_name: prevMeetup.name || '',
-    meetup_lat: prevMeetup.lat || 0,
-    meetup_lng: prevMeetup.lng || 0,
-    meetup_nickname: prevMeetup.nick || ''
-  };
-  await fetch(`/api/carpools/${currentCarpoolId}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+async function addSavedLocation() {
+  const name = document.getElementById('loc-add-name').value;
+  const address = document.getElementById('loc-add-address').value.trim();
+  const lat = parseFloat(document.getElementById('loc-add-lat').value);
+  const lng = parseFloat(document.getElementById('loc-add-lng').value);
+  if (!address || !lat || !lng) { alert('Search and pick a place first'); return; }
+  const res = await fetch(`/api/carpools/${currentCarpoolId}/locations`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name || address.split(',')[0], address, lat, lng })
   });
-  if (activeSession) {
-    await fetch(`/api/carpools/${currentCarpoolId}/sessions/locations`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-    });
-  }
-  prevMeetup = null;
-  document.getElementById('btn-restore-meetup').classList.add('hidden');
-  await refreshMyCarpools();
-  await loadCarpoolView(currentCarpoolId);
+  if (!res.ok) { alert('Failed to add location'); return; }
+  ['loc-add-address', 'loc-add-name', 'loc-add-lat', 'loc-add-lng'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  await loadSavedLocations();
+}
+
+async function editSavedLocation(locId) {
+  const loc = savedLocations.find(l => l.id == locId);
+  if (!loc) return;
+  const newName = prompt('Name for this location:', loc.name);
+  if (newName === null) return;
+  const res = await fetch(`/api/carpools/${currentCarpoolId}/locations/${locId}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName.trim() || loc.name })
+  });
+  if (res.ok) await loadSavedLocations();
+}
+
+async function deleteSavedLocation(locId) {
+  const loc = savedLocations.find(l => l.id == locId);
+  if (!confirm('Delete "' + (loc ? loc.name : 'this location') + '"? The active carpool location is not changed.')) return;
+  await fetch(`/api/carpools/${currentCarpoolId}/locations/${locId}`, { method: 'DELETE' });
+  await loadSavedLocations();
 }
 
 // ── Carpool Settings ────────────────────────────────────────────────────────
@@ -2082,7 +2130,7 @@ function selectAutocomplete(key, item) {
     'dest':          { prefix: 'new', type: 'dest' },
     'meetup-edit':   { prefix: 'edit', type: 'meetup' },
     'dest-edit':     { prefix: 'edit', type: 'dest' },
-    'meetup-adjust': { prefix: 'adjust', type: 'meetup' },
+    'loc-add':       { prefix: 'loc', type: 'add' },
   };
 
   const mapping = keyMap[key];

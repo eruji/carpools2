@@ -221,6 +221,21 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .subway-stop:last-child { padding-bottom: 0; }
 
+/* Clickable stops (meetup / destination) */
+.subway-stop[onclick] {
+  cursor: pointer;
+  border-radius: 8px;
+}
+.subway-stop[onclick]:hover { background: var(--accent-soft); }
+.subway-stop[onclick] .stop-name::after {
+  content: '⌄';
+  margin-left: 5px;
+  font-size: 0.8em;
+  color: var(--text-3);
+  vertical-align: 1px;
+}
+.subway-stop[onclick]:hover .stop-name::after { color: var(--accent-deep); }
+
 .subway-stop .dot {
   position: absolute;
   left: -22px;
@@ -404,6 +419,45 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .phase-step.active { background: var(--accent-dark); color: #fff; border-color: var(--accent-dark); }
 .phase-step.done { background: var(--accent-soft); color: var(--accent-deep); border-color: rgba(143,174,139,0.35); }
+
+/* ── Location Switcher panel ───────────────────────────────── */
+.loc-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.loc-slot-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-2);
+  width: 90px;
+  flex-shrink: 0;
+}
+.loc-slot-select {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.loc-slot-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+.loc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.loc-row:last-child { border-bottom: none; }
+.loc-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.loc-name { font-weight: 700; font-size: 0.9rem; color: var(--text); }
+.loc-addr { font-size: 0.72rem; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loc-actions { display: flex; gap: 5px; flex-shrink: 0; }
 
 /* ── Session Panel ───────────────────────────────────────────── */
 .phase-panel {

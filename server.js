@@ -99,6 +99,16 @@ db.exec(`
     status TEXT DEFAULT 'pending',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS carpool_locations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    carpool_id INTEGER NOT NULL REFERENCES carpools(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    address TEXT DEFAULT '',
+    lat REAL DEFAULT 0,
+    lng REAL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // ── Migrations (existing databases) ────────────────────────────────────────
@@ -435,6 +445,50 @@ app.post('/api/carpools/join', requireAuth, (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── Saved Locations Routes ───────────────────────────────────────────────────
+function requireOwner(req, res) {
+  const carpool = stmts.carpoolById.get(req.params.id);
+  if (!carpool) { res.status(404).json({ error: 'Not found' }); return null; }
+  if (carpool.owner_id !== req.session.userId) { res.status(403).json({ error: 'Only owner can manage locations' }); return null; }
+  return carpool;
+}
+
+app.get('/api/carpools/:id/locations', requireAuth, (req, res) => {
+  const carpool = requireOwner(req, res);
+  if (!carpool) return;
+  const locations = db.prepare('SELECT * FROM carpool_locations WHERE carpool_id = ? ORDER BY created_at ASC').all(carpool.id);
+  res.json({ locations });
+});
+
+app.post('/api/carpools/:id/locations', requireAuth, (req, res) => {
+  const carpool = requireOwner(req, res);
+  if (!carpool) return;
+  const { name, address, lat, lng } = req.body;
+  if (!name || !lat || !lng) return res.status(400).json({ error: 'Name and coordinates required' });
+  const result = db.prepare('INSERT INTO carpool_locations (carpool_id, name, address, lat, lng) VALUES (?, ?, ?, ?, ?)')
+    .run(carpool.id, name, address || '', lat, lng);
+  res.json({ ok: true, location: db.prepare('SELECT * FROM carpool_locations WHERE id = ?').get(result.lastInsertRowid) });
+});
+
+app.put('/api/carpools/:id/locations/:locId', requireAuth, (req, res) => {
+  const carpool = requireOwner(req, res);
+  if (!carpool) return;
+  const loc = db.prepare('SELECT * FROM carpool_locations WHERE id = ? AND carpool_id = ?').get(req.params.locId, carpool.id);
+  if (!loc) return res.status(404).json({ error: 'Location not found' });
+  const { name, address, lat, lng } = req.body;
+  db.prepare('UPDATE carpool_locations SET name=?, address=?, lat=?, lng=? WHERE id=?').run(
+    name ?? loc.name, address ?? loc.address, lat ?? loc.lat, lng ?? loc.lng, loc.id
+  );
+  res.json({ ok: true, location: db.prepare('SELECT * FROM carpool_locations WHERE id = ?').get(loc.id) });
+});
+
+app.delete('/api/carpools/:id/locations/:locId', requireAuth, (req, res) => {
+  const carpool = requireOwner(req, res);
+  if (!carpool) return;
+  db.prepare('DELETE FROM carpool_locations WHERE id = ? AND carpool_id = ?').run(req.params.locId, carpool.id);
+  res.json({ ok: true });
 });
 
 // ── Session Routes ──────────────────────────────────────────────────────────
