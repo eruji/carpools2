@@ -109,6 +109,17 @@ if (!carpoolCols.includes('meetup_nickname')) {
 if (!carpoolCols.includes('destination_nickname')) {
   db.exec("ALTER TABLE carpools ADD COLUMN destination_nickname TEXT DEFAULT ''");
 }
+if (!carpoolCols.includes('invite_code')) {
+  db.exec("ALTER TABLE carpools ADD COLUMN invite_code TEXT DEFAULT ''");
+}
+
+// ── Invite code generator ───────────────────────────────────────────────────
+function generateInviteCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
+  let code = '';
+  for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
 
 // ── Prepared Statements ─────────────────────────────────────────────────────
 const stmts = {
@@ -120,7 +131,7 @@ const stmts = {
   searchUsers: db.prepare('SELECT id, username, email FROM users WHERE (username LIKE ? OR email LIKE ?) AND id != ? LIMIT 20'),
 
   // Carpools
-  createCarpool: db.prepare('INSERT INTO carpools (name, owner_id, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
+  createCarpool: db.prepare('INSERT INTO carpools (name, owner_id, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname, invite_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
   carpoolById: db.prepare('SELECT * FROM carpools WHERE id = ?'),
   carpoolsByUser: db.prepare(`
     SELECT c.*, cm.coins_balance FROM carpools c
@@ -282,7 +293,8 @@ app.post('/api/carpools', requireAuth, (req, res) => {
       meetup_name || '', meetup_lat || 0, meetup_lng || 0,
       meetup_nickname || '',
       destination_name || '', destination_lat || 0, destination_lng || 0,
-      destination_nickname || ''
+      destination_nickname || '',
+      generateInviteCode()
     );
     const carpoolId = result.lastInsertRowid;
     stmts.addMember.run(carpoolId, req.session.userId);
@@ -377,6 +389,46 @@ app.get('/api/users/search', requireAuth, (req, res) => {
   if (!q || q.length < 2) return res.json({ users: [] });
   const users = stmts.searchUsers.all(`%${q}%`, `%${q}%`, req.session.userId);
   res.json({ users });
+});
+
+// ── Invite Routes ───────────────────────────────────────────────────────────
+app.get('/api/carpools/:id/invite', requireAuth, (req, res) => {
+  const carpool = stmts.carpoolById.get(req.params.id);
+  if (!carpool) return res.status(404).json({ error: 'Not found' });
+  if (carpool.owner_id !== req.session.userId) return res.status(403).json({ error: 'Only owner can get invite link' });
+  let code = carpool.invite_code;
+  if (!code) {
+    code = generateInviteCode();
+    db.prepare('UPDATE carpools SET invite_code = ? WHERE id = ?').run(code, carpool.id);
+  }
+  res.json({ code });
+});
+
+app.post('/api/carpools/:id/invite/rotate', requireAuth, (req, res) => {
+  const carpool = stmts.carpoolById.get(req.params.id);
+  if (!carpool) return res.status(404).json({ error: 'Not found' });
+  if (carpool.owner_id !== req.session.userId) return res.status(403).json({ error: 'Only owner can rotate invite link' });
+  const code = generateInviteCode();
+  db.prepare('UPDATE carpools SET invite_code = ? WHERE id = ?').run(code, carpool.id);
+  res.json({ code });
+});
+
+app.post('/api/carpools/join', requireAuth, (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'Invite code required' });
+    const carpool = db.prepare('SELECT * FROM carpools WHERE invite_code = ?').get(code.trim().toUpperCase());
+    if (!carpool) return res.status(404).json({ error: 'Invalid or expired invite code' });
+    const member = stmts.isMember.get(carpool.id, req.session.userId);
+    if (member) {
+      return res.json({ ok: true, carpool, alreadyMember: true });
+    }
+    stmts.addMember.run(carpool.id, req.session.userId);
+    stmts.createInvitation.run(carpool.id, req.session.userId, carpool.owner_id);
+    res.json({ ok: true, carpool, alreadyMember: false });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── Session Routes ──────────────────────────────────────────────────────────

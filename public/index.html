@@ -79,7 +79,25 @@
 <div id="view-dashboard" class="app-container hidden">
   <div class="flex-between mb-2">
     <h2>My Carpools</h2>
-    <button class="btn btn-primary" onclick="showCreateCarpool()">+ New</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-outline btn-sm" onclick="showJoinCarpool()">Join</button>
+      <button class="btn btn-primary" onclick="showCreateCarpool()">+ New</button>
+    </div>
+  </div>
+
+  <!-- Join Carpool Form -->
+  <div id="join-carpool-form" class="card hidden">
+    <h3>Join a Carpool</h3>
+    <form onsubmit="handleJoinCarpool(event)">
+      <div class="form-group">
+        <label>Invite Code</label>
+        <input type="text" id="join-carpool-code" required placeholder="Enter invite code (e.g., AB3D7F9K)" autocomplete="off">
+      </div>
+      <div class="btn-group">
+        <button type="submit" class="btn btn-success">Join</button>
+        <button type="button" class="btn btn-outline" onclick="hideJoinCarpool()">Cancel</button>
+      </div>
+    </form>
   </div>
 
   <!-- Create Carpool Form -->
@@ -284,6 +302,22 @@
       </div>
       <div id="add-member-result" class="text-xs text-muted mt-1"></div>
     </div>
+
+    <!-- Invite Link (owner only) -->
+    <div id="invite-section" class="mt-2 hidden">
+      <h4>Invite Link</h4>
+      <p class="text-xs text-muted mb-1">Share this link — anyone who opens it and logs in will join automatically.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <input type="text" id="invite-link-input" readonly onclick="this.select()">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="copyInviteLink()">Copy</button>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline btn-sm" onclick="rotateInviteCode()">Replace Link</button>
+        <span id="invite-link-result" class="text-xs text-muted" style="align-self:center;"></span>
+      </div>
+    </div>
   </div>
 
   <!-- History Tab -->
@@ -354,16 +388,31 @@ let socket = null;
 let locationWatchId = null;
 let locationInterval = null;
 let myLocation = null; // { lat, lng }
+let pendingInviteCode = null; // invite code from URL, joined after auth
 
 // ── Init ────────────────────────────────────────────────────────────────────
 async function init() {
   loadVersion();
+
+  // Check for an invite link (?invite=CODE)
+  const params = new URLSearchParams(window.location.search);
+  const inviteCode = params.get('invite');
+  if (inviteCode) {
+    pendingInviteCode = inviteCode.trim().toUpperCase();
+    // Clean the URL so the code isn't dangling in the address bar
+    history.replaceState(null, '', window.location.pathname);
+  }
+
   const res = await fetch('/api/me');
   const data = await res.json();
   if (data.user) {
     currentUser = data.user;
     showApp();
     connectSocket();
+    if (pendingInviteCode) {
+      await joinCarpoolByCode(pendingInviteCode);
+      pendingInviteCode = null;
+    }
     await loadDashboard();
   } else {
     showAuth();
@@ -444,6 +493,10 @@ async function handleLogin(e) {
     currentUser = data.user;
     showApp();
     connectSocket();
+    if (pendingInviteCode) {
+      await joinCarpoolByCode(pendingInviteCode);
+      pendingInviteCode = null;
+    }
     await loadDashboard();
   }
 }
@@ -468,6 +521,10 @@ async function handleRegister(e) {
     currentUser = data.user;
     showApp();
     connectSocket();
+    if (pendingInviteCode) {
+      await joinCarpoolByCode(pendingInviteCode);
+      pendingInviteCode = null;
+    }
     await loadDashboard();
   }
 }
@@ -615,6 +672,7 @@ async function loadCarpoolView(carpoolId) {
   // Members tab
   renderMembers(data.members, data.isOwner);
   document.getElementById('add-member-section').classList.toggle('hidden', !data.isOwner);
+  loadInviteLink(data.isOwner);
 
   // Settings tab
   document.getElementById('edit-carpool-name').value = data.carpool.name || '';
@@ -1419,6 +1477,99 @@ async function removeMember(userId) {
   const res = await fetch(`/api/carpools/${currentCarpoolId}/members/${userId}`, { method: 'DELETE' });
   if (res.ok) {
     loadCarpoolView(currentCarpoolId);
+  }
+}
+
+// ── Invite & Join ───────────────────────────────────────────────────────────
+function showJoinCarpool() {
+  document.getElementById('join-carpool-form').classList.remove('hidden');
+  document.getElementById('join-carpool-code').focus();
+}
+
+function hideJoinCarpool() {
+  document.getElementById('join-carpool-form').classList.add('hidden');
+}
+
+async function handleJoinCarpool(e) {
+  e.preventDefault();
+  const code = document.getElementById('join-carpool-code').value.trim().toUpperCase();
+  if (!code) return;
+  await joinCarpoolByCode(code);
+  hideJoinCarpool();
+  document.getElementById('join-carpool-code').value = '';
+}
+
+async function joinCarpoolByCode(code) {
+  const res = await fetch('/api/carpools/join', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    alert('Could not join: ' + (data.error || 'Invalid code'));
+    return false;
+  }
+  if (data.alreadyMember) {
+    alert('You are already a member of this carpool!');
+  } else {
+    alert('Joined carpool: ' + data.carpool.name + '!');
+  }
+  await loadDashboard();
+  if (data.carpool) goToCarpool(data.carpool.id);
+  return true;
+}
+
+// Load the owner's invite link into the Members tab
+async function loadInviteLink(isOwner) {
+  const section = document.getElementById('invite-section');
+  const input = document.getElementById('invite-link-input');
+  const result = document.getElementById('invite-link-result');
+  if (!isOwner || !currentCarpoolId) {
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+  result.textContent = '';
+  try {
+    const res = await fetch(`/api/carpools/${currentCarpoolId}/invite`);
+    const data = await res.json();
+    if (res.ok && data.code) {
+      input.value = window.location.origin + '/?invite=' + data.code;
+    } else {
+      input.value = '';
+      result.textContent = data.error || 'Failed to load';
+    }
+  } catch (err) {
+    result.textContent = 'Failed to load';
+  }
+}
+
+async function copyInviteLink() {
+  const input = document.getElementById('invite-link-input');
+  const result = document.getElementById('invite-link-result');
+  if (!input.value) return;
+  try {
+    await navigator.clipboard.writeText(input.value);
+    result.textContent = 'Copied!'; result.style.color = '#5F7D5B';
+  } catch (e) {
+    input.select();
+    document.execCommand('copy');
+    result.textContent = 'Copied!'; result.style.color = '#5F7D5B';
+  }
+  setTimeout(() => { result.textContent = ''; }, 2000);
+}
+
+async function rotateInviteCode() {
+  const result = document.getElementById('invite-link-result');
+  const res = await fetch(`/api/carpools/${currentCarpoolId}/invite/rotate`, { method: 'POST' });
+  const data = await res.json();
+  if (res.ok && data.code) {
+    document.getElementById('invite-link-input').value = window.location.origin + '/?invite=' + data.code;
+    result.textContent = 'New link created — old one no longer works'; result.style.color = '#5F7D5B';
+    setTimeout(() => { result.textContent = ''; }, 3000);
+  } else {
+    result.textContent = data.error || 'Failed'; result.style.color = '#B07166';
   }
 }
 
