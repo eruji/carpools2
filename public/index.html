@@ -20,9 +20,15 @@
 <header id="app-header" class="hidden">
   <h1>Carpool <span id="app-version" class="app-version"></span></h1>
   <nav>
-    <span id="header-user"></span>
     <button class="btn btn-outline btn-sm" onclick="goToDashboard()" id="btn-dashboard" style="color:#6F6F66;border-color:#C9C9BF;">Dashboard</button>
-    <button class="btn btn-sm" style="background:#7C9A77;color:#fff;" onclick="logout()">Logout</button>
+    <div class="profile-menu">
+      <button class="profile-icon" id="profile-icon" onclick="toggleProfileMenu()" title="Profile"></button>
+      <div class="profile-dropdown hidden" id="profile-dropdown">
+        <div class="profile-menu-name" id="profile-menu-name"></div>
+        <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openProfileModal()">Edit Profile</button>
+        <button class="btn btn-danger btn-sm" style="width:100%;justify-content:flex-start;" onclick="logout()">Logout</button>
+      </div>
+    </div>
   </nav>
 </header>
 
@@ -181,8 +187,7 @@
       <div id="map-legend-body" class="map-legend-body hidden">
         <div class="legend-item"><span class="legend-icon"><svg width="14" height="18" viewBox="0 0 24 32"><path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="#fff"/></svg></span>Meetup</div>
         <div class="legend-item"><span class="legend-icon"><svg width="14" height="17" viewBox="0 0 24 28"><path d="M5 2v24" stroke="#8A5248" stroke-width="2.5"/><path d="M5 4h13l-3.5 4L18 12H5z" fill="#B07166" stroke="#fff" stroke-width="1.2"/></svg></span>Destination</div>
-        <div class="legend-item"><span class="legend-you-dot"></span>You <span class="legend-sub">(pulsing, shows ETA)</span></div>
-        <div class="legend-item"><span class="legend-avatar">AB</span>Member <span class="legend-sub">(initials)</span></div>
+        <div class="legend-item"><span class="legend-avatar">AB</span>People <span class="legend-sub">(includes you, halo ring)</span></div>
         <div class="legend-item"><span class="legend-line"></span>Route <span class="legend-sub">(dashed = member paths)</span></div>
       </div>
     </div>
@@ -383,6 +388,44 @@
         <button type="button" class="btn btn-danger btn-sm" onclick="deleteCarpool()">Delete</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PROFILE MODAL                                                -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="profile-modal" class="loc-modal hidden">
+  <div class="loc-modal-card">
+    <div class="flex-between">
+      <h3>Edit Profile</h3>
+      <button class="btn btn-outline btn-sm" onclick="closeProfileModal()">Close</button>
+    </div>
+    <div id="profile-body">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="profile-username" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="profile-email" autocomplete="off">
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary btn-sm" onclick="saveProfile()">Save</button>
+      </div>
+      <h4 class="mt-1">Change Password</h4>
+      <div class="form-group">
+        <label>Current Password</label>
+        <input type="password" id="profile-pw-current" autocomplete="current-password">
+      </div>
+      <div class="form-group">
+        <label>New Password</label>
+        <input type="password" id="profile-pw-new" autocomplete="new-password">
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary btn-sm" onclick="changePassword()">Change Password</button>
+      </div>
+      <div id="profile-result" class="text-xs text-muted mt-1"></div>
+    </div>
   </div>
 </div>
 
@@ -1274,7 +1317,7 @@ function updateMap(data) {
     addPoint(carpool.destination_lat, carpool.destination_lng);
   }
 
-  // My location marker (pulsing dot + heading name)
+  // My location marker (avatar with halo ring = you)
   if (myLocation) {
     let locTarget = 'You';
     if (session && session.phase === 'meetup' && carpool.meetup_lat && carpool.meetup_lng) {
@@ -1287,15 +1330,12 @@ function updateMap(data) {
     const myMarker = L.marker([myLocation.lat, myLocation.lng], {
       icon: L.divIcon({
         className: '',
-        html: `<div class="location-badge">
-          <div class="pulse-location"></div>
-          <div class="location-label-tag">
-            <span class="loc-target">${esc(locTarget)}</span>
-          </div>
-        </div>`,
-        iconAnchor: [11, 11]
+        html: `<div style="width:38px;height:38px;border-radius:50%;background:#5F7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;letter-spacing:0.02em;border:3px solid #fff;box-shadow:0 0 0 3px #8FAE8B, 0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(currentUser.username))}</div>`,
+        iconAnchor: [19, 19]
       })
-    }).addTo(map).bindPopup('<b>You</b> — heading to ' + locTarget);
+    }).addTo(map)
+      .bindTooltip('<b>You</b> — heading to ' + esc(locTarget), { direction: 'top', offset: [0, -12] })
+      .bindPopup('<b>You</b> — heading to ' + esc(locTarget));
     mapMarkers.myLocation = myMarker;
     // In transit we fit the whole route instead of zooming to the user
     if (!inTransit) addPoint(myLocation.lat, myLocation.lng);
