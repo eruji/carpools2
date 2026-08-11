@@ -6,7 +6,7 @@
 <title>Carpool App</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -183,13 +183,13 @@
   <div id="map-container">
     <div id="map"></div>
     <div id="map-legend" class="map-legend">
-      <div class="map-legend-title" onclick="toggleMapLegend()">Key <span class="legend-caret">▸</span></div>
       <div id="map-legend-body" class="map-legend-body hidden">
         <div class="legend-item"><span class="legend-icon"><svg width="14" height="18" viewBox="0 0 24 32"><path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="#fff"/></svg></span>Meetup</div>
         <div class="legend-item"><span class="legend-icon"><svg width="14" height="17" viewBox="0 0 24 28"><path d="M5 2v24" stroke="#8A5248" stroke-width="2.5"/><path d="M5 4h13l-3.5 4L18 12H5z" fill="#B07166" stroke="#fff" stroke-width="1.2"/></svg></span>Destination</div>
         <div class="legend-item"><span class="legend-avatar">AB</span>People <span class="legend-sub">(includes you, halo ring)</span></div>
         <div class="legend-item"><span class="legend-line"></span>Route <span class="legend-sub">(dashed = member paths)</span></div>
       </div>
+      <div class="map-legend-title" onclick="toggleMapLegend()">Key <span class="legend-caret">▸</span></div>
     </div>
   </div>
 
@@ -209,7 +209,10 @@
       </div>
       <!-- Stop 2: Meetup (name only) — clickable to edit/swap -->
       <div class="subway-stop" id="subway-stop-meetup" onclick="openLocConfig('meetup')">
-        <div class="dot"></div>
+        <svg class="dot dot-pin" viewBox="0 0 24 32" width="22" height="26">
+          <path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/>
+          <circle cx="12" cy="11" r="4" fill="#fff"/>
+        </svg>
         <div class="stop-content">
           <div class="stop-row">
             <div class="stop-name" id="subway-meetup-name">Meetup</div>
@@ -220,7 +223,10 @@
       </div>
       <!-- Stop 3: Destination (name only) — clickable to edit/swap -->
       <div class="subway-stop" id="subway-stop-dest" onclick="openLocConfig('destination')">
-        <div class="dot"></div>
+        <svg class="dot dot-flag" viewBox="0 0 24 28" width="22" height="24">
+          <path d="M5 2v24" stroke="#8A5248" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M5 4h13l-3.5 4L18 12H5z" fill="#B07166" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
         <div class="stop-content">
           <div class="stop-row">
             <div class="stop-name" id="subway-dest-name">Destination</div>
@@ -1093,7 +1099,7 @@ function renderSubwayMembers(data) {
     bubble.dataset.to = leg.to;
     bubble.dataset.progress = progress;
     bubble.title = m.username + ' · ' + detail;
-    bubble.innerHTML = `<div class="subway-avatar-bubble" style="background:${memberDotColor(m.status)};">${esc(getInitials(m.username))}</div>`;
+    bubble.innerHTML = `<div class="subway-avatar-bubble" style="background:${memberColor(m.user_id)};">${esc(getInitials(m.username))}</div>`;
     layer.appendChild(bubble);
   });
 
@@ -1238,7 +1244,7 @@ function renderMemberStatus(session) {
     return `
       <div class="member-row">
         <div class="member-info">
-          <span class="member-avatar" style="background:${memberDotColor(m.status)};">${esc(getInitials(m.username))}</span>
+          <span class="member-avatar" style="background:${memberColor(m.user_id)};">${esc(getInitials(m.username))}</span>
           <span class="member-name">${esc(m.username)}</span>
           <span class="badge ${statusColors[m.status] || 'badge-gray'}">${statusLabels[m.status] || statusLabels.pending}</span>
           <span class="text-xs text-muted">${etaStr}</span>
@@ -1406,7 +1412,7 @@ function updateMap(data) {
     const myMarker = L.marker([myLocation.lat, myLocation.lng], {
       icon: L.divIcon({
         className: '',
-        html: `<div style="width:38px;height:38px;border-radius:50%;background:#5F7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;letter-spacing:0.02em;border:3px solid #fff;box-shadow:0 0 0 3px #8FAE8B, 0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(currentUser.username))}</div>`,
+        html: `<div style="width:38px;height:38px;border-radius:50%;background:${memberColor(currentUser.id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;letter-spacing:0.02em;border:3px solid #fff;box-shadow:0 0 0 3px #8FAE8B, 0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(currentUser.username))}</div>`,
         iconAnchor: [19, 19]
       })
     }).addTo(map)
@@ -1476,7 +1482,7 @@ function updateMap(data) {
 
     session.members.forEach(m => {
       if (!(m.location_lat && m.location_lng) || m.status === 'skip') return;
-      const avatarColor = memberDotColor(m.status);
+      const avatarColor = memberColor(m.user_id);
       const marker = L.marker([m.location_lat, m.location_lng], {
         icon: L.divIcon({
           className: '',
@@ -2065,9 +2071,22 @@ function getInitials(name) {
   return '?';
 }
 
-// Muted avatar colors per status
-function memberDotColor(status) {
-  return status === 'driving' ? '#A89050' : status === 'riding' ? '#7C9A77' : '#5F7D5B';
+// Each member gets a consistent, unique muted color (stable per user id)
+const MEMBER_COLORS = [
+  '#7C9A77', // sage
+  '#B07166', // terracotta
+  '#A89050', // olive
+  '#7B8A9E', // slate
+  '#9E7B8F', // dusty rose
+  '#5F7D5B', // dark sage
+  '#8A6E5A', // brown
+  '#6E8A9E'  // steel blue
+];
+function memberColor(id) {
+  const s = String(id);
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return MEMBER_COLORS[h % MEMBER_COLORS.length];
 }
 
 function haversine(lat1, lng1, lat2, lng2) {
