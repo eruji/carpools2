@@ -1166,6 +1166,23 @@ function renderSessionUI(session) {
   }
   if (!session.driver_id) lastDriverId = null;
 
+  // Waiting message: arrived at the meetup but others haven't yet
+  const alertEl = document.getElementById('session-alert');
+  if (session.phase === 'meetup') {
+    const myMember = session.members.find(m => m.user_id === currentUser.id);
+    const active = session.members.filter(m => m.status !== 'skip');
+    const allArrived = active.length > 0 && active.every(m => m.status === 'arrived');
+    if (myMember && myMember.status === 'arrived' && !allArrived) {
+      alertEl.textContent = 'Waiting for all members to arrive...';
+      alertEl.className = 'alert alert-info';
+      alertEl.classList.remove('hidden');
+    } else {
+      alertEl.classList.add('hidden');
+    }
+  } else {
+    alertEl.classList.add('hidden');
+  }
+
   if (session.phase === 'meetup') {
     phaseMeetup.classList.remove('hidden');
     phaseAdvance.classList.add('hidden');

@@ -717,6 +717,9 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
     };
     io.to('carpool:' + carpool.id).emit('session-updated', updatedSession);
 
+    // If everyone has arrived at the meetup, move to the destination phase
+    autoAdvanceCheck(carpool.id);
+
     res.json({ ok: true, session: updatedSession });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -742,6 +745,7 @@ app.post('/api/carpools/:id/sessions/skip-member', requireAuth, (req, res) => {
       members: stmts.sessionMembers.all(activeSession.id)
     };
     io.to('carpool:' + carpool.id).emit('session-updated', updatedSession);
+    autoAdvanceCheck(carpool.id);
     res.json({ ok: true, session: updatedSession });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -767,36 +771,7 @@ app.post('/api/carpools/:id/sessions/advance-phase', requireAuth, (req, res) => 
 
     // Phase transitions
     if (phase === 'destination' && activeSession.phase === 'meetup') {
-      // Calculate coins when moving to destination phase
-      const members = stmts.sessionMembers.all(activeSession.id);
-      const riders = members.filter(m => m.status === 'riding');
-      const driver = members.find(m => m.status === 'driving');
-      const actualDriverId = driver ? driver.user_id : activeSession.driver_id;
-
-      // Coins: driver gets +1 per rider, riders get -1 each
-      const coinsData = {};
-      for (const rider of riders) {
-        stmts.updateCoins.run(-1, carpool.id, rider.user_id);
-        coinsData[rider.user_id] = -1;
-      }
-      if (actualDriverId) {
-        stmts.updateCoins.run(riders.length, carpool.id, actualDriverId);
-        coinsData[actualDriverId] = riders.length;
-      }
-
-      // Update session driver
-      stmts.updateSessionDriver.run(actualDriverId, activeSession.id);
-
-      // Calculate mileage (meetup -> destination)
-      mileage = haversine(
-        activeSession.meetup_lat, activeSession.meetup_lng,
-        activeSession.destination_lat, activeSession.destination_lng
-      );
-
-      // Log history
-      stmts.addHistory.run(carpool.id, activeSession.id, 'destination', actualDriverId, 'phase_start', JSON.stringify(coinsData), mileage,
-        `Departed for destination. ${riders.length} riders. Coins distributed.`);
-
+      mileage = transitionToDestination(carpool, activeSession);
     } else if (phase === 'back_to_meetup' && activeSession.phase === 'destination') {
       mileage = haversine(
         activeSession.destination_lat, activeSession.destination_lng,
@@ -915,6 +890,56 @@ app.post('/api/invitations/:id/decline', requireAuth, (req, res) => {
 });
 
 // ── Utility ─────────────────────────────────────────────────────────────────
+// Meetup → Destination: distribute coins, log mileage/history, set phase
+function transitionToDestination(carpool, activeSession) {
+  const members = stmts.sessionMembers.all(activeSession.id);
+  const driver = members.find(m => m.status === 'driving');
+  const actualDriverId = driver ? driver.user_id : activeSession.driver_id;
+  // Riders: anyone riding OR arrived at the meetup (excluding the driver)
+  const riders = members.filter(m =>
+    (m.status === 'riding' || m.status === 'arrived') && m.user_id !== actualDriverId
+  );
+
+  const coinsData = {};
+  for (const rider of riders) {
+    stmts.updateCoins.run(-1, carpool.id, rider.user_id);
+    coinsData[rider.user_id] = -1;
+  }
+  if (actualDriverId) {
+    stmts.updateCoins.run(riders.length, carpool.id, actualDriverId);
+    coinsData[actualDriverId] = riders.length;
+  }
+  stmts.updateSessionDriver.run(actualDriverId, activeSession.id);
+
+  const mileage = haversine(
+    activeSession.meetup_lat, activeSession.meetup_lng,
+    activeSession.destination_lat, activeSession.destination_lng
+  );
+  stmts.addHistory.run(carpool.id, activeSession.id, 'destination', actualDriverId, 'phase_start',
+    JSON.stringify(coinsData), mileage,
+    `Departed for destination. ${riders.length} riders. Coins distributed.`);
+  stmts.updateSessionPhase.run('destination', 'destination', activeSession.id);
+  return mileage;
+}
+
+// If everyone (non-skipped) has arrived at the meetup, auto-advance to the destination
+function autoAdvanceCheck(carpoolId) {
+  const session = stmts.activeSession.get(carpoolId);
+  if (!session || session.phase !== 'meetup' || !session.driver_id) return false;
+  const members = stmts.sessionMembers.all(session.id);
+  const active = members.filter(m => m.status !== 'skip');
+  if (active.length === 0) return false;
+  if (!active.every(m => m.status === 'arrived')) return false;
+
+  const mileage = transitionToDestination(stmts.carpoolById.get(carpoolId), session);
+  const updated = { ...stmts.latestSession.get(carpoolId), members: stmts.sessionMembers.all(session.id) };
+  io.to('carpool:' + carpoolId).emit('session-updated', updated);
+  io.to('carpool:' + carpoolId).emit('phase-changed', {
+    from: 'meetup', to: 'destination', coinsDistributed: true, mileage
+  });
+  return true;
+}
+
 function haversine(lat1, lng1, lat2, lng2) {
   if (!lat1 || !lng1 || !lat2 || !lng2) return 0;
   const R = 3959; // Earth radius in miles
