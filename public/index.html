@@ -187,6 +187,7 @@
 
   <!-- ═══════ SUBWAY-STYLE TRANSIT LINE ═══════ -->
   <div class="subway-map" id="subway-map">
+    <div class="subway-carpool-name" id="subway-carpool-name"></div>
     <div class="route-label">
       <span id="subway-header-title">Route Map</span>
       <span id="subway-header-eta" class="hidden"></span>
@@ -767,6 +768,7 @@ function updateSubwayMap(data) {
   document.getElementById('subway-dest-addr').textContent = '';
   document.getElementById('subway-return-name').textContent = meetupName;
   document.getElementById('subway-return-addr').textContent = 'Return';
+  document.getElementById('subway-carpool-name').textContent = carpool.name || '';
 
   // Header
   const totalDist = (carpool.meetup_lat && carpool.destination_lat)
@@ -791,7 +793,7 @@ function updateSubwayMap(data) {
   subwayLine.className = 'subway-line';
 
   // Reset ETAs
-  ['subway-meetup-eta', 'subway-dest-eta', 'subway-return-eta'].forEach(id => {
+  ['subway-start-eta', 'subway-meetup-eta', 'subway-dest-eta', 'subway-return-eta'].forEach(id => {
     document.getElementById(id).classList.add('hidden');
   });
 
@@ -833,6 +835,7 @@ function updateSubwayMap(data) {
 function updateSubwayETAs(data) {
   const session = data.activeSession;
   const carpool = data.carpool;
+  const startEta = document.getElementById('subway-start-eta');
   const meetupEta = document.getElementById('subway-meetup-eta');
   const destEta = document.getElementById('subway-dest-eta');
   const returnEta = document.getElementById('subway-return-eta');
@@ -842,41 +845,41 @@ function updateSubwayETAs(data) {
   const fullDist = (carpool.meetup_lat && carpool.destination_lat)
     ? haversine(carpool.meetup_lat, carpool.meetup_lng, carpool.destination_lat, carpool.destination_lng)
     : 0;
-  const fullEta = Math.round(fullDist / 0.5);
+  const legEta = Math.round(fullDist / 0.5);
 
-  if (session.phase === 'meetup' && myLocation && carpool.meetup_lat) {
-    const dist = haversine(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng);
-    const etaMin = Math.round(dist / 0.5);
-    meetupEta.textContent = `~${etaMin} min`;
-    meetupEta.classList.remove('hidden');
-    destEta.textContent = `+${fullEta} min from start`;
-    destEta.classList.remove('hidden');
-    returnEta.textContent = `+${fullEta * 2} min round trip`;
-    returnEta.classList.remove('hidden');
-  }
+  // "12 min · 5:42 PM" — clock time so you know when you'll arrive
+  const fmt = (min) => {
+    const mins = Math.max(0, Math.round(min));
+    const clock = new Date(Date.now() + mins * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return `~${mins} min · ${clock}`;
+  };
+  const show = (el, txt) => { el.textContent = txt; el.classList.remove('hidden'); };
+  const done = (el) => show(el, 'Departed');
 
-  if (session.phase === 'destination') {
-    meetupEta.textContent = 'Departed ✓';
-    meetupEta.classList.remove('hidden');
-    if (myLocation && carpool.destination_lat) {
-      const dist = haversine(myLocation.lat, myLocation.lng, carpool.destination_lat, carpool.destination_lng);
-      const etaMin = Math.round(dist / 0.5);
-      destEta.textContent = `~${etaMin} min to arrival`;
-      destEta.classList.remove('hidden');
-    }
-    returnEta.textContent = `+${fullEta} min return trip`;
-    returnEta.classList.remove('hidden');
-  }
-
-  if (session.phase === 'back_to_meetup') {
-    meetupEta.textContent = '';
-    destEta.textContent = 'Departed ✓';
-    destEta.classList.remove('hidden');
+  if (session.phase === 'meetup') {
+    show(startEta, 'Now');
     if (myLocation && carpool.meetup_lat) {
-      const dist = haversine(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng);
-      const etaMin = Math.round(dist / 0.5);
-      returnEta.textContent = `~${etaMin} min to return`;
-      returnEta.classList.remove('hidden');
+      const d = haversine(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng);
+      const m = Math.round(d / 0.5);
+      show(meetupEta, fmt(m));
+      show(destEta, fmt(m + legEta));
+      show(returnEta, fmt(m + legEta * 2));
+    }
+  } else if (session.phase === 'destination') {
+    done(meetupEta);
+    if (myLocation && carpool.destination_lat) {
+      const d = haversine(myLocation.lat, myLocation.lng, carpool.destination_lat, carpool.destination_lng);
+      const m = Math.round(d / 0.5);
+      show(destEta, fmt(m));
+      show(returnEta, fmt(m + legEta));
+    }
+  } else if (session.phase === 'back_to_meetup') {
+    done(meetupEta);
+    done(destEta);
+    if (myLocation && carpool.meetup_lat) {
+      const d = haversine(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng);
+      const m = Math.round(d / 0.5);
+      show(returnEta, fmt(m));
     }
   }
 }
@@ -1672,9 +1675,13 @@ function startLocationTracking() {
     );
   }
 
-  // Fallback interval
+  // Fallback interval — also keeps the clock-time ETAs ticking
   locationInterval = setInterval(() => {
-    if (!activeSession || !socket) return;
+    if (!activeSession) return;
+    if (currentCarpoolData) {
+      updateSubwayETAs({ carpool: currentCarpoolData.carpool, activeSession });
+    }
+    if (!socket) return;
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
