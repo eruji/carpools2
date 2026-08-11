@@ -334,6 +334,11 @@
         <label>Carpool Name</label>
         <input type="text" id="edit-carpool-name" required>
       </div>
+      <div class="form-group">
+        <label>Arrival Radius (meters)</label>
+        <input type="number" id="edit-arrival-radius" min="50" max="2000" step="50" placeholder="400">
+        <p class="text-xs text-muted">How close GPS must be to auto-arrive. 400m covers a block or two (parking garages).</p>
+      </div>
       <p class="text-xs text-muted mb-1">Meetup and destination are set from the subway stops.</p>
       <div class="btn-group">
         <button type="submit" class="btn btn-primary">Update</button>
@@ -879,6 +884,7 @@ async function loadCarpoolView(carpoolId) {
 
   // Settings tab
   document.getElementById('edit-carpool-name').value = data.carpool.name || '';
+  document.getElementById('edit-arrival-radius').value = data.carpool.arrival_radius || 400;
 
   // History
   renderHistory(data.history);
@@ -2078,6 +2084,7 @@ async function handleUpdateCarpool(e) {
   e.preventDefault();
   const body = {
     name: document.getElementById('edit-carpool-name').value.trim(),
+    arrival_radius: parseFloat(document.getElementById('edit-arrival-radius').value) || 400,
   };
   const res = await fetch(`/api/carpools/${currentCarpoolId}`, {
     method: 'PUT',
@@ -2182,7 +2189,7 @@ function startLocationTracking() {
 }
 
 // ── Geo-fenced arrivals ─────────────────────────────────────────────────────
-const GEO_FENCE_M = 150; // meters — within this of the target = arrived
+const GEO_FENCE_M = 400; // default meters (per-carpool override in Setup)
 let lastAutoArriveAt = 0;
 
 function checkGeoFence() {
@@ -2204,8 +2211,10 @@ function checkGeoFence() {
   }
   if (!targetLat || !targetLng) return;
 
+  // Per-carpool radius (default 400m) so garages/parking a block over still count
+  const radius = carpool.arrival_radius || GEO_FENCE_M;
   const distM = haversine(myLocation.lat, myLocation.lng, targetLat, targetLng) * 1609.34;
-  if (distM <= GEO_FENCE_M) {
+  if (distM <= radius) {
     autoArrive(targetName);
   }
 }

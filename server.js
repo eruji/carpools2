@@ -135,6 +135,9 @@ if (!carpoolCols.includes('destination_nickname')) {
 if (!carpoolCols.includes('invite_code')) {
   db.exec("ALTER TABLE carpools ADD COLUMN invite_code TEXT DEFAULT ''");
 }
+if (!carpoolCols.includes('arrival_radius')) {
+  db.exec('ALTER TABLE carpools ADD COLUMN arrival_radius REAL DEFAULT 400');
+}
 // Repair any member statuses that were accidentally set to NULL by old location updates
 db.exec("UPDATE session_members SET status='pending' WHERE status IS NULL");
 // Track geo-fence (automatic) arrivals
@@ -171,7 +174,7 @@ const stmts = {
     WHERE cm.user_id = ?
     ORDER BY c.created_at DESC
   `),
-  updateCarpool: db.prepare('UPDATE carpools SET name=?, meetup_name=?, meetup_lat=?, meetup_lng=?, meetup_nickname=?, destination_name=?, destination_lat=?, destination_lng=?, destination_nickname=? WHERE id=?'),
+  updateCarpool: db.prepare('UPDATE carpools SET name=?, meetup_name=?, meetup_lat=?, meetup_lng=?, meetup_nickname=?, destination_name=?, destination_lat=?, destination_lng=?, destination_nickname=?, arrival_radius=? WHERE id=?'),
   deleteCarpool: db.prepare('DELETE FROM carpools WHERE id=?'),
 
   // Members
@@ -489,13 +492,14 @@ app.put('/api/carpools/:id', requireAuth, (req, res) => {
   const carpool = stmts.carpoolById.get(req.params.id);
   if (!carpool) return res.status(404).json({ error: 'Not found' });
   if (carpool.owner_id !== req.session.userId) return res.status(403).json({ error: 'Only owner can edit' });
-  const { name, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname } = req.body;
+  const { name, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname, arrival_radius } = req.body;
   stmts.updateCarpool.run(
     name || carpool.name,
     meetup_name ?? carpool.meetup_name, meetup_lat ?? carpool.meetup_lat, meetup_lng ?? carpool.meetup_lng,
     meetup_nickname ?? carpool.meetup_nickname,
     destination_name ?? carpool.destination_name, destination_lat ?? carpool.destination_lat, destination_lng ?? carpool.destination_lng,
     destination_nickname ?? carpool.destination_nickname,
+    arrival_radius ?? carpool.arrival_radius,
     carpool.id
   );
   res.json({ ok: true, carpool: stmts.carpoolById.get(carpool.id) });
