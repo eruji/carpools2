@@ -290,6 +290,46 @@ app.get('/api/version', (req, res) => {
   });
 });
 
+// Update profile (name / email)
+app.put('/api/profile', requireAuth, (req, res) => {
+  try {
+    const { username, email } = req.body;
+    const user = stmts.userById.get(req.session.userId);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    const newUsername = (username || user.username).trim();
+    const newEmail = (email || user.email).trim();
+    if (!newUsername || !newEmail) return res.status(400).json({ error: 'Name and email required' });
+    if (newUsername !== user.username && stmts.userByUsername.get(newUsername)) {
+      return res.status(409).json({ error: 'Username taken' });
+    }
+    if (newEmail !== user.email && stmts.userByEmail.get(newEmail)) {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+    db.prepare('UPDATE users SET username=?, email=? WHERE id=?').run(newUsername, newEmail, user.id);
+    res.json({ ok: true, user: stmts.userById.get(user.id) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Change password (requires current password)
+app.put('/api/profile/password', requireAuth, (req, res) => {
+  try {
+    const { current, next } = req.body;
+    if (!current || !next) return res.status(400).json({ error: 'Current and new password required' });
+    if (next.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+    if (!user || !bcrypt.compareSync(current, user.password_hash)) {
+      return res.status(403).json({ error: 'Current password is incorrect' });
+    }
+    const hash = bcrypt.hashSync(next, 10);
+    db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hash, user.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Carpool Routes ──────────────────────────────────────────────────────────
 app.get('/api/carpools', requireAuth, (req, res) => {
   const carpools = stmts.carpoolsByUser.all(req.session.userId);

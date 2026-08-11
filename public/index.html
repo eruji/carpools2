@@ -6,7 +6,7 @@
 <title>Carpool App</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -506,8 +506,84 @@ function showAuth() {
 
 function showApp() {
   document.getElementById('app-header').classList.remove('hidden');
-  document.getElementById('header-user').textContent = currentUser.username;
+  renderProfileIcon();
   document.getElementById('view-auth').classList.add('hidden');
+}
+
+// ── Profile ─────────────────────────────────────────────────────────────────
+function renderProfileIcon() {
+  const icon = document.getElementById('profile-icon');
+  if (icon) icon.textContent = getInitials(currentUser.username);
+  const name = document.getElementById('profile-menu-name');
+  if (name) name.textContent = currentUser.username;
+}
+
+function toggleProfileMenu() {
+  document.getElementById('profile-dropdown').classList.toggle('hidden');
+}
+
+function openProfileModal() {
+  document.getElementById('profile-dropdown').classList.add('hidden');
+  document.getElementById('profile-username').value = currentUser.username;
+  document.getElementById('profile-email').value = currentUser.email || '';
+  document.getElementById('profile-pw-current').value = '';
+  document.getElementById('profile-pw-new').value = '';
+  document.getElementById('profile-result').textContent = '';
+  document.getElementById('profile-modal').classList.remove('hidden');
+}
+
+function closeProfileModal() {
+  document.getElementById('profile-modal').classList.add('hidden');
+}
+
+async function saveProfile() {
+  const username = document.getElementById('profile-username').value.trim();
+  const email = document.getElementById('profile-email').value.trim();
+  const result = document.getElementById('profile-result');
+  const res = await fetch('/api/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, email })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    result.textContent = data.error || 'Failed to save';
+    result.style.color = '#B07166';
+    return;
+  }
+  currentUser = data.user;
+  renderProfileIcon();
+  result.textContent = 'Saved!';
+  result.style.color = '#5F7D5B';
+}
+
+async function changePassword() {
+  const current = document.getElementById('profile-pw-current').value;
+  const next = document.getElementById('profile-pw-new').value;
+  const result = document.getElementById('profile-result');
+  const res = await fetch('/api/profile/password', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ current, next })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    result.textContent = data.error || 'Failed to change password';
+    result.style.color = '#B07166';
+    return;
+  }
+  document.getElementById('profile-pw-current').value = '';
+  document.getElementById('profile-pw-new').value = '';
+  result.textContent = 'Password changed!';
+  result.style.color = '#5F7D5B';
+}
+
+// Close the profile dropdown when clicking outside it
+function closeProfileDropdownOnOutside(e) {
+  const menu = document.querySelector('.profile-menu');
+  if (menu && !menu.contains(e.target)) {
+    document.getElementById('profile-dropdown').classList.add('hidden');
+  }
 }
 
 function showDashboard() {
@@ -2141,6 +2217,10 @@ function escAttr(str) {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.autocomplete-wrapper')) {
     document.querySelectorAll('.autocomplete-dropdown').forEach(d => d.classList.add('hidden'));
+  }
+  // Close the profile dropdown when clicking outside it
+  if (!e.target.closest('.profile-menu')) {
+    document.getElementById('profile-dropdown').classList.add('hidden');
   }
 });
 
