@@ -828,7 +828,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 
 /* ── Mobile: immersive full-bleed map with floating content ──── */
 @media (max-width: 480px) {
-  /* The map fills the whole screen as a background layer (behind content) */
+  /* The map fills the whole screen as a background layer */
   #map-container {
     position: fixed;
     inset: 0;
@@ -836,7 +836,8 @@ tr:hover td { background: rgba(0,0,0,0.015); }
     border: none;
     border-radius: 0;
     margin: 0;
-    z-index: -1;
+    z-index: 1;
+    pointer-events: auto;
   }
   /* Content floats on top; gaps let touches reach the map */
   #view-carpool {
@@ -845,7 +846,15 @@ tr:hover td { background: rgba(0,0,0,0.015); }
     padding: 330px 10px 40px;
     pointer-events: none;
   }
+  /* Floating cards sit above the map and stay interactive */
   #view-carpool > * { pointer-events: auto; }
+  #view-carpool > .subway-map,
+  #view-carpool > .phase-panel,
+  #view-carpool > .card,
+  #view-carpool > .loc-modal {
+    position: relative;
+    z-index: 2;
+  }
   /* Title row (carpool name + gear) floats over the map at the top */
   #view-carpool > .flex-between {
     position: fixed;
