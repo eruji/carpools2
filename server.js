@@ -370,6 +370,9 @@ app.post('/api/carpools/:id/members', requireAuth, (req, res) => {
   stmts.addMember.run(carpool.id, user.id);
   // Also create an invitation record
   stmts.createInvitation.run(carpool.id, user.id, req.session.userId);
+  // If a session is already active, add the new member to it as pending
+  const active = stmts.activeSession.get(carpool.id);
+  if (active) stmts.addSessionMember.run(active.id, user.id, 'pending');
   const members = stmts.carpoolMembers.all(carpool.id);
   res.json({ ok: true, members });
 });
@@ -425,6 +428,9 @@ app.post('/api/carpools/join', requireAuth, (req, res) => {
     }
     stmts.addMember.run(carpool.id, req.session.userId);
     stmts.createInvitation.run(carpool.id, req.session.userId, carpool.owner_id);
+    // If a session is already active, add the new member to it as pending
+    const active = stmts.activeSession.get(carpool.id);
+    if (active) stmts.addSessionMember.run(active.id, req.session.userId, 'pending');
     res.json({ ok: true, carpool, alreadyMember: false });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -483,8 +489,14 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
     const activeSession = stmts.activeSession.get(carpool.id);
     if (!activeSession) return res.status(400).json({ error: 'No active session' });
 
-    const sm = stmts.sessionMemberByUser.get(activeSession.id, req.session.userId);
-    if (!sm) return res.status(403).json({ error: 'Not in session' });
+    let sm = stmts.sessionMemberByUser.get(activeSession.id, req.session.userId);
+    if (!sm) {
+      // Member joined after the session started — add them now
+      const member = stmts.isMember.get(carpool.id, req.session.userId);
+      if (!member) return res.status(403).json({ error: 'Not in session' });
+      stmts.addSessionMember.run(activeSession.id, req.session.userId, 'pending');
+      sm = stmts.sessionMemberByUser.get(activeSession.id, req.session.userId);
+    }
 
     // If setting to 'driving', update the session driver
     if (status === 'driving') {
@@ -684,6 +696,9 @@ app.post('/api/invitations/:id/accept', requireAuth, (req, res) => {
   // Get the invitation to know carpool_id
   const inv = db.prepare('SELECT * FROM invitations WHERE id=?').get(req.params.id);
   stmts.addMember.run(inv.carpool_id, req.session.userId);
+  // If a session is already active, add the new member to it as pending
+  const active = stmts.activeSession.get(inv.carpool_id);
+  if (active) stmts.addSessionMember.run(active.id, req.session.userId, 'pending');
   res.json({ ok: true });
 });
 
