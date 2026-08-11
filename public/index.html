@@ -211,7 +211,6 @@
 
   <!-- ═══════ SUBWAY-STYLE TRANSIT LINE ═══════ -->
   <div class="subway-map" id="subway-map">
-    <div class="subway-carpool-name" id="subway-carpool-name"></div>
     <div class="route-label">
       <span id="subway-header-title">Route Map</span>
       <span id="subway-header-eta" class="hidden"></span>
@@ -835,7 +834,6 @@ function updateSubwayMap(data) {
   document.getElementById('subway-dest-addr').textContent = '';
   document.getElementById('subway-return-name').textContent = meetupName;
   document.getElementById('subway-return-addr').textContent = 'Return';
-  document.getElementById('subway-carpool-name').textContent = carpool.name || '';
 
   // Header (arrival times only — no mileage)
   document.getElementById('subway-header-title').textContent = `${meetupName} → ${destName}`;
@@ -1707,6 +1705,7 @@ async function applyMeetupAdjust() {
 
   document.getElementById('meetup-adjust').classList.add('hidden');
   document.getElementById('btn-restore-meetup').classList.remove('hidden');
+  await refreshMyCarpools();
   await loadCarpoolView(currentCarpoolId);
 }
 
@@ -1728,10 +1727,33 @@ async function restoreMeetup() {
   }
   prevMeetup = null;
   document.getElementById('btn-restore-meetup').classList.add('hidden');
+  await refreshMyCarpools();
   await loadCarpoolView(currentCarpoolId);
 }
 
 // ── Carpool Settings ────────────────────────────────────────────────────────
+// Re-fetch the carpool list so the dropdown/dashboard reflect edits
+async function refreshMyCarpools() {
+  const res = await fetch('/api/carpools');
+  const data = await res.json();
+  myCarpools = data.carpools || [];
+  populateCarpoolSwitcher();
+}
+
+// Push carpool locations into the active session so the live view matches
+async function syncSessionLocations() {
+  if (!activeSession || !currentCarpoolData) return;
+  const c = currentCarpoolData.carpool;
+  await fetch(`/api/carpools/${currentCarpoolId}/sessions/locations`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      meetup_name: c.meetup_name, meetup_lat: c.meetup_lat, meetup_lng: c.meetup_lng,
+      destination_name: c.destination_name, destination_lat: c.destination_lat, destination_lng: c.destination_lng
+    })
+  });
+}
+
 async function handleUpdateCarpool(e) {
   e.preventDefault();
   const body = {
@@ -1751,6 +1773,8 @@ async function handleUpdateCarpool(e) {
     body: JSON.stringify(body)
   });
   if (res.ok) {
+    await syncSessionLocations();
+    await refreshMyCarpools();
     alert('Carpool updated!');
     loadCarpoolView(currentCarpoolId);
   }
