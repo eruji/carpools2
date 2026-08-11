@@ -778,18 +778,10 @@ function updateSubwayMap(data) {
   document.getElementById('subway-return-addr').textContent = 'Return';
   document.getElementById('subway-carpool-name').textContent = carpool.name || '';
 
-  // Header
-  const totalDist = (carpool.meetup_lat && carpool.destination_lat)
-    ? haversine(carpool.meetup_lat, carpool.meetup_lng, carpool.destination_lat, carpool.destination_lng)
-    : 0;
+  // Header (arrival times only — no mileage)
   document.getElementById('subway-header-title').textContent = `${meetupName} → ${destName}`;
   const headerEta = document.getElementById('subway-header-eta');
-  if (totalDist > 0) {
-    headerEta.textContent = `${totalDist.toFixed(1)} mi`;
-    headerEta.classList.remove('hidden');
-  } else {
-    headerEta.classList.add('hidden');
-  }
+  headerEta.classList.add('hidden');
 
   // Reset all stops
   const stopStart = document.getElementById('subway-stop-start');
@@ -855,11 +847,10 @@ function updateSubwayETAs(data) {
     : 0;
   const legEta = Math.round(fullDist / 0.5);
 
-  // "12 min · 5:42 PM" — clock time so you know when you'll arrive
+  // Arrival clock time only (e.g., "9:45 PM")
   const fmt = (min) => {
     const mins = Math.max(0, Math.round(min));
-    const clock = new Date(Date.now() + mins * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return `~${mins} min · ${clock}`;
+    return new Date(Date.now() + mins * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   };
   const show = (el, txt) => { el.textContent = txt; el.classList.remove('hidden'); };
   const done = (el) => show(el, 'Departed');
@@ -940,7 +931,7 @@ function renderSubwayMembers(data) {
     const dist = haversine(m.location_lat, m.location_lng, targetLat, targetLng);
     const progress = Math.min(1, Math.max(0, 1 - dist / denominator));
     const eta = Math.round(dist / 0.5);
-    const detail = m.status === 'arrived' ? 'Arrived' : `${dist.toFixed(1)} mi · ~${eta} min`;
+    const detail = m.status === 'arrived' ? 'Arrived' : `~${eta} min`;
     const bubble = document.createElement('div');
     bubble.className = 'subway-avatar-online';
     bubble.dataset.from = leg.from;
