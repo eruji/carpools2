@@ -146,6 +146,13 @@ header nav span { opacity: 0.7; font-size: 0.9rem; max-width: 100px; overflow: h
   flex-direction: column;
   gap: 6px;
 }
+/* Profile dropdown floats above everything (not trapped in the header) */
+#profile-dropdown {
+  position: fixed;
+  top: 58px;
+  right: 12px;
+  z-index: 1100;
+}
 .profile-menu-name {
   font-size: 0.8rem;
   font-weight: 600;

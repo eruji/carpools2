@@ -25,13 +25,6 @@
       <button class="btn btn-outline btn-sm" onclick="goToDashboard()" id="btn-dashboard" style="color:#6F6F66;border-color:#C9C9BF;">Dashboard</button>
       <div class="profile-menu">
         <button class="profile-icon" id="profile-icon" onclick="toggleProfileMenu()" title="Profile"></button>
-        <div class="profile-dropdown hidden" id="profile-dropdown">
-          <div class="profile-menu-name" id="profile-menu-name"></div>
-          <div class="profile-menu-email" id="profile-menu-email"></div>
-          <button class="btn btn-outline btn-sm mobile-dashboard hidden" style="width:100%;justify-content:flex-start;" onclick="goToDashboard()">Dashboard</button>
-          <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openProfileModal()">Edit Profile</button>
-          <button class="btn btn-danger btn-sm" style="width:100%;justify-content:flex-start;" onclick="logout()">Logout</button>
-        </div>
       </div>
     </nav>
   </div>
@@ -365,6 +358,17 @@
 <!-- TOAST                                                          -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <div id="toast" class="toast hidden"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PROFILE DROPDOWN (body-level so it overlays everything)        -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="profile-dropdown hidden" id="profile-dropdown">
+  <div class="profile-menu-name" id="profile-menu-name"></div>
+  <div class="profile-menu-email" id="profile-menu-email"></div>
+  <button class="btn btn-outline btn-sm mobile-dashboard hidden" style="width:100%;justify-content:flex-start;" onclick="goToDashboard()">Dashboard</button>
+  <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openProfileModal()">Edit Profile</button>
+  <button class="btn btn-danger btn-sm" style="width:100%;justify-content:flex-start;" onclick="logout()">Logout</button>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- PROFILE MODAL                                                -->
@@ -2515,7 +2519,7 @@ document.addEventListener('click', (e) => {
     document.querySelectorAll('.autocomplete-dropdown').forEach(d => d.classList.add('hidden'));
   }
   // Close the profile/carpool dropdowns when clicking outside them
-  if (!e.target.closest('.profile-menu') && !e.target.closest('.carpool-menu')) {
+  if (!e.target.closest('.profile-menu') && !e.target.closest('.carpool-menu') && !e.target.closest('.profile-dropdown')) {
     document.getElementById('profile-dropdown').classList.add('hidden');
     document.getElementById('carpool-menu-dropdown').classList.add('hidden');
   }
