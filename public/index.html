@@ -15,7 +15,7 @@
 <!-- HEADER                                                        -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <header id="app-header" class="hidden">
-  <h1>🚗 Carpool</h1>
+  <h1>Carpool</h1>
   <nav>
     <span id="header-user"></span>
     <button class="btn btn-outline btn-sm" onclick="goToDashboard()" id="btn-dashboard" style="color:#6F6F66;border-color:#C9C9BF;">Dashboard</button>
@@ -28,7 +28,7 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <div id="view-auth" class="app-container">
   <div style="text-align:center;padding:30px 0;">
-    <h1>🚗 Carpool App</h1>
+    <h1>Carpool App</h1>
     <p class="text-muted mt-1">Coordinate your daily carpool with real-time tracking</p>
   </div>
 
@@ -145,7 +145,7 @@
     <h2 id="carpool-title">Carpool</h2>
     <div style="display:flex;gap:6px;align-items:center;">
       <span id="carpool-owner-badge" class="badge badge-blue hidden">Owner</span>
-      <span id="carpool-coins-badge" class="badge badge-yellow">🪙 0</span>
+      <span id="carpool-coins-badge" class="badge badge-yellow">0</span>
     </div>
   </div>
 
@@ -162,7 +162,7 @@
 
   <!-- Time/ETA Info Bar -->
   <div id="route-info-bar" class="card hidden" style="padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <span style="font-weight:700;font-size:0.85rem;">📍 Route</span>
+    <span style="font-weight:700;font-size:0.85rem;">Route</span>
     <span id="route-info-text" class="text-sm text-muted"></span>
     <span id="route-info-eta" class="eta-badge hidden"></span>
   </div>
@@ -170,7 +170,7 @@
   <!-- ═══════ SUBWAY-STYLE TRANSIT LINE ═══════ -->
   <div class="subway-map" id="subway-map">
     <div class="route-label">
-      <span id="subway-header-title">🚇 Route Map</span>
+      <span id="subway-header-title">Route Map</span>
       <span id="subway-header-eta" class="hidden"></span>
     </div>
     <div class="subway-line" id="subway-line">
@@ -223,29 +223,29 @@
   <div id="session-panel" class="phase-panel">
     <div id="session-idle">
       <p class="text-muted mb-1 text-sm">No active session. Start one to begin tracking!</p>
-      <button class="btn btn-primary btn-lg" onclick="startSession()" style="width:100%;">🚗 I'm Driving!</button>
+      <button class="btn btn-primary btn-lg" onclick="startSession()" style="width:100%;">I'm Driving!</button>
     </div>
 
     <div id="session-active" class="hidden">
       <div class="phase-status">
-        <span class="phase-icon" id="session-phase-icon">📍</span>
+        <span class="phase-dot" id="session-phase-icon"></span>
         <span class="phase-text" id="session-phase-title">Phase: Meetup</span>
       </div>
       <p id="session-info" class="text-sm text-muted mb-1"></p>
 
       <!-- Phase 1: Meetup Controls -->
       <div id="phase-meetup-controls" class="btn-group">
-        <button class="btn btn-primary" onclick="respondToSession('driving')">🚗 Driving</button>
-        <button class="btn btn-success" onclick="respondToSession('riding')">🚶 Riding</button>
-        <button class="btn btn-warning" onclick="respondToSession('skip')">⏭ Skip</button>
-        <button class="btn btn-outline" onclick="respondToSession('arrived')">📍 Arrived</button>
+        <button class="btn btn-primary" onclick="respondToSession('driving')">Driving</button>
+        <button class="btn btn-success" onclick="respondToSession('riding')">Riding</button>
+        <button class="btn btn-warning" onclick="respondToSession('skip')">Skip</button>
+        <button class="btn btn-outline" onclick="respondToSession('arrived')">Arrived</button>
       </div>
 
       <!-- Phase 2-3 Controls -->
       <div id="phase-advance-controls" class="btn-group hidden">
-        <button id="btn-leaving-dest" class="btn btn-primary btn-lg hidden" onclick="advancePhase('destination')" style="width:100%;">🚗 Leaving for Destination</button>
-        <button id="btn-back-to-meetup" class="btn btn-warning btn-lg hidden" onclick="advancePhase('back_to_meetup')" style="width:100%;">🔙 Back to Meetup</button>
-        <button id="btn-complete" class="btn btn-success btn-lg hidden" onclick="advancePhase('completed')" style="width:100%;">✅ Complete Carpool</button>
+        <button id="btn-leaving-dest" class="btn btn-primary btn-lg hidden" onclick="advancePhase('destination')" style="width:100%;">Leaving for Destination</button>
+        <button id="btn-back-to-meetup" class="btn btn-warning btn-lg hidden" onclick="advancePhase('back_to_meetup')" style="width:100%;">Back to Meetup</button>
+        <button id="btn-complete" class="btn btn-success btn-lg hidden" onclick="advancePhase('completed')" style="width:100%;">Complete Carpool</button>
       </div>
 
       <div id="session-alert" class="hidden"></div>
@@ -490,7 +490,7 @@ function renderCarpoolsList(carpools) {
         </div>
       </div>
       <div style="text-align:right;">
-        <span class="badge badge-yellow">🪙 ${c.coins_balance}</span>
+        <span class="badge badge-yellow">${c.coins_balance}</span>
         <div class="text-xs text-muted">${c.owner_id === currentUser.id ? 'Owner' : 'Member'}</div>
       </div>
     </div>
@@ -595,7 +595,7 @@ async function loadCarpoolView(carpoolId) {
   }
 
   // Coins badge
-  document.getElementById('carpool-coins-badge').textContent = '🪙 ' + data.myMembership.coins_balance;
+  document.getElementById('carpool-coins-badge').textContent = data.myMembership.coins_balance;
 
   // Members tab
   renderMembers(data.members, data.isOwner);
@@ -655,11 +655,11 @@ function renderHistory(history) {
   }
   container.innerHTML = history.map(h => {
     const phaseNames = {
-      destination: '🟢 To Destination',
-      back_to_meetup: '🟡 Back to Meetup',
-      completed: '✅ Completed',
-      cancelled: '❌ Cancelled',
-      phase_start: '📍 Phase Start'
+      destination: 'To Destination',
+      back_to_meetup: 'Back to Meetup',
+      completed: 'Completed',
+      cancelled: 'Cancelled',
+      phase_start: 'Phase Start'
     };
     let coinsStr = '';
     if (h.coins_data && h.coins_data !== '{}') {
@@ -696,14 +696,14 @@ function updateSubwayMap(data) {
   document.getElementById('subway-meetup-addr').textContent = '';
   document.getElementById('subway-dest-name').textContent = destName;
   document.getElementById('subway-dest-addr').textContent = '';
-  document.getElementById('subway-return-name').textContent = '↩ ' + meetupName;
-  document.getElementById('subway-return-addr').textContent = '';
+  document.getElementById('subway-return-name').textContent = meetupName;
+  document.getElementById('subway-return-addr').textContent = 'Return';
 
   // Header
   const totalDist = (carpool.meetup_lat && carpool.destination_lat)
     ? haversine(carpool.meetup_lat, carpool.meetup_lng, carpool.destination_lat, carpool.destination_lng)
     : 0;
-  document.getElementById('subway-header-title').textContent = `🚇 ${meetupName} → ${destName}`;
+  document.getElementById('subway-header-title').textContent = `${meetupName} → ${destName}`;
   const headerEta = document.getElementById('subway-header-eta');
   if (totalDist > 0) {
     headerEta.textContent = `${totalDist.toFixed(1)} mi`;
@@ -838,7 +838,6 @@ function renderSubwayMembers(data) {
   container.innerHTML = session.members
     .filter(m => m.location_lat && m.location_lng && m.status !== 'skip' && m.status !== 'pending')
     .map(m => {
-      const emoji = m.status === 'driving' ? '🚗' : m.status === 'riding' ? '🚶' : m.status === 'arrived' ? '📍' : '👤';
       let positionLabel = '';
 
       if (m.status === 'arrived') {
@@ -865,7 +864,7 @@ function renderSubwayMembers(data) {
         <div class="subway-member-row">
           <div class="subway-member-dot ${m.status}"></div>
           <div class="subway-member-info">
-            <span class="subway-member-name">${emoji} ${esc(m.username)}</span>
+            <span class="subway-member-name">${esc(m.username)}</span>
             <span class="subway-member-detail">${positionLabel}</span>
           </div>
         </div>
@@ -890,7 +889,7 @@ function updateRouteInfo(data) {
   textEl.textContent = `${meetupLabel(carpool)} → ${destLabel(carpool)}: ${dist.toFixed(1)} mi one-way`;
 
   if (activeSession && (activeSession.phase === 'destination' || activeSession.phase === 'back_to_meetup')) {
-    etaEl.textContent = '🕐 ~' + Math.round(dist / 0.5) + ' min drive';
+    etaEl.textContent = '~' + Math.round(dist / 0.5) + ' min drive';
     etaEl.classList.remove('hidden');
   } else {
     etaEl.classList.add('hidden');
@@ -921,8 +920,8 @@ function renderSessionUI(session) {
   memberPanel.classList.remove('hidden');
   updatePhaseIndicator(session.phase);
 
-  const phaseIcons = {
-    meetup: '📍', destination: '🚗', back_to_meetup: '🔙', completed: '✅'
+  const phaseDotColors = {
+    meetup: '#8FAE8B', destination: '#C0A46A', back_to_meetup: '#B07166', completed: '#7C9A77'
   };
   const phaseTitles = {
     meetup: 'Phase 1 · Heading to Meetup',
@@ -931,7 +930,7 @@ function renderSessionUI(session) {
     completed: 'Phase 4 · Complete'
   };
 
-  document.getElementById('session-phase-icon').textContent = phaseIcons[session.phase] || '📍';
+  document.getElementById('session-phase-icon').style.background = phaseDotColors[session.phase] || '#8FAE8B';
   document.getElementById('session-phase-title').textContent = phaseTitles[session.phase] || session.phase;
 
   // Driver info
@@ -987,11 +986,11 @@ function renderMemberStatus(session) {
 
   container.innerHTML = session.members.map(m => {
     const statusLabels = {
-      driving: '🚗 Driving',
-      riding: '🚶 Riding',
-      skip: '⏭ Skipped',
-      arrived: '📍 Arrived',
-      pending: '⏳ Waiting...'
+      driving: 'Driving',
+      riding: 'Riding',
+      skip: 'Skipped',
+      arrived: 'Arrived',
+      pending: 'Waiting...'
     };
     const statusColors = {
       driving: 'badge-yellow',
@@ -1025,7 +1024,7 @@ function renderMemberStatus(session) {
             ? `<button class="btn btn-warning btn-sm" onclick="skipMember(${m.user_id})">Skip</button>`
             : ''}
           ${m.user_id === currentUser.id && (m.status === 'driving' || m.status === 'riding')
-            ? '<span class="badge badge-green text-xs">📍 Sharing</span>'
+            ? '<span class="badge badge-green text-xs">Sharing</span>'
             : ''}
         </div>
       </div>
@@ -1135,7 +1134,7 @@ function updateMap(data) {
 
   // Meetup marker (green pin)
   if (carpool.meetup_lat && carpool.meetup_lng) {
-    const label = (inMeetup ? '🎯 ' : '') + meetupLabel(carpool);
+    const label = inMeetup ? meetupLabel(carpool) : meetupLabel(carpool);
     const marker = L.marker([carpool.meetup_lat, carpool.meetup_lng], {
       icon: L.divIcon({
         className: '',
@@ -1237,7 +1236,7 @@ function updateMap(data) {
         const indicator = L.marker(coords[mid], {
           icon: L.divIcon({
             className: '',
-            html: `<div style="background:#C0A46A;color:#fff;padding:8px 18px;border-radius:14px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,0.25);border:2px solid #fff;">🚗 ${phaseLabel}</div>`,
+            html: `<div style="background:#C0A46A;color:#fff;padding:8px 18px;border-radius:14px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,0.25);border:2px solid #fff;">${phaseLabel}</div>`,
             iconAnchor: [40, 20]
           })
         }).addTo(map).bindPopup('In transit · ' + distanceText);
@@ -1253,7 +1252,7 @@ function updateMap(data) {
   if (inMeetup && session.members) {
     session.members.forEach(m => {
       if (m.location_lat && m.location_lng && m.status !== 'skip') {
-        const emoji = m.status === 'driving' ? '🚗' : m.status === 'riding' ? '🚶' : '📍';
+        const dotColor = m.status === 'driving' ? '#C0A46A' : m.status === 'riding' ? '#8FAE8B' : '#7C9A77';
         let etaStr = '';
         if (carpool.meetup_lat && carpool.meetup_lng) {
           const dist = haversine(m.location_lat, m.location_lng, carpool.meetup_lat, carpool.meetup_lng);
@@ -1262,7 +1261,7 @@ function updateMap(data) {
         const marker = L.marker([m.location_lat, m.location_lng], {
           icon: L.divIcon({
             className: '',
-            html: `<div style="background:#DDE8D9;color:#4A5E47;padding:6px 14px;border-radius:12px;font-size:13px;white-space:nowrap;font-weight:700;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.15);">${emoji} ${esc(m.username)}${etaStr}</div>`,
+            html: `<div style="background:#DDE8D9;color:#4A5E47;padding:6px 14px;border-radius:12px;font-size:13px;white-space:nowrap;font-weight:700;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.15);display:flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0;"></span>${esc(m.username)}${etaStr}</div>`,
             iconAnchor: [32, 14]
           })
         }).addTo(map).bindPopup(`${esc(m.username)} (${m.status})${etaStr}`);

@@ -347,7 +347,13 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   padding: 8px 12px; background: var(--accent-soft);
   border-radius: 8px; margin-bottom: 12px; border: 1px solid rgba(143,174,139,0.3);
 }
-.phase-panel .phase-status .phase-icon { font-size: 1.4rem; }
+.phase-panel .phase-status .phase-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent-dark);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
 .phase-panel .phase-status .phase-text { font-size: 0.85rem; font-weight: 600; color: var(--accent-deep); }
 
 /* ── Member Status Cards ─────────────────────────────────────── */
