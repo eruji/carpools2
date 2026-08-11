@@ -1178,19 +1178,21 @@ function renderSessionUI(session) {
     const btnSkip = document.getElementById('btn-skip');
     const btnArrived = document.getElementById('btn-arrived');
 
-    if (myStatus === 'pending') {
-      // Choose your role
-      btnDriving.classList.remove('hidden');
-      btnRiding.classList.remove('hidden');
-      btnSkip.classList.remove('hidden');
-      btnArrived.classList.add('hidden');
-    } else {
-      // Active: arrive (auto via geo-fence) or skip
+    const someoneElseDriving = session.driver_id && session.driver_id !== currentUser.id;
+
+    // Driving button: claim it, or offer to override if someone else is driving
+    if (myStatus === 'driving') {
       btnDriving.classList.add('hidden');
-      btnRiding.classList.add('hidden');
-      btnSkip.classList.remove('hidden');
-      btnArrived.classList.remove('hidden');
+    } else {
+      btnDriving.classList.remove('hidden');
+      btnDriving.textContent = someoneElseDriving ? "I'll Drive Instead" : 'Driving';
     }
+    // Riding: only while undecided
+    btnRiding.classList.toggle('hidden', myStatus !== 'pending');
+    // Arrive: once you've picked a role
+    btnArrived.classList.toggle('hidden', myStatus === 'pending');
+    // Skip: always available
+    btnSkip.classList.remove('hidden');
 
     const ready = session.members.filter(m => m.status !== 'skip' && m.status !== 'pending');
     const allReady = ready.length > 0 && ready.every(m => m.status === 'arrived' || m.status === 'driving');
