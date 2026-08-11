@@ -1360,6 +1360,14 @@ function renderMemberStatus(session) {
     const myCoins = coins[m.user_id] || 0;
     const isDriver = m.user_id === session.driver_id;
     const isNext = m.user_id === nextDriverId;
+    // Last-updated staleness indicator
+    const ageMins = minutesAgo(m.updated_at);
+    let ageText = '', ageClass = '';
+    if (ageMins !== null) {
+      ageText = ageMins < 1 ? 'just now' : ageMins + 'm ago';
+      if (ageMins > 10) ageClass = 'age-stale';
+      else if (ageMins > 5) ageClass = 'age-warm';
+    }
     let etaStr = '';
     if (m.location_lat && m.location_lng && activeSession && currentCarpoolData) {
       const carpool = currentCarpoolData.carpool;
@@ -1385,6 +1393,7 @@ function renderMemberStatus(session) {
           <span class="badge ${statusColors[m.status] || 'badge-gray'}">${statusLabels[m.status] || statusLabels.pending}</span>
           ${m.status === 'arrived' && m.auto_arrived ? '<span class="badge badge-blue" title="Geo-fence arrival">Auto</span>' : ''}
           <span class="text-xs text-muted">${etaStr}</span>
+          ${ageText ? `<span class="text-xs ${ageClass}">· updated ${ageText}</span>` : ''}
         </div>
         <div class="member-actions">
           ${!noSkip && m.status !== 'skip' && m.user_id !== currentUser.id
@@ -1930,6 +1939,14 @@ async function rotateInviteCode() {
   } else {
     result.textContent = data.error || 'Failed'; result.style.color = '#B07166';
   }
+}
+
+// Minutes since a SQLite UTC timestamp (updated_at) — for staleness indicators
+function minutesAgo(utcStr) {
+  if (!utcStr) return null;
+  const d = new Date(utcStr.replace(' ', 'T') + 'Z');
+  if (isNaN(d.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));
 }
 
 // ── Location Config (tap the › on a subway stop) ────────────────────────────

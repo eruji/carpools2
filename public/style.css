@@ -657,6 +657,8 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   background: rgba(192,164,106,0.08);
   border-left: 4px solid #C0A46A;
 }
+.age-warm { color: #9C8A4F; }
+.age-stale { color: #B07166; font-weight: 600; }
 .member-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .member-info .member-name { font-weight: 600; font-size: 1.05rem; }
 .member-actions { display: flex; gap: 6px; flex-shrink: 0; }
