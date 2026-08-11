@@ -424,35 +424,6 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   gap: 6px;
 }
 
-/* ── Member avatars positioned along the transit line ───────── */
-.subway-avatars-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 6;
-}
-.subway-avatar-online {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  pointer-events: auto;
-  z-index: 6;
-  transition: top 0.6s ease, left 0.6s ease;
-}
-.subway-avatar-bubble {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  color: #fff;
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.3);
-}
-
 .subway-member-row {
   display: flex;
   align-items: center;

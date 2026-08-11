@@ -219,8 +219,7 @@
           <div class="stop-detail" id="subway-return-addr"></div>
         </div>
       </div>
-      <!-- Member avatars positioned along the transit line -->
-      <div id="subway-avatars-layer" class="subway-avatars-layer"></div>
+      <!-- Member avatars removed — the line and stop icons represent the route -->
     </div>
   </div>
 
@@ -334,34 +333,7 @@
         <label>Carpool Name</label>
         <input type="text" id="edit-carpool-name" required>
       </div>
-      <div class="form-group">
-        <label>Meetup Address <span class="text-xs text-muted">(search to auto-fill)</span></label>
-        <div class="autocomplete-wrapper">
-          <input type="text" id="edit-meetup-address" placeholder="Start typing an address..." autocomplete="off" oninput="autocompleteAddress(this, 'meetup-edit')" onfocus="this.select()">
-          <div class="autocomplete-dropdown hidden" id="ac-dropdown-meetup-edit"></div>
-        </div>
-      </div>
-      <input type="hidden" id="edit-meetup-lat" value="0">
-      <input type="hidden" id="edit-meetup-lng" value="0">
-      <input type="hidden" id="edit-meetup-name" value="">
-      <div class="form-group">
-        <label>Meetup Nickname <span class="text-xs text-muted">(optional, short name)</span></label>
-        <input type="text" id="edit-meetup-nickname" placeholder="e.g., Sarah's House">
-      </div>
-      <div class="form-group">
-        <label>Destination Address <span class="text-xs text-muted">(search to auto-fill)</span></label>
-        <div class="autocomplete-wrapper">
-          <input type="text" id="edit-dest-address" placeholder="Start typing an address..." autocomplete="off" oninput="autocompleteAddress(this, 'dest-edit')" onfocus="this.select()">
-          <div class="autocomplete-dropdown hidden" id="ac-dropdown-dest-edit"></div>
-        </div>
-      </div>
-      <input type="hidden" id="edit-dest-lat" value="0">
-      <input type="hidden" id="edit-dest-lng" value="0">
-      <input type="hidden" id="edit-dest-name" value="">
-      <div class="form-group">
-        <label>Destination Nickname <span class="text-xs text-muted">(optional, short name)</span></label>
-        <input type="text" id="edit-dest-nickname" placeholder="e.g., Office">
-      </div>
+      <p class="text-xs text-muted mb-1">Meetup and destination are set from the subway stops.</p>
       <div class="btn-group">
         <button type="submit" class="btn btn-primary">Update</button>
         <button type="button" class="btn btn-danger btn-sm" onclick="deleteCarpool()">Delete</button>
@@ -818,16 +790,6 @@ async function loadCarpoolView(carpoolId) {
 
   // Settings tab
   document.getElementById('edit-carpool-name').value = data.carpool.name || '';
-  document.getElementById('edit-meetup-address').value = data.carpool.meetup_name || '';
-  document.getElementById('edit-meetup-name').value = data.carpool.meetup_name || '';
-  document.getElementById('edit-meetup-nickname').value = data.carpool.meetup_nickname || '';
-  document.getElementById('edit-meetup-lat').value = data.carpool.meetup_lat || '';
-  document.getElementById('edit-meetup-lng').value = data.carpool.meetup_lng || '';
-  document.getElementById('edit-dest-address').value = data.carpool.destination_name || '';
-  document.getElementById('edit-dest-name').value = data.carpool.destination_name || '';
-  document.getElementById('edit-dest-nickname').value = data.carpool.destination_nickname || '';
-  document.getElementById('edit-dest-lat').value = data.carpool.destination_lat || '';
-  document.getElementById('edit-dest-lng').value = data.carpool.destination_lng || '';
 
   // History
   renderHistory(data.history);
@@ -957,9 +919,6 @@ function updateSubwayMap(data) {
 
   // ETAs
   updateSubwayETAs(data);
-
-  // Members
-  renderSubwayMembers(data);
 }
 
 function updateSubwayETAs(data) {
@@ -1013,89 +972,6 @@ function updateSubwayETAs(data) {
       show(returnEta, fmt(d, m));
     }
   }
-}
-
-function renderSubwayMembers(data) {
-  const session = data.activeSession;
-  const carpool = data.carpool;
-  const layer = document.getElementById('subway-avatars-layer');
-  layer.innerHTML = '';
-
-  if (!session || session.phase === 'completed' || session.phase === 'idle' || !session.members) {
-    return;
-  }
-
-  // Which stops bound the current leg
-  const legMap = {
-    meetup:        { from: 'subway-stop-start',  to: 'subway-stop-meetup' },
-    destination:   { from: 'subway-stop-meetup', to: 'subway-stop-dest' },
-    back_to_meetup:{ from: 'subway-stop-dest',  to: 'subway-stop-return' }
-  };
-  const leg = legMap[session.phase];
-  if (!leg) return;
-
-  // Target coordinates for progress + ETA
-  let targetLat, targetLng;
-  if (session.phase === 'destination') {
-    targetLat = carpool.destination_lat; targetLng = carpool.destination_lng;
-  } else {
-    targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng;
-  }
-  const legTotal = (targetLat && targetLng)
-    ? haversine(leg.from === 'subway-stop-meetup' ? carpool.meetup_lat : (leg.from === 'subway-stop-dest' ? carpool.destination_lat : (myLocation ? myLocation.lat : targetLat)),
-                leg.from === 'subway-stop-meetup' ? carpool.meetup_lng : (leg.from === 'subway-stop-dest' ? carpool.destination_lng : (myLocation ? myLocation.lng : targetLng)),
-                targetLat, targetLng)
-    : 0;
-
-  const withLocation = session.members.filter(m => m.location_lat && m.location_lng && m.status !== 'skip' && m.status !== 'pending');
-  if (withLocation.length === 0) return;
-
-  // Denominator: use max distance to target during meetup (arbitrary start),
-  // otherwise the real leg distance
-  let denominator = legTotal;
-  if (session.phase === 'meetup') {
-    denominator = Math.max(...withLocation.map(m => haversine(m.location_lat, m.location_lng, targetLat, targetLng)));
-    if (!(denominator > 0)) denominator = 1;
-  }
-  if (!(denominator > 0)) denominator = 1;
-
-  withLocation.forEach(m => {
-    const dist = haversine(m.location_lat, m.location_lng, targetLat, targetLng);
-    const progress = Math.min(1, Math.max(0, 1 - dist / denominator));
-    const eta = Math.round(dist / 0.5);
-    const detail = m.status === 'arrived' ? 'Arrived' : `${dist.toFixed(1)} mi · ~${eta} min`;
-    const bubble = document.createElement('div');
-    bubble.className = 'subway-avatar-online';
-    bubble.dataset.from = leg.from;
-    bubble.dataset.to = leg.to;
-    bubble.dataset.progress = progress;
-    bubble.title = m.username + ' · ' + detail;
-    bubble.innerHTML = `<div class="subway-avatar-bubble" style="background:${memberColor(m.user_id)};">${esc(getInitials(m.username))}</div>`;
-    layer.appendChild(bubble);
-  });
-
-  // Position avatars along the track after layout
-  requestAnimationFrame(positionSubwayAvatars);
-}
-
-function positionSubwayAvatars() {
-  const line = document.getElementById('subway-line');
-  const layer = document.getElementById('subway-avatars-layer');
-  if (!line || !layer) return;
-  const lineRect = line.getBoundingClientRect();
-  layer.querySelectorAll('.subway-avatar-online').forEach(a => {
-    const fromEl = document.getElementById(a.dataset.from);
-    const toEl = document.getElementById(a.dataset.to);
-    if (!fromEl || !toEl) return;
-    const fromDot = fromEl.querySelector('.dot').getBoundingClientRect();
-    const toDot = toEl.querySelector('.dot').getBoundingClientRect();
-    const p = parseFloat(a.dataset.progress) || 0;
-    const x = (fromDot.left + fromDot.width / 2) - lineRect.left;
-    const y = (fromDot.top + fromDot.height / 2) - lineRect.top
-            + ((toDot.top + toDot.height / 2) - (fromDot.top + fromDot.height / 2)) * p;
-    a.style.left = x + 'px';
-    a.style.top = y + 'px';
-  });
 }
 
 // ── Session UI ──────────────────────────────────────────────────────────────
@@ -1842,14 +1718,6 @@ async function handleUpdateCarpool(e) {
   e.preventDefault();
   const body = {
     name: document.getElementById('edit-carpool-name').value.trim(),
-    meetup_name: document.getElementById('edit-meetup-address').value.trim() || document.getElementById('edit-meetup-name').value.trim(),
-    meetup_nickname: document.getElementById('edit-meetup-nickname').value.trim(),
-    meetup_lat: parseFloat(document.getElementById('edit-meetup-lat').value) || 0,
-    meetup_lng: parseFloat(document.getElementById('edit-meetup-lng').value) || 0,
-    destination_name: document.getElementById('edit-dest-address').value.trim() || document.getElementById('edit-dest-name').value.trim(),
-    destination_nickname: document.getElementById('edit-dest-nickname').value.trim(),
-    destination_lat: parseFloat(document.getElementById('edit-dest-lat').value) || 0,
-    destination_lng: parseFloat(document.getElementById('edit-dest-lng').value) || 0,
   };
   const res = await fetch(`/api/carpools/${currentCarpoolId}`, {
     method: 'PUT',
@@ -1857,7 +1725,6 @@ async function handleUpdateCarpool(e) {
     body: JSON.stringify(body)
   });
   if (res.ok) {
-    await syncSessionLocations();
     await refreshMyCarpools();
     alert('Carpool updated!');
     loadCarpoolView(currentCarpoolId);
