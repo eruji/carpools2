@@ -935,7 +935,7 @@ function renderSubwayMembers(data) {
 
       return `
         <div class="subway-member-row">
-          <div class="subway-member-dot ${m.status}"></div>
+          <div class="subway-member-avatar" style="background:${memberDotColor(m.status)};">${esc(getInitials(m.username))}</div>
           <div class="subway-member-info">
             <span class="subway-member-name">${esc(m.username)}</span>
             <span class="subway-member-detail">${positionLabel}</span>
@@ -1088,6 +1088,7 @@ function renderMemberStatus(session) {
     return `
       <div class="member-row">
         <div class="member-info">
+          <span class="member-avatar" style="background:${memberDotColor(m.status)};">${esc(getInitials(m.username))}</span>
           <span class="member-name">${esc(m.username)}</span>
           <span class="badge ${statusColors[m.status] || 'badge-gray'}">${statusLabels[m.status] || m.status}</span>
           <span class="text-xs text-muted">${etaStr}</span>
@@ -1211,7 +1212,7 @@ function updateMap(data) {
     const marker = L.marker([carpool.meetup_lat, carpool.meetup_lng], {
       icon: L.divIcon({
         className: '',
-        html: `<div style="background:#7C9A77;color:#fff;padding:8px 18px;border-radius:14px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,0.25);border:2px solid #fff;">${esc(label)}</div>`,
+        html: `<div style="background:#FFFFFF;color:#3F5F3B;padding:8px 18px;border-radius:14px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,0.25);border:2px solid #8FAE8B;">${esc(label)}</div>`,
         iconAnchor: [40, 20]
       })
     }).addTo(map).bindPopup('<b>Meetup:</b> ' + (carpool.meetup_name || ''));
@@ -1224,7 +1225,7 @@ function updateMap(data) {
     const marker = L.marker([carpool.destination_lat, carpool.destination_lng], {
       icon: L.divIcon({
         className: '',
-        html: `<div style="background:#B07166;color:#fff;padding:8px 18px;border-radius:14px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,0.25);border:2px solid #fff;">${esc(destLabel(carpool))}</div>`,
+        html: `<div style="background:#FFFFFF;color:#8A5248;padding:8px 18px;border-radius:14px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,0.25);border:2px solid #B07166;">${esc(destLabel(carpool))}</div>`,
         iconAnchor: [40, 20]
       })
     }).addTo(map).bindPopup('<b>Destination:</b> ' + (carpool.destination_name || ''));
@@ -1295,7 +1296,7 @@ function updateMap(data) {
       // Lighter preview line when idle/meetup, solid when in transit
       const active = inTransit;
       const line = L.polyline(coords, {
-        color: '#8FAE8B',
+        color: '#5F7D5B',
         weight: active ? 5 : 3,
         opacity: active ? 0.95 : 0.5,
         dashArray: active ? null : '7,7'
@@ -1309,7 +1310,7 @@ function updateMap(data) {
         const indicator = L.marker(coords[mid], {
           icon: L.divIcon({
             className: '',
-            html: `<div style="background:#C0A46A;color:#fff;padding:8px 18px;border-radius:14px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,0.25);border:2px solid #fff;">${phaseLabel}</div>`,
+            html: `<div style="background:#FFFFFF;color:#7A6530;padding:8px 18px;border-radius:14px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,0.25);border:2px solid #C0A46A;">${phaseLabel}</div>`,
             iconAnchor: [40, 20]
           })
         }).addTo(map).bindPopup('In transit · ' + distanceText);
@@ -1325,7 +1326,7 @@ function updateMap(data) {
   if (inMeetup && session.members) {
     session.members.forEach(m => {
       if (m.location_lat && m.location_lng && m.status !== 'skip') {
-        const dotColor = m.status === 'driving' ? '#C0A46A' : m.status === 'riding' ? '#8FAE8B' : '#7C9A77';
+        const avatarColor = memberDotColor(m.status);
         let etaStr = '';
         if (carpool.meetup_lat && carpool.meetup_lng) {
           const dist = haversine(m.location_lat, m.location_lng, carpool.meetup_lat, carpool.meetup_lng);
@@ -1334,8 +1335,11 @@ function updateMap(data) {
         const marker = L.marker([m.location_lat, m.location_lng], {
           icon: L.divIcon({
             className: '',
-            html: `<div style="background:#DDE8D9;color:#4A5E47;padding:6px 14px;border-radius:12px;font-size:13px;white-space:nowrap;font-weight:700;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.15);display:flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0;"></span>${esc(m.username)}${etaStr}</div>`,
-            iconAnchor: [32, 14]
+            html: `<div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:38px;height:38px;border-radius:50%;background:${avatarColor};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;letter-spacing:0.02em;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);flex-shrink:0;">${esc(getInitials(m.username))}</div>
+              <div style="background:rgba(255,255,255,0.95);border:1px solid #D8D8D0;border-radius:10px;padding:3px 10px;color:#33332D;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.18);">${esc(m.username)}${etaStr}</div>
+            </div>`,
+            iconAnchor: [24, 24]
           })
         }).addTo(map).bindPopup(`${esc(m.username)} (${m.status})${etaStr}`);
         mapMarkers['member_' + m.user_id] = marker;
@@ -1347,7 +1351,7 @@ function updateMap(data) {
             if (!map) return;
             const coords = r ? r.coords : [[m.location_lat, m.location_lng], [carpool.meetup_lat, carpool.meetup_lng]];
             const line = L.polyline(coords, {
-              color: '#8FAE8B', weight: 2.5, dashArray: '6,6', opacity: 0.75
+              color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75
             }).addTo(map);
             mapPolylines['line_' + m.user_id] = line;
           });
@@ -1765,6 +1769,19 @@ function esc(str) {
 // Nickname-aware labels: nickname if set, else first comma part of the name
 function meetupLabel(c) { return (c.meetup_nickname || '').trim() || (c.meetup_name || 'Meetup').split(',')[0]; }
 function destLabel(c) { return (c.destination_nickname || '').trim() || (c.destination_name || 'Destination').split(',')[0]; }
+
+// Initials from username: first letter of first + last word (or first 2 chars)
+function getInitials(name) {
+  const parts = (name || '').trim().split(/\s+/);
+  if (parts.length >= 2 && parts[0] && parts[parts.length - 1]) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  if (parts.length === 1 && parts[0]) return parts[0].slice(0, 2).toUpperCase();
+  return '?';
+}
+
+// Muted avatar colors per status
+function memberDotColor(status) {
+  return status === 'driving' ? '#A89050' : status === 'riding' ? '#7C9A77' : '#5F7D5B';
+}
 
 function haversine(lat1, lng1, lat2, lng2) {
   if (!lat1 || !lng1 || !lat2 || !lng2) return 0;

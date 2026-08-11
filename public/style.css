@@ -314,6 +314,24 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .subway-member-dot.riding  { background: var(--accent); box-shadow: 0 0 0 1px #A9C2A5; }
 .subway-member-dot.arrived { background: var(--accent-dark); box-shadow: 0 0 0 1px #A9C2A5; }
 
+.subway-member-avatar,
+.member-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+.subway-member-avatar { width: 28px; height: 28px; font-size: 11px; }
+
 .subway-member-info {
   display: flex;
   flex-direction: column;
