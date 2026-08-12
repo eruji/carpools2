@@ -1338,10 +1338,10 @@ function renderMemberStatus(session) {
     if (ca !== cb) return ca - cb;
     return a.username.localeCompare(b.username);
   });
-  // No skipping once everyone has arrived at the pickup
+  // Skipping is locked once the carpool departs the pickup (or everyone has arrived)
   const active = session.members.filter(m => m.status !== 'skip');
   const allArrived = active.length > 0 && active.every(m => m.status === 'arrived');
-  const noSkip = session.phase === 'meetup' && allArrived;
+  const noSkip = session.phase !== 'meetup' || allArrived;
 
   container.innerHTML = sorted.map(m => {
     const statusLabels = {
@@ -1388,7 +1388,7 @@ function renderMemberStatus(session) {
           ${!noSkip && m.status !== 'skip' && m.user_id !== currentUser.id
             ? `<button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip</button>`
             : ''}
-          ${m.user_id === currentUser.id && m.status === 'skip'
+          ${!noSkip && m.user_id === currentUser.id && m.status === 'skip'
             ? `<button class="btn btn-outline btn-sm" onclick="respondToSession('pending')">Changed my mind</button>`
             : ''}
           ${!noSkip && m.status !== 'skip' && m.user_id === currentUser.id && m.status !== 'pending'

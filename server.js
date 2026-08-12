@@ -813,7 +813,18 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
       stmts.updateSessionDriver.run(req.session.userId, activeSession.id);
     }
 
-    stmts.updateSessionMember.run(status, null, null, activeSession.id, req.session.userId);
+    // Once the carpool is en route, everyone is in the same car — one "Arrived"
+    // marks the whole group so any member can advance the leg.
+    if (status === 'arrived' && (activeSession.phase === 'destination' || activeSession.phase === 'back_to_meetup')) {
+      const members = stmts.sessionMembers.all(activeSession.id);
+      for (const m of members) {
+        if (m.status !== 'skip') {
+          stmts.updateSessionMember.run('arrived', null, null, activeSession.id, m.user_id);
+        }
+      }
+    } else {
+      stmts.updateSessionMember.run(status, null, null, activeSession.id, req.session.userId);
+    }
 
     // Mark geo-fence arrivals so the UI can show it
     if (status === 'arrived' && auto) {
