@@ -1426,11 +1426,22 @@ function updatePhaseIndicator() {
 let lastMapData = null;
 let lastMapFitKey = null;
 let mapUpdateSeq = 0;
+let pendingLocFit = false;
 
 function recenterMap() {
   if (!map || !lastMapData) return;
   lastMapFitKey = null; // force a refit on the next update
   updateMap(lastMapData);
+}
+
+// Fit the map to just my current location and the pickup point
+function fitMapToMyLeg() {
+  if (!map || !myLocation || !currentCarpoolData) return;
+  const c = currentCarpoolData.carpool;
+  if (!c.meetup_lat || !c.meetup_lng) return;
+  const opts = { padding: [50, 50], maxZoom: 15 };
+  if (window.innerWidth <= 480) opts.paddingBottomRight = [50, 420];
+  map.fitBounds(L.latLngBounds([[myLocation.lat, myLocation.lng], [c.meetup_lat, c.meetup_lng]]), opts);
 }
 
 function toggleMapLegend() {
@@ -1768,6 +1779,7 @@ async function respondToSession(status) {
   }
 
   if (status === 'driving' || status === 'riding') {
+    pendingLocFit = true;
     startLocationTracking();
   }
   if (status === 'skip') {
@@ -2171,9 +2183,14 @@ function startLocationTracking() {
         });
         // Geo-fence: auto-arrive when close to the current target
         checkGeoFence();
-        // Refresh subway ETA
+        // Refresh subway ETA + live map
         if (currentCarpoolData) {
           updateSubwayETAs({ carpool: currentCarpoolData.carpool, activeSession });
+          updateMap({ carpool: currentCarpoolData.carpool, activeSession });
+          if (pendingLocFit) {
+            pendingLocFit = false;
+            fitMapToMyLeg();
+          }
         }
       },
       (err) => { console.log('Geolocation error:', err.message); },
@@ -2198,6 +2215,13 @@ function startLocationTracking() {
             lng: myLocation.lng
           });
           checkGeoFence();
+          if (currentCarpoolData) {
+            updateMap({ carpool: currentCarpoolData.carpool, activeSession });
+            if (pendingLocFit) {
+              pendingLocFit = false;
+              fitMapToMyLeg();
+            }
+          }
         },
         () => {},
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
