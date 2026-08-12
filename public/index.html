@@ -270,13 +270,6 @@
         <button id="btn-arrived" class="btn btn-success btn-sm" onclick="respondToSession('arrived')">Arrived</button>
       </div>
 
-      <!-- Phase 2-3 Controls -->
-      <div id="phase-advance-controls" class="btn-group hidden">
-        <button id="btn-leaving-dest" class="btn btn-primary btn-sm hidden" onclick="advancePhase('destination')" style="width:100%;">Leaving for Destination</button>
-        <button id="btn-back-to-meetup" class="btn btn-warning btn-sm hidden" onclick="advancePhase('back_to_meetup')" style="width:100%;">Dropoff</button>
-        <button id="btn-complete" class="btn btn-success btn-sm hidden" onclick="advancePhase('completed')" style="width:100%;">Complete Carpool</button>
-      </div>
-
       <div id="session-alert" class="hidden"></div>
     </div>
 
@@ -1189,10 +1182,6 @@ function renderSessionUI(session) {
   const idleDiv = document.getElementById('session-idle');
   const activeDiv = document.getElementById('session-active');
   const phaseMeetup = document.getElementById('phase-meetup-controls');
-  const phaseAdvance = document.getElementById('phase-advance-controls');
-  const btnLeaving = document.getElementById('btn-leaving-dest');
-  const btnBack = document.getElementById('btn-back-to-meetup');
-  const btnComplete = document.getElementById('btn-complete');
   const btnDriving = document.getElementById('btn-driving');
   const btnRiding = document.getElementById('btn-riding');
   const btnArrived = document.getElementById('btn-arrived');
@@ -1255,7 +1244,6 @@ function renderSessionUI(session) {
 
   if (session.phase === 'meetup') {
     phaseMeetup.classList.remove('hidden');
-    phaseAdvance.classList.add('hidden');
 
     // Only show buttons relevant to your current status
     const myMember = session.members.find(m => m.user_id === currentUser.id);
@@ -1268,7 +1256,6 @@ function renderSessionUI(session) {
       btnDriving.classList.add('hidden');
       btnRiding.classList.add('hidden');
       btnArrived.classList.add('hidden');
-      phaseAdvance.classList.add('hidden');
     } else {
       // The current driver never sees the claim button — just Arrived
       if (myStatus === 'driving' || session.driver_id === currentUser.id) {
@@ -1282,25 +1269,11 @@ function renderSessionUI(session) {
       // Arrive: once you've picked a role
       btnArrived.classList.toggle('hidden', myStatus === 'pending');
     }
-
-    const ready = session.members.filter(m => m.status !== 'skip' && m.status !== 'pending');
-    const allReady = ready.length > 0 && ready.every(m => m.status === 'arrived' || m.status === 'driving');
-    const driver = session.members.find(m => m.user_id === session.driver_id);
-    const driverArrived = driver && driver.status === 'arrived';
-
-    // Only offer to leave once the driver is actually at the pickup
-    if (allReady && driverArrived && session.driver_id === currentUser.id) {
-      phaseAdvance.classList.remove('hidden');
-      btnLeaving.classList.remove('hidden');
-      btnBack.classList.add('hidden');
-      btnComplete.classList.add('hidden');
-    }
   } else if (session.phase === 'destination') {
     // Arrival step: everyone marks Arrived at the destination (auto-advance when all in)
     const myMember2 = session.members.find(m => m.user_id === currentUser.id);
     const myStatus2 = myMember2 ? myMember2.status : 'pending';
     phaseMeetup.classList.remove('hidden');
-    phaseAdvance.classList.add('hidden');
     btnDriving.classList.add('hidden');
     btnRiding.classList.add('hidden');
     if (myStatus2 === 'skip') btnArrived.classList.add('hidden');
@@ -1310,7 +1283,6 @@ function renderSessionUI(session) {
     const myMember3 = session.members.find(m => m.user_id === currentUser.id);
     const myStatus3 = myMember3 ? myMember3.status : 'pending';
     phaseMeetup.classList.remove('hidden');
-    phaseAdvance.classList.add('hidden');
     btnDriving.classList.add('hidden');
     btnRiding.classList.add('hidden');
     if (myStatus3 === 'skip') btnArrived.classList.add('hidden');
