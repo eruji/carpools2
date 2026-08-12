@@ -825,10 +825,14 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
     };
     io.to('carpool:' + carpool.id).emit('session-updated', updatedSession);
 
-    // If everyone has arrived at the meetup, move to the destination phase
+    // Auto-advance may move the phase — return the freshest state so the client
+    // never reverts to a stale phase (e.g., stuck on destination after advancing to return)
     autoAdvanceCheck(carpool.id);
-
-    res.json({ ok: true, session: updatedSession });
+    const finalSession = {
+      ...stmts.latestSession.get(carpool.id),
+      members: stmts.sessionMembers.all(activeSession.id)
+    };
+    res.json({ ok: true, session: finalSession });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -854,7 +858,12 @@ app.post('/api/carpools/:id/sessions/skip-member', requireAuth, (req, res) => {
     };
     io.to('carpool:' + carpool.id).emit('session-updated', updatedSession);
     autoAdvanceCheck(carpool.id);
-    res.json({ ok: true, session: updatedSession });
+    // Return the freshest state (skipping may complete the meetup/destination check)
+    const finalSession = {
+      ...stmts.latestSession.get(carpool.id),
+      members: stmts.sessionMembers.all(activeSession.id)
+    };
+    res.json({ ok: true, session: finalSession });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
