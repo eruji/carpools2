@@ -1771,13 +1771,14 @@ function updateMap(data) {
     addPoint(carpool.destination_lat, carpool.destination_lng);
   }
 
-  // Geo-fence radius circle around the current target (visual aid)
+  // Geo-fence radius circles around pickup and destination (visual aid)
   if (session && session.phase !== 'idle' && session.phase !== 'completed') {
-    const gfLat = session.phase === 'destination' ? carpool.destination_lat : carpool.meetup_lat;
-    const gfLng = session.phase === 'destination' ? carpool.destination_lng : carpool.meetup_lng;
-    if (gfLat && gfLng) {
-      const gfRadius = carpool.arrival_radius || 400;
-      mapMarkers.geofence = L.circle([gfLat, gfLng], {
+    const gfRadius = carpool.arrival_radius || 400;
+    const gfTargets = [];
+    if (carpool.meetup_lat && carpool.meetup_lng) gfTargets.push([carpool.meetup_lat, carpool.meetup_lng]);
+    if (carpool.destination_lat && carpool.destination_lng) gfTargets.push([carpool.destination_lat, carpool.destination_lng]);
+    gfTargets.forEach((t, i) => {
+      mapMarkers['geofence_' + i] = L.circle(t, {
         radius: gfRadius,
         color: '#8FAE8B',
         weight: 1.5,
@@ -1785,7 +1786,7 @@ function updateMap(data) {
         fillColor: '#8FAE8B',
         fillOpacity: 0.08
       }).addTo(map);
-    }
+    });
   }
 
   // ── People (pickup phase) or single car (transit phases) ──
@@ -2203,11 +2204,30 @@ async function editSavedLocation(locId) {
   if (!loc) return;
   const newName = prompt('Name for this location:', loc.name);
   if (newName === null) return;
+  const trimmed = newName.trim() || loc.name;
   const res = await fetch(`/api/carpools/${currentCarpoolId}/locations/${locId}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: newName.trim() || loc.name })
+    body: JSON.stringify({ name: trimmed })
   });
-  if (res.ok) await loadLocConfig();
+  if (!res.ok) { alert('Failed to rename location'); return; }
+
+  // If this saved location is the active pickup/destination, sync the carpool
+  // so the map + subway labels update immediately (avoid duplicated names).
+  if (locConfigSlot && currentCarpoolData) {
+    const c = currentCarpoolData.carpool;
+    const activeLat = locConfigSlot === 'meetup' ? c.meetup_lat : c.destination_lat;
+    const activeLng = locConfigSlot === 'meetup' ? c.meetup_lng : c.destination_lng;
+    if (activeLat != null && activeLng != null &&
+        Math.abs(loc.lat - activeLat) < 1e-6 && Math.abs(loc.lng - activeLng) < 1e-6) {
+      await fetch(`/api/carpools/${currentCarpoolId}/location`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot: locConfigSlot, name: trimmed, address: loc.address, lat: loc.lat, lng: loc.lng })
+      });
+      await refreshMyCarpools();
+      await loadCarpoolView(currentCarpoolId);
+    }
+  }
+  await loadLocConfig();
 }
 
 async function deleteSavedLocation(locId) {
