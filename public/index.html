@@ -1398,7 +1398,7 @@ function renderMemberStatus(session) {
         <div class="member-info">
           <span class="member-avatar${isDriver ? ' is-driver' : ''}" style="background:${memberColor(m.user_id)};">
             ${esc(getInitials(m.username))}
-            ${isDriver ? '<span class="avatar-star" title="Driver">★</span>' : ''}
+            ${isDriver ? '<span class="avatar-star" title="Driver">D</span>' : ''}
             ${isSharing ? '<span class="avatar-sharing" title="Sharing your location"></span>' : ''}
           </span>
           <span class="member-coin" title="${myCoins} credits">${myCoins}</span>

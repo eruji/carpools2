@@ -668,18 +668,19 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .member-avatar .avatar-star {
   position: absolute;
-  top: -7px;
-  right: -7px;
-  width: 16px;
-  height: 16px;
+  top: -8px;
+  right: -6px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: #C0A46A;
   color: #fff;
-  font-size: 10px;
-  line-height: 16px;
-  text-align: center;
-  font-weight: 700;
-  border: 2px solid var(--surface);
+  font-size: 9px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #fff;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   z-index: 2;
 }
