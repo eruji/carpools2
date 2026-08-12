@@ -1083,6 +1083,33 @@ function roadEta(lat1, lng1, lat2, lng2, cb) {
   });
 }
 
+// Shared arrival-time text used by the subway stops and the member list
+function etaClock(mins) {
+  return new Date(Date.now() + Math.max(0, Math.round(mins)) * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+function etaText(mi, mins) {
+  return `${Math.round(mi)}mi ${etaClock(mins)}`;
+}
+
+// The single "car" position during transit: the driver's live location, else mine
+function carPosition(session) {
+  if (session && session.members) {
+    const driver = session.members.find(m => m.status === 'driving' && m.location_lat && m.location_lng);
+    if (driver) return driver;
+  }
+  if (myLocation && currentUser) {
+    return { username: currentUser.username, user_id: currentUser.id, location_lat: myLocation.lat, location_lng: myLocation.lng };
+  }
+  return null;
+}
+
+// Which point are members heading to for the current phase?
+function phaseTarget(session, carpool) {
+  if (!session || !carpool) return null;
+  if (session.phase === 'destination') return { lat: carpool.destination_lat, lng: carpool.destination_lng };
+  return { lat: carpool.meetup_lat, lng: carpool.meetup_lng };
+}
+
 function updateSubwayETAs(data) {
   const session = data.activeSession;
   const carpool = data.carpool;
@@ -1094,14 +1121,9 @@ function updateSubwayETAs(data) {
   if (!session || session.phase === 'completed' || session.phase === 'idle') return;
 
   // "(24mi 10:10PM)" — distance + arrival clock time
-  const fmt = (mi, min) => {
-    const miTxt = Math.round(mi);
-    const mins = Math.max(0, Math.round(min));
-    const clock = new Date(Date.now() + mins * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return `(${miTxt}mi ${clock})`;
-  };
+  const fmt = (mi, min) => `(${etaText(mi, min)})`;
   const show = (el, txt) => { el.textContent = txt; el.classList.remove('hidden'); };
-  const done = (el) => show(el, 'Departed');
+  const hide = (el) => { el.textContent = ''; el.classList.add('hidden'); };
   // Prefer road routing (matches the live map); fall back to straight-line estimate
   const pair = (lat1, lng1, lat2, lng2, cb) => {
     roadEta(lat1, lng1, lat2, lng2, (dist, dur) => {
@@ -1134,7 +1156,7 @@ function updateSubwayETAs(data) {
       });
     }
   } else if (session.phase === 'destination') {
-    done(meetupEta);
+    hide(meetupEta);
     if (mL && has(dk, dl)) {
       pair(mL.lat, mL.lng, dk, dl, (a) => {
         show(destEta, fmt(a.dist, a.min));
@@ -1146,8 +1168,8 @@ function updateSubwayETAs(data) {
       });
     }
   } else if (session.phase === 'back_to_meetup') {
-    done(meetupEta);
-    done(destEta);
+    hide(meetupEta);
+    hide(destEta);
     if (mL && has(mk, ml)) {
       pair(mL.lat, mL.lng, mk, ml, (a) => {
         show(returnEta, fmt(a.dist, a.min));
@@ -1379,20 +1401,6 @@ function renderMemberStatus(session) {
       if (ageMins > 10) ageClass = 'age-stale';
       else if (ageMins > 5) ageClass = 'age-warm';
     }
-    let etaStr = '';
-    if (m.location_lat && m.location_lng && activeSession && currentCarpoolData) {
-      const carpool = currentCarpoolData.carpool;
-      let targetLat, targetLng, targetName;
-      if (activeSession.phase === 'meetup') {
-        targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'pickup';
-      } else {
-        targetLat = carpool.destination_lat; targetLng = carpool.destination_lng; targetName = 'dest';
-      }
-      const dist = haversine(m.location_lat, m.location_lng, targetLat, targetLng);
-      const etaMin = Math.round(dist / 0.5);
-      const clock = new Date(Date.now() + etaMin * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      etaStr = `· ${dist.toFixed(1)} mi · ~${etaMin} min · ${clock}`;
-    }
     return `
       <div class="member-row ${isDriver ? 'is-driver' : ''}">
         <div class="member-info">
@@ -1403,7 +1411,7 @@ function renderMemberStatus(session) {
           ${isNext ? '<span class="badge badge-blue">Next Driver</span>' : ''}
           <span class="badge ${statusColors[m.status] || 'badge-gray'}">${statusLabels[m.status] || statusLabels.pending}</span>
           ${m.status === 'arrived' && m.auto_arrived ? '<span class="badge badge-blue" title="Geo-fence arrival">Auto</span>' : ''}
-          <span class="text-xs text-muted">${etaStr}</span>
+          <span class="text-xs text-muted" id="member-eta-${m.user_id}"></span>
           ${ageText ? `<span class="text-xs ${ageClass}">· updated ${ageText}</span>` : ''}
         </div>
         <div class="member-actions">
@@ -1423,6 +1431,24 @@ function renderMemberStatus(session) {
       </div>
     `;
   }).join('');
+
+  // Populate member ETAs with the same road-based numbers shown on the subway
+  const target = phaseTarget(activeSession, currentCarpoolData ? currentCarpoolData.carpool : null);
+  if (target && target.lat && target.lng) {
+    sorted.forEach(m => {
+      if (!(m.location_lat && m.location_lng) || m.status === 'skip') return;
+      roadEta(m.location_lat, m.location_lng, target.lat, target.lng, (dist, dur) => {
+        const el = document.getElementById('member-eta-' + m.user_id);
+        if (!el) return;
+        if (dist != null) {
+          el.textContent = `· (${etaText(dist, dur / 60)})`;
+        } else {
+          const d = haversine(m.location_lat, m.location_lng, target.lat, target.lng);
+          el.textContent = `· (${etaText(d, d / 0.5)})`;
+        }
+      });
+    });
+  }
 }
 
 function updatePhaseIndicator() {
@@ -1431,21 +1457,13 @@ function updatePhaseIndicator() {
 
 // ── Map ─────────────────────────────────────────────────────────────────────
 let lastMapData = null;
-let recenterTimer = null;
-const RECENTER_PAUSE = 2500; // ms after the user stops interacting
+let lastMapFitKey = null;
+let mapUpdateSeq = 0;
 
 function recenterMap() {
   if (!map || !lastMapData) return;
+  lastMapFitKey = null; // force a refit on the next update
   updateMap(lastMapData);
-}
-
-function scheduleRecenter() {
-  if (!lastMapData) return;
-  if (recenterTimer) clearTimeout(recenterTimer);
-  recenterTimer = setTimeout(() => {
-    recenterTimer = null;
-    recenterMap();
-  }, RECENTER_PAUSE);
 }
 
 function toggleMapLegend() {
@@ -1468,13 +1486,8 @@ function initMap() {
   }).addTo(map);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-  // Auto-recenter after a short pause in panning/zooming
-  map.on('dragstart zoomstart', () => {
-    if (recenterTimer) { clearTimeout(recenterTimer); recenterTimer = null; }
-  });
-  map.on('dragend zoomend', () => {
-    scheduleRecenter();
-  });
+  // Auto-recenter is disabled — the map only refits when the segment changes
+  // or the user taps the recenter button.
 
   // Keep the full-bleed map sized correctly on orientation/resize
   window.addEventListener('resize', () => {
@@ -1585,13 +1598,19 @@ function updateMap(data) {
   if (!map) return;
   lastMapData = data;
   clearMapMarkers();
+  const seq = ++mapUpdateSeq;
 
   const carpool = data.carpool;
   const session = data.activeSession;
-  const inTransit = session && (session.phase === 'destination' || session.phase === 'back_to_meetup');
-  const inMeetup = session && session.phase === 'meetup';
+  const phase = session ? session.phase : 'idle';
+  const inTransit = phase === 'destination' || phase === 'back_to_meetup';
+  const inMeetup = phase === 'meetup';
 
-  // Phase-aware zoom: fit different points depending on the phase
+  // Only auto-fit when the segment changes or the user taps recenter —
+  // never yank the map around on individual location updates.
+  const shouldFit = phase !== lastMapFitKey;
+  if (shouldFit) lastMapFitKey = phase;
+
   const bounds = [];
   const addPoint = (lat, lng) => { if (lat && lng) bounds.push([lat, lng]); };
   const fitBounds = (pts, maxZ) => {
@@ -1602,8 +1621,11 @@ function updateMap(data) {
     map.fitBounds(L.latLngBounds(pts), opts);
   };
 
-  // Pickup marker (location pin icon)
-  if (carpool.meetup_lat && carpool.meetup_lng) {
+  const hasPickup = carpool.meetup_lat && carpool.meetup_lng;
+  const hasDest = carpool.destination_lat && carpool.destination_lng;
+
+  // ── Pickup marker (home base / dropoff point) ──
+  if (hasPickup) {
     const label = meetupLabel(carpool);
     const marker = L.marker([carpool.meetup_lat, carpool.meetup_lng], {
       icon: L.divIcon({
@@ -1622,8 +1644,8 @@ function updateMap(data) {
     addPoint(carpool.meetup_lat, carpool.meetup_lng);
   }
 
-  // Destination marker (flag icon)
-  if (carpool.destination_lat && carpool.destination_lng) {
+  // ── Destination marker — hidden during pickup (a future segment) ──
+  if (hasDest && phase !== 'meetup') {
     const marker = L.marker([carpool.destination_lat, carpool.destination_lng], {
       icon: L.divIcon({
         className: '',
@@ -1642,106 +1664,101 @@ function updateMap(data) {
     addPoint(carpool.destination_lat, carpool.destination_lng);
   }
 
-  // My location marker (avatar with halo ring = you)
-  if (myLocation) {
-    let locTarget = 'You';
-    if (session && session.phase === 'meetup' && carpool.meetup_lat && carpool.meetup_lng) {
-      locTarget = meetupLabel(carpool);
-    } else if (session && session.phase === 'destination' && carpool.destination_lat && carpool.destination_lng) {
-      locTarget = destLabel(carpool);
-    } else if (session && session.phase === 'back_to_meetup' && carpool.meetup_lat && carpool.meetup_lng) {
-      locTarget = meetupLabel(carpool);
+  // ── People (pickup phase) or single car (transit phases) ──
+  if (inMeetup && session.members) {
+    // Me (halo ring) converging on the pickup point
+    if (myLocation) {
+      const marker = L.marker([myLocation.lat, myLocation.lng], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="width:32px;height:32px;border-radius:50%;background:${memberColor(currentUser.id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:0.02em;border:3px solid #fff;box-shadow:0 0 0 3px #8FAE8B, 0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(currentUser.username))}</div>`,
+          iconAnchor: [16, 16]
+        })
+      }).addTo(map).bindTooltip('<b>You</b> — heading to pickup', { direction: 'top', offset: [0, -12] });
+      mapMarkers.myLocation = marker;
+      addPoint(myLocation.lat, myLocation.lng);
+
+      if (hasPickup) {
+        fetchRoute(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng, (r) => {
+          if (!map || seq !== mapUpdateSeq) return;
+          const coords = r ? r.coords : [[myLocation.lat, myLocation.lng], [carpool.meetup_lat, carpool.meetup_lng]];
+          mapPolylines['line_me'] = L.polyline(coords, { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 }).addTo(map);
+        });
+      }
     }
-    const myMarker = L.marker([myLocation.lat, myLocation.lng], {
-      icon: L.divIcon({
-        className: '',
-        html: `<div style="width:32px;height:32px;border-radius:50%;background:${memberColor(currentUser.id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:0.02em;border:3px solid #fff;box-shadow:0 0 0 3px #8FAE8B, 0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(currentUser.username))}</div>`,
-        iconAnchor: [16, 16]
-      })
-    }).addTo(map)
-      .bindTooltip('<b>You</b> — heading to ' + esc(locTarget), { direction: 'top', offset: [0, -12] })
-      .bindPopup('<b>You</b> — heading to ' + esc(locTarget));
-    mapMarkers.myLocation = myMarker;
-    // In transit we fit the whole route instead of zooming to the user
-    if (!inTransit) addPoint(myLocation.lat, myLocation.lng);
+
+    // Other members
+    session.members.forEach(m => {
+      if (m.user_id === currentUser.id || m.status === 'skip') return;
+      if (!(m.location_lat && m.location_lng)) return;
+      const marker = L.marker([m.location_lat, m.location_lng], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="width:32px;height:32px;border-radius:50%;background:${memberColor(m.user_id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:0.02em;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(m.username))}</div>`,
+          iconAnchor: [16, 16]
+        })
+      }).addTo(map).bindTooltip(`${esc(m.username)} (${m.status})`, { direction: 'top', offset: [0, -12] });
+      mapMarkers['member_' + m.user_id] = marker;
+      addPoint(m.location_lat, m.location_lng);
+
+      if (hasPickup) {
+        fetchRoute(m.location_lat, m.location_lng, carpool.meetup_lat, carpool.meetup_lng, (r) => {
+          if (!map || seq !== mapUpdateSeq) return;
+          const coords = r ? r.coords : [[m.location_lat, m.location_lng], [carpool.meetup_lat, carpool.meetup_lng]];
+          mapPolylines['line_' + m.user_id] = L.polyline(coords, { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 }).addTo(map);
+        });
+      }
+    });
+  } else if (inTransit) {
+    // One bubble for the whole car: driver's live location (fall back to mine)
+    const car = carPosition(session);
+    if (car && car.location_lat && car.location_lng) {
+      const isMe = car.user_id === currentUser.id;
+      const label = isMe ? currentUser.username : (car.username || 'Driver');
+      const targetName = phase === 'destination' ? destLabel(carpool) : meetupLabel(carpool);
+      const marker = L.marker([car.location_lat, car.location_lng], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="display:flex;flex-direction:column;align-items:center;">
+            <div style="width:34px;height:34px;border-radius:50%;background:${memberColor(car.user_id || currentUser.id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:3px solid #fff;box-shadow:0 0 0 3px #8FAE8B, 0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(label))}</div>
+            <div style="margin-top:2px;font-size:13px;">🚗</div>
+          </div>`,
+          iconAnchor: [17, 17]
+        })
+      }).addTo(map).bindTooltip('<b>Car</b> — heading to ' + esc(targetName), { direction: 'top', offset: [0, -12] });
+      mapMarkers.car = marker;
+      addPoint(car.location_lat, car.location_lng);
+    }
   }
 
-  // Route line — always draw actual-road route when both points exist
-  if (carpool.meetup_lat && carpool.meetup_lng && carpool.destination_lat && carpool.destination_lng) {
+  // ── Route for the current segment only ──
+  if (hasPickup && hasDest && phase !== 'meetup') {
     // Direction: pickup→dest normally; dest→pickup during dropoff
-    const toDest = session && session.phase === 'back_to_meetup' ? false : true;
+    const toDest = phase !== 'back_to_meetup';
     const lat1 = toDest ? carpool.meetup_lat : carpool.destination_lat;
     const lng1 = toDest ? carpool.meetup_lng : carpool.destination_lng;
     const lat2 = toDest ? carpool.destination_lat : carpool.meetup_lat;
     const lng2 = toDest ? carpool.destination_lng : carpool.meetup_lng;
 
     fetchRoute(lat1, lng1, lat2, lng2, (route) => {
-      if (!map) return;
-
-      let coords, distanceText;
-      if (route) {
-        coords = route.coords;
-        distanceText = `${route.distance.toFixed(1)} mi · ~${formatDuration(route.duration)}`;
-      } else {
-        coords = [[lat1, lng1], [lat2, lng2]];
-        const dist = haversine(lat1, lng1, lat2, lng2);
-        distanceText = `${dist.toFixed(1)} mi (straight line)`;
-      }
-
-      // Lighter preview line when idle/pickup, solid when in transit
-      const active = inTransit;
+      if (!map || seq !== mapUpdateSeq) return;
+      const coords = route ? route.coords : [[lat1, lng1], [lat2, lng2]];
       const line = L.polyline(coords, {
         color: '#5F7D5B',
-        weight: active ? 5 : 3,
-        opacity: active ? 0.95 : 0.5,
-        dashArray: active ? null : '7,7'
+        weight: inTransit ? 5 : 3,
+        opacity: inTransit ? 0.95 : 0.5,
+        dashArray: inTransit ? null : '7,7'
       }).addTo(map);
       mapPolylines.route = line;
 
-      // Zoom out to fit the whole road route for this phase
-      if (active) {
+      if (inTransit && shouldFit) {
         fitBounds(coords, 14);
       }
     });
   }
 
-  // Member locations with avatar bubbles + road-routed lines to the phase target
-  if (session && session.members && (inMeetup || inTransit)) {
-    const target = session.phase === 'destination'
-      ? { lat: carpool.destination_lat, lng: carpool.destination_lng, name: 'dest' }
-      : { lat: carpool.meetup_lat, lng: carpool.meetup_lng, name: 'meetup' };
-
-    session.members.forEach(m => {
-      if (!(m.location_lat && m.location_lng) || m.status === 'skip') return;
-      const avatarColor = memberColor(m.user_id);
-      const marker = L.marker([m.location_lat, m.location_lng], {
-        icon: L.divIcon({
-          className: '',
-          html: `<div style="width:32px;height:32px;border-radius:50%;background:${avatarColor};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:0.02em;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(m.username))}</div>`,
-          iconAnchor: [16, 16]
-        })
-      }).addTo(map)
-        .bindTooltip(`${esc(m.username)} (${m.status})`, { direction: 'top', offset: [0, -12] })
-        .bindPopup(`${esc(m.username)} (${m.status})`);
-      mapMarkers['member_' + m.user_id] = marker;
-      addPoint(m.location_lat, m.location_lng);
-
-      // Route each member to the phase target on actual roads (fallback to straight line)
-      if (target.lat && target.lng) {
-        fetchRoute(m.location_lat, m.location_lng, target.lat, target.lng, (r) => {
-          if (!map) return;
-          const coords = r ? r.coords : [[m.location_lat, m.location_lng], [target.lat, target.lng]];
-          const line = L.polyline(coords, {
-            color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75
-          }).addTo(map);
-          mapPolylines['line_' + m.user_id] = line;
-        });
-      }
-    });
-  }
-
-  // Fit bounds to the current phase (transit fits the route after it loads)
-  if (!inTransit) {
+  // Fit the current segment once (transit fits via the route callback above)
+  if (shouldFit && !inTransit) {
     fitBounds(bounds, 15);
   }
 }
