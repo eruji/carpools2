@@ -807,10 +807,52 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .carpool-card:hover { border-color: var(--border-strong); }
 
 /* ── History ─────────────────────────────────────────────────── */
-.history-item {
-  padding: 10px 12px; border-left: 3px solid var(--border-strong); margin-bottom: 6px;
-  font-size: 0.82rem; background: rgba(0,0,0,0.015); border-radius: 0 8px 8px 0;
+.history-trip {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--surface);
 }
+.history-trip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.history-date {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.history-people {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.history-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+.history-role {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.history-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text);
+}
+.history-balance {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.history-balance.pos { color: var(--accent-deep); }
+.history-balance.neg { color: var(--danger); }
 
 /* ── Utility ─────────────────────────────────────────────────── */
 .text-sm { font-size: 0.9rem; }

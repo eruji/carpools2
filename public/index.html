@@ -879,7 +879,7 @@ async function loadCarpoolView(carpoolId) {
   document.getElementById('edit-arrival-radius').value = data.carpool.arrival_radius || 400;
 
   // History
-  renderHistory(data.history);
+  renderHistory(data.trips || []);
 
   // Session UI
   renderSessionUI(data.activeSession);
@@ -916,37 +916,38 @@ function renderSetupMembers(members, isOwner) {
   `).join('');
 }
 
-function renderHistory(history) {
+function renderHistory(trips) {
   const container = document.getElementById('history-list');
-  if (!history || history.length === 0) {
-    container.innerHTML = '<p class="text-muted">No history yet.</p>';
+  if (!trips || trips.length === 0) {
+    container.innerHTML = '<p class="text-muted">No trips yet.</p>';
     return;
   }
-  container.innerHTML = history.map(h => {
-    const phaseNames = {
-      destination: 'To Destination',
-      back_to_meetup: 'Dropoff',
-      completed: 'Completed',
-      cancelled: 'Cancelled',
-      phase_start: 'Phase Start'
-    };
-    let coinsStr = '';
-    if (h.coins_data && h.coins_data !== '{}') {
-      try {
-        const cd = JSON.parse(h.coins_data);
-        coinsStr = ' | Coins: ' + Object.entries(cd).map(([uid,amt]) => `${amt>0?'+':''}${amt}`).join(', ');
-      } catch(e) {}
-    }
+  container.innerHTML = trips.map(t => {
+    const d = new Date((t.date || '').replace(' ', 'T') + 'Z');
+    const dateStr = isNaN(d) ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    const timeStr = isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const people = (t.people || []).map(p => {
+      const isDriver = p.username === t.driver;
+      const isSkipped = (t.skipped || []).includes(p.username);
+      const role = isDriver ? '🚗' : isSkipped ? '⏭' : '🚶';
+      const bal = p.balance || 0;
+      const balCls = bal > 0 ? 'pos' : bal < 0 ? 'neg' : '';
+      const balStr = bal > 0 ? '+' + bal : String(bal);
+      return `
+        <div class="history-person">
+          <span class="history-role">${role}</span>
+          <span class="history-name">${esc(p.username)}</span>
+          <span class="history-balance ${balCls}">${balStr}</span>
+        </div>`;
+    }).join('');
     return `
-      <div class="history-item">
-        <strong>${phaseNames[h.event] || h.event}</strong>
-        <span class="text-xs text-muted">${new Date(h.created_at).toLocaleString()}</span>
-        ${h.driver_name ? `<span class="text-xs"> | ${esc(h.driver_name)}</span>` : ''}
-        ${h.mileage > 0 ? `<span class="text-xs"> | ${h.mileage.toFixed(1)} mi</span>` : ''}
-        ${coinsStr}
-        ${h.details ? `<div class="text-xs text-muted">${esc(h.details)}</div>` : ''}
-      </div>
-    `;
+      <div class="history-trip">
+        <div class="history-trip-head">
+          <span class="history-date">${dateStr} · ${timeStr}</span>
+          ${t.cancelled ? '<span class="badge badge-gray">Cancelled</span>' : ''}
+        </div>
+        <div class="history-people">${people}</div>
+      </div>`;
   }).join('');
 }
 

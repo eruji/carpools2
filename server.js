@@ -541,8 +541,43 @@ app.get('/api/carpools/:id', requireAuth, (req, res) => {
     };
   }
   const history = stmts.carpoolHistory.all(carpool.id);
+
+  // Per-trip summary: date, roles (driver/riders/skipped), running point balances
+  const trips = [];
+  const doneSessions = db.prepare(
+    "SELECT * FROM carpool_sessions WHERE carpool_id = ? AND phase IN ('completed','cancelled') ORDER BY started_at ASC"
+  ).all(carpool.id);
+  const balances = {};
+  for (const s of doneSessions) {
+    const sm = stmts.sessionMembers.all(s.id);
+    const driver = sm.find(m => m.user_id === s.driver_id);
+    const riders = sm.filter(m => m.status !== 'skip' && m.user_id !== s.driver_id).map(m => m.username);
+    const skipped = sm.filter(m => m.status === 'skip').map(m => m.username);
+    const coinsRow = db.prepare(
+      'SELECT coins_data FROM carpool_history WHERE session_id = ? AND phase = ? ORDER BY id LIMIT 1'
+    ).get(s.id, 'destination');
+    let deltas = {};
+    if (coinsRow) { try { deltas = JSON.parse(coinsRow.coins_data || '{}'); } catch (e) {} }
+    for (const uid of Object.keys(deltas)) {
+      balances[uid] = (balances[uid] || 0) + deltas[uid];
+    }
+    trips.push({
+      id: s.id,
+      date: s.started_at,
+      cancelled: s.phase === 'cancelled',
+      driver: driver ? driver.username : null,
+      riders,
+      skipped,
+      people: sm.map(m => ({
+        userId: m.user_id,
+        username: m.username,
+        balance: balances[m.user_id] || 0
+      }))
+    });
+  }
+
   const isOwner = carpool.owner_id === req.session.userId;
-  res.json({ carpool, members, activeSession: sessionData, history, isOwner, myMembership: member });
+  res.json({ carpool, members, activeSession: sessionData, history, trips, isOwner, myMembership: member });
 });
 
 app.put('/api/carpools/:id', requireAuth, (req, res) => {
