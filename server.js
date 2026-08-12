@@ -1124,18 +1124,25 @@ function transitionToReturn(carpool, activeSession) {
 
 // Dropoff → Completed: everyone's back at the pickup
 function transitionToComplete(carpool, activeSession) {
-  // Total trip miles: pickup → destination → dropoff (round trip)
-  const outbound = haversine(
-    activeSession.meetup_lat, activeSession.meetup_lng,
-    activeSession.destination_lat, activeSession.destination_lng
-  );
-  const inbound = haversine(
-    activeSession.destination_lat, activeSession.destination_lng,
-    activeSession.meetup_lat, activeSession.meetup_lng
-  );
-  const totalMiles = outbound + inbound;
+  // Track miles only when the carpool had at least one rider (miles "saved"
+  // by carpooling). A solo driver saves nothing, so record 0 miles.
+  const members = stmts.sessionMembers.all(activeSession.id);
+  const riderCount = members.filter(m => m.status !== 'skip' && m.user_id !== activeSession.driver_id).length;
+  let totalMiles = 0;
+  if (riderCount > 0) {
+    // Total trip miles: pickup → destination → dropoff (round trip)
+    const outbound = haversine(
+      activeSession.meetup_lat, activeSession.meetup_lng,
+      activeSession.destination_lat, activeSession.destination_lng
+    );
+    const inbound = haversine(
+      activeSession.destination_lat, activeSession.destination_lng,
+      activeSession.meetup_lat, activeSession.meetup_lng
+    );
+    totalMiles = outbound + inbound;
+  }
   stmts.addHistory.run(carpool.id, activeSession.id, 'completed', activeSession.driver_id, 'carpool_complete', '{}', totalMiles,
-    'Carpool completed. Total trip miles recorded.');
+    'Carpool completed. Miles recorded only when riders were present.');
   stmts.updateSessionPhase.run('completed', 'completed', activeSession.id);
   return totalMiles;
 }
