@@ -1163,6 +1163,15 @@ function renderSessionUI(session) {
   const btnLeaving = document.getElementById('btn-leaving-dest');
   const btnBack = document.getElementById('btn-back-to-meetup');
   const btnComplete = document.getElementById('btn-complete');
+  const btnDriving = document.getElementById('btn-driving');
+  const btnRiding = document.getElementById('btn-riding');
+  const btnArrived = document.getElementById('btn-arrived');
+
+  // Specific arrival label per leg
+  const arrivalLabel = session && session.phase === 'meetup' ? 'Arrived at Meetup'
+    : session && session.phase === 'destination' ? 'Arrived at Destination'
+    : 'Arrived back at Meetup';
+  btnArrived.textContent = arrivalLabel;
 
   if (!session || session.phase === 'completed') {
     idleDiv.classList.remove('hidden');
@@ -1221,9 +1230,6 @@ function renderSessionUI(session) {
     // Only show buttons relevant to your current status
     const myMember = session.members.find(m => m.user_id === currentUser.id);
     const myStatus = myMember ? myMember.status : 'pending';
-    const btnDriving = document.getElementById('btn-driving');
-    const btnRiding = document.getElementById('btn-riding');
-    const btnArrived = document.getElementById('btn-arrived');
 
     const someoneElseDriving = session.driver_id && session.driver_id !== currentUser.id;
 
