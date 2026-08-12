@@ -1793,6 +1793,15 @@ async function skipMember(userId) {
 
 async function advancePhase(phase) {
   if (!currentCarpoolId || !activeSession) return;
+  // Guard against stale buttons: only allow the valid next step from the current phase
+  const validNext = {
+    meetup: ['destination'],
+    destination: ['back_to_meetup'],
+    back_to_meetup: ['completed']
+  };
+  if (!validNext[activeSession.phase] || !validNext[activeSession.phase].includes(phase)) {
+    return;
+  }
   const res = await fetch(`/api/carpools/${currentCarpoolId}/sessions/advance-phase`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
