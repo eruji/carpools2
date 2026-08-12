@@ -593,6 +593,16 @@ async function saveProfile() {
   }
   currentUser = data.user;
   renderProfileIcon();
+  // Refresh any live views still showing the old username (member list, seating chart, map)
+  if (activeSession && activeSession.members) {
+    const me = activeSession.members.find(m => m.user_id === currentUser.id);
+    if (me) me.username = currentUser.username;
+  }
+  if (currentCarpoolData && currentCarpoolData.members) {
+    const me = currentCarpoolData.members.find(m => m.id === currentUser.id);
+    if (me) me.username = currentUser.username;
+  }
+  if (currentCarpoolData) renderSections();
   result.textContent = 'Saved!';
   result.style.color = '#5F7D5B';
 }
