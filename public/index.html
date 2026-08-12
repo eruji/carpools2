@@ -997,6 +997,8 @@ function renderHistory(trips) {
       ? ''
       : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' · ' +
         d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const miles = Number(t.miles) || 0;
+    const milesStr = miles > 0 ? miles.toFixed(1) + ' mi' : '';
     (t.people || []).forEach((p, i) => {
       const role = p.username === t.driver ? 'Driver' : (t.skipped || []).includes(p.username) ? 'Skip' : 'Rider';
       const delta = p.delta || 0;
@@ -1007,6 +1009,7 @@ function renderHistory(trips) {
       const balCls = bal > 0 ? 'pos' : bal < 0 ? 'neg' : '';
       rows.push({
         dt: i === 0 ? dt : '',
+        milesStr: i === 0 ? milesStr : '',
         cancelled: i === 0 && t.cancelled,
         username: p.username,
         role,
@@ -1025,7 +1028,7 @@ function renderHistory(trips) {
       <tbody>
         ${rows.map(r => `
           <tr>
-            <td class="text-xs text-muted">${esc(r.dt)}${r.cancelled ? ' <span class="badge badge-gray">Cancelled</span>' : ''}</td>
+            <td class="text-xs text-muted">${esc(r.dt)}${r.milesStr ? ' · ' + esc(r.milesStr) : ''}${r.cancelled ? ' <span class="badge badge-gray">Cancelled</span>' : ''}</td>
             <td>${esc(r.username)}</td>
             <td>${esc(r.role)}</td>
             <td class="history-balance ${r.deltaCls}">${r.deltaStr}</td>
