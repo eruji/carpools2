@@ -361,7 +361,7 @@
 </div>
 <div class="profile-dropdown hidden" id="carpool-menu-dropdown">
   <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openHistoryModal()">History</button>
-  <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openSetupModal()">Setup</button>
+  <button id="btn-menu-setup" class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openSetupModal()">Setup</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -867,8 +867,9 @@ async function loadCarpoolView(carpoolId) {
   activeSession = data.activeSession;
   populateCarpoolSwitcher();
 
-  // Gear menu (Setup/History) — owner only
-  document.getElementById('btn-carpool-gear').classList.toggle('hidden', !data.isOwner);
+  // Gear menu: History is for everyone; Setup is owner-only
+  document.getElementById('btn-carpool-gear').classList.remove('hidden');
+  document.getElementById('btn-menu-setup').classList.toggle('hidden', !data.isOwner);
 
   // Setup tab: member management + invite (owner only)
   renderSetupMembers(data.members, data.isOwner);
