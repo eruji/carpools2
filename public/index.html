@@ -478,6 +478,12 @@ function onLocationsChanged() {
   }
 }
 
+// Single entry point for session changes: set the state and re-render.
+function setSession(session) {
+  activeSession = session;
+  renderSessionUI(session);
+}
+
 // Remember the last carpool the user opened
 function saveLastCarpool(id) { localStorage.setItem('carpoolLast', String(id)); }
 function getLastCarpool() { return localStorage.getItem('carpoolLast'); }
@@ -1915,8 +1921,7 @@ async function startSession() {
     alert(data.error || 'Failed to start session');
     return;
   }
-  activeSession = data.session;
-  renderSessionUI(activeSession);
+  setSession(data.session);
   // Location tracking starts once someone claims Driving/Riding (see respondToSession)
 }
 
@@ -1932,8 +1937,7 @@ async function respondToSession(status) {
     alert(data.error || 'Failed to respond');
     return;
   }
-  activeSession = data.session;
-  renderSessionUI(activeSession);
+  setSession(data.session);
 
   if (status === 'driving' || status === 'riding') {
     pendingLocFit = true;
@@ -1956,8 +1960,7 @@ async function skipMember(userId) {
     alert(data.error || 'Failed to skip member');
     return;
   }
-  activeSession = data.session;
-  renderSessionUI(activeSession);
+  setSession(data.session);
 }
 
 async function advancePhase(phase) {
@@ -1981,8 +1984,7 @@ async function advancePhase(phase) {
     alert(data.error || 'Failed to advance phase');
     return;
   }
-  activeSession = data.session;
-  renderSessionUI(activeSession);
+  setSession(data.session);
 
   if (phase === 'completed') {
     stopLocationTracking();
@@ -2460,8 +2462,7 @@ async function autoArrive(targetName, targetLat, targetLng) {
   if (targetLat && targetLng) lastAutoArrivePos = { lat: targetLat, lng: targetLng };
   else if (myLocation) lastAutoArrivePos = { lat: myLocation.lat, lng: myLocation.lng };
   const data = await res.json();
-  activeSession = data.session;
-  renderSessionUI(activeSession);
+  setSession(data.session);
   showToast('Auto-arrived at ' + targetName);
 }
 
@@ -2508,8 +2509,7 @@ function connectSocket() {
   });
 
   socket.on('session-started', (session) => {
-    activeSession = session;
-    renderSessionUI(session);
+    setSession(session);
     const myMember = session.members.find(m => m.user_id === currentUser.id);
     if (myMember && (myMember.status === 'driving' || myMember.status === 'riding')) {
       startLocationTracking();
@@ -2517,13 +2517,11 @@ function connectSocket() {
   });
 
   socket.on('session-updated', (session) => {
-    activeSession = session;
-    renderSessionUI(session);
+    setSession(session);
   });
 
   socket.on('session-cancelled', (data) => {
-    activeSession = null;
-    renderSessionUI(null);
+    setSession(null);
     stopLocationTracking();
     if (currentCarpoolId) loadCarpoolView(currentCarpoolId);
   });
