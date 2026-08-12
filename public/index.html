@@ -1195,14 +1195,15 @@ function renderSessionUI(session) {
   }
   if (!session.driver_id) lastDriverId = null;
 
-  // Waiting message: arrived at the meetup but others haven't yet
+  // Waiting message: arrived at the current stop but others haven't yet
   const alertEl = document.getElementById('session-alert');
-  if (session.phase === 'meetup') {
+  if (session.phase === 'meetup' || session.phase === 'destination') {
     const myMember = session.members.find(m => m.user_id === currentUser.id);
     const active = session.members.filter(m => m.status !== 'skip');
     const allArrived = active.length > 0 && active.every(m => m.status === 'arrived');
+    const targetName = session.phase === 'meetup' ? 'the meetup' : 'the destination';
     if (myMember && myMember.status === 'arrived' && !allArrived) {
-      alertEl.textContent = 'Waiting for all members to arrive...';
+      alertEl.textContent = 'Waiting for all members to arrive at ' + targetName + '...';
       alertEl.className = 'alert alert-info';
       alertEl.classList.remove('hidden');
     } else {
@@ -1258,7 +1259,14 @@ function renderSessionUI(session) {
       btnComplete.classList.add('hidden');
     }
   } else if (session.phase === 'destination') {
-    phaseMeetup.classList.add('hidden');
+    // Arrival step: everyone marks Arrived at the destination (auto-advance when all in)
+    const myMember2 = session.members.find(m => m.user_id === currentUser.id);
+    const myStatus2 = myMember2 ? myMember2.status : 'pending';
+    phaseMeetup.classList.remove('hidden');
+    btnDriving.classList.add('hidden');
+    btnRiding.classList.add('hidden');
+    if (myStatus2 === 'skip') btnArrived.classList.add('hidden');
+    else btnArrived.classList.remove('hidden');
     if (session.driver_id === currentUser.id) {
       phaseAdvance.classList.remove('hidden');
       btnLeaving.classList.add('hidden');

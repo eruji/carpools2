@@ -1030,20 +1030,40 @@ function transitionToDestination(carpool, activeSession) {
   return mileage;
 }
 
-// If everyone (non-skipped) has arrived at the meetup, auto-advance to the destination
+// Destination → Return: log the return trip and set phase
+function transitionToReturn(carpool, activeSession) {
+  const mileage = haversine(
+    activeSession.destination_lat, activeSession.destination_lng,
+    activeSession.meetup_lat, activeSession.meetup_lng
+  );
+  stmts.addHistory.run(carpool.id, activeSession.id, 'back_to_meetup', activeSession.driver_id, 'phase_start', '{}', mileage,
+    'Heading back to meetup.');
+  stmts.updateSessionPhase.run('back_to_meetup', 'back_to_meetup', activeSession.id);
+  return mileage;
+}
+
+// Auto-advance when everyone (non-skipped) has arrived at the current stop
 function autoAdvanceCheck(carpoolId) {
   const session = stmts.activeSession.get(carpoolId);
-  if (!session || session.phase !== 'meetup' || !session.driver_id) return false;
+  if (!session || !session.driver_id) return false;
   const members = stmts.sessionMembers.all(session.id);
   const active = members.filter(m => m.status !== 'skip');
   if (active.length === 0) return false;
   if (!active.every(m => m.status === 'arrived')) return false;
 
-  const mileage = transitionToDestination(stmts.carpoolById.get(carpoolId), session);
+  let mileage;
+  if (session.phase === 'meetup') {
+    mileage = transitionToDestination(stmts.carpoolById.get(carpoolId), session);
+  } else if (session.phase === 'destination') {
+    mileage = transitionToReturn(stmts.carpoolById.get(carpoolId), session);
+  } else {
+    return false;
+  }
+
   const updated = { ...stmts.latestSession.get(carpoolId), members: stmts.sessionMembers.all(session.id) };
   io.to('carpool:' + carpoolId).emit('session-updated', updated);
   io.to('carpool:' + carpoolId).emit('phase-changed', {
-    from: 'meetup', to: 'destination', coinsDistributed: true, mileage
+    from: session.phase, to: updated.phase, coinsDistributed: session.phase === 'meetup', mileage
   });
   return true;
 }
