@@ -2208,6 +2208,7 @@ function startLocationTracking() {
 // ── Geo-fenced arrivals ─────────────────────────────────────────────────────
 const GEO_FENCE_M = 400; // default meters (per-carpool override in Setup)
 let lastAutoArriveAt = 0;
+let lastAutoArrivePos = null; // { lat, lng } — where we last auto-arrived
 
 function checkGeoFence() {
   if (!activeSession || !currentCarpoolData || !myLocation) return;
@@ -2232,11 +2233,17 @@ function checkGeoFence() {
   const radius = carpool.arrival_radius || GEO_FENCE_M;
   const distM = haversine(myLocation.lat, myLocation.lng, targetLat, targetLng) * 1609.34;
   if (distM <= radius) {
-    autoArrive(targetName);
+    // Don't auto-arrive the next stop while still parked at the previous one
+    // (prevents meetup→destination skipping when the stops are close together)
+    if (lastAutoArrivePos) {
+      const fromPrev = haversine(myLocation.lat, myLocation.lng, lastAutoArrivePos.lat, lastAutoArrivePos.lng) * 1609.34;
+      if (fromPrev < radius) return;
+    }
+    autoArrive(targetName, targetLat, targetLng);
   }
 }
 
-async function autoArrive(targetName) {
+async function autoArrive(targetName, targetLat, targetLng) {
   // Debounce so we don't spam the server while inside the fence
   if (Date.now() - lastAutoArriveAt < 20000) return;
   lastAutoArriveAt = Date.now();
@@ -2247,6 +2254,9 @@ async function autoArrive(targetName) {
     body: JSON.stringify({ status: 'arrived', auto: true })
   });
   if (!res.ok) return;
+  // Remember where we auto-arrived so the next stop isn't skipped while still here
+  if (targetLat && targetLng) lastAutoArrivePos = { lat: targetLat, lng: targetLng };
+  else if (myLocation) lastAutoArrivePos = { lat: myLocation.lat, lng: myLocation.lng };
   const data = await res.json();
   activeSession = data.session;
   renderSessionUI(activeSession);
