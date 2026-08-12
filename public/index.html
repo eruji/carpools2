@@ -932,14 +932,19 @@ function renderHistory(trips) {
         d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     (t.people || []).forEach((p, i) => {
       const role = p.username === t.driver ? 'Driver' : (t.skipped || []).includes(p.username) ? 'Skip' : 'Rider';
+      const delta = p.delta || 0;
       const bal = p.balance || 0;
-      const balCls = bal > 0 ? 'pos' : bal < 0 ? 'neg' : '';
+      const deltaStr = delta > 0 ? '+' + delta : String(delta);
+      const deltaCls = delta > 0 ? 'pos' : delta < 0 ? 'neg' : '';
       const balStr = bal > 0 ? '+' + bal : String(bal);
+      const balCls = bal > 0 ? 'pos' : bal < 0 ? 'neg' : '';
       rows.push({
         dt: i === 0 ? dt : '',
         cancelled: i === 0 && t.cancelled,
         username: p.username,
         role,
+        deltaStr,
+        deltaCls,
         balStr,
         balCls
       });
@@ -948,7 +953,7 @@ function renderHistory(trips) {
   container.innerHTML = `
     <table class="history-table">
       <thead>
-        <tr><th>Date</th><th>Member</th><th>Role</th><th>Balance</th></tr>
+        <tr><th>Date</th><th>Member</th><th>Role</th><th>Δ</th><th>Balance</th></tr>
       </thead>
       <tbody>
         ${rows.map(r => `
@@ -956,6 +961,7 @@ function renderHistory(trips) {
             <td class="text-xs text-muted">${esc(r.dt)}${r.cancelled ? ' <span class="badge badge-gray">Cancelled</span>' : ''}</td>
             <td>${esc(r.username)}</td>
             <td>${esc(r.role)}</td>
+            <td class="history-balance ${r.deltaCls}">${r.deltaStr}</td>
             <td class="history-balance ${r.balCls}">${r.balStr}</td>
           </tr>`).join('')}
       </tbody>

@@ -571,6 +571,7 @@ app.get('/api/carpools/:id', requireAuth, (req, res) => {
       people: sm.map(m => ({
         userId: m.user_id,
         username: m.username,
+        delta: deltas[m.user_id] || 0,
         balance: balances[m.user_id] || 0
       }))
     });
