@@ -431,6 +431,7 @@ let lastDriverId = null; // for driver-change toasts
 // Remember the last carpool the user opened
 function saveLastCarpool(id) { localStorage.setItem('carpoolLast', String(id)); }
 function getLastCarpool() { return localStorage.getItem('carpoolLast'); }
+function clearLastCarpool() { localStorage.removeItem('carpoolLast'); }
 
 // ── Init ────────────────────────────────────────────────────────────────────
 async function init() {
@@ -588,6 +589,11 @@ function showDashboard() {
   document.getElementById('view-dashboard').classList.remove('hidden');
   document.getElementById('view-carpool').classList.add('hidden');
   document.getElementById('btn-dashboard').classList.add('hidden');
+  // Close any body-level overlays (setup/history/location modals, dropdowns)
+  ['loc-config', 'history-modal', 'setup-modal', 'profile-modal', 'profile-dropdown', 'carpool-menu-dropdown'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
   stopLocationTracking();
   if (socket && currentCarpoolId) {
     socket.emit('leave-carpool', currentCarpoolId);
@@ -1210,7 +1216,7 @@ function renderSessionUI(session) {
   // Driver info — everyone sees who's driving and where they're headed
   const driver = session.members.find(m => m.user_id === session.driver_id);
   const phaseTarget = session.phase === 'destination' ? 'the destination'
-    : session.phase === 'back_to_meetup' ? 'the pickup' : 'the pickup';
+    : session.phase === 'back_to_meetup' ? 'the dropoff' : 'the pickup';
   if (driver) {
     document.getElementById('session-info').textContent =
       `Driver: ${esc(driver.username)} — en route to ${phaseTarget}`;
@@ -1294,35 +1300,21 @@ function renderSessionUI(session) {
     const myMember2 = session.members.find(m => m.user_id === currentUser.id);
     const myStatus2 = myMember2 ? myMember2.status : 'pending';
     phaseMeetup.classList.remove('hidden');
+    phaseAdvance.classList.add('hidden');
     btnDriving.classList.add('hidden');
     btnRiding.classList.add('hidden');
     if (myStatus2 === 'skip') btnArrived.classList.add('hidden');
     else btnArrived.classList.remove('hidden');
-    if (session.driver_id === currentUser.id) {
-      phaseAdvance.classList.remove('hidden');
-      btnLeaving.classList.add('hidden');
-      btnBack.classList.remove('hidden');
-      btnComplete.classList.add('hidden');
-    } else {
-      phaseAdvance.classList.add('hidden');
-    }
   } else if (session.phase === 'back_to_meetup') {
-    // Arrival step: everyone arrives back at the pickup (auto-complete when all in)
+    // Arrival step: everyone arrives back at the dropoff (auto-complete when all in)
     const myMember3 = session.members.find(m => m.user_id === currentUser.id);
     const myStatus3 = myMember3 ? myMember3.status : 'pending';
     phaseMeetup.classList.remove('hidden');
+    phaseAdvance.classList.add('hidden');
     btnDriving.classList.add('hidden');
     btnRiding.classList.add('hidden');
     if (myStatus3 === 'skip') btnArrived.classList.add('hidden');
     else btnArrived.classList.remove('hidden');
-    if (session.driver_id === currentUser.id) {
-      phaseAdvance.classList.remove('hidden');
-      btnLeaving.classList.add('hidden');
-      btnBack.classList.add('hidden');
-      btnComplete.classList.remove('hidden');
-    } else {
-      phaseAdvance.classList.add('hidden');
-    }
   }
 
   renderMemberStatus(session);
@@ -2151,6 +2143,7 @@ async function deleteCarpool() {
   try {
     const res = await fetch(`/api/carpools/${currentCarpoolId}`, { method: 'DELETE' });
     if (res.ok) {
+      clearLastCarpool();
       goToDashboard();
     } else {
       const data = await res.json();
@@ -2256,7 +2249,7 @@ function checkGeoFence() {
   } else if (activeSession.phase === 'destination') {
     targetLat = carpool.destination_lat; targetLng = carpool.destination_lng; targetName = 'the destination';
   } else if (activeSession.phase === 'back_to_meetup') {
-    targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'the pickup';
+    targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'the dropoff';
   } else {
     return;
   }
