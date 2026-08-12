@@ -24,11 +24,11 @@ Open `http://localhost:3000` in a browser. Leaflet maps and Socket.IO load from 
 ## How It Works
 
 1. **Register** two+ users (or use the test script)
-2. **Create a carpool** with meetup/destination coordinates
+2. **Create a carpool** with pickup/destination coordinates
 3. **Invite members** — they accept from the dashboard
 4. **Start a session** — driver clicks "I'm Driving!"
 5. **Members respond** — driving, riding, skip, or arrived
-6. **Phase flow:** Meetup → Destination → Back to Meetup → Complete
+6. **Phase flow:** Pickup → Destination → Dropoff → Complete
 7. **Coins** are distributed when leaving for destination: driver gets +1 per rider, riders pay -1 each
 8. **Real-time map** shows member locations and route during active sessions
 
@@ -42,7 +42,7 @@ Open `http://localhost:3000` in a browser. Leaflet maps and Socket.IO load from 
 
 ### Carpools
 - `GET /api/carpools` — list user's carpools
-- `POST /api/carpools` — create `{ name, meetup_name, meetup_lat, meetup_lng, destination_name, destination_lat, destination_lng }`
+- `POST /api/carpools` — create `{ name, meetup_name, meetup_lat, meetup_lng, destination_name, destination_lat, destination_lng }` (meetup = pickup point)
 - `GET /api/carpools/:id` — detail with members, active session, history
 - `PUT /api/carpools/:id` — update (owner only)
 - `DELETE /api/carpools/:id` — delete (owner only)
@@ -58,7 +58,7 @@ Open `http://localhost:3000` in a browser. Leaflet maps and Socket.IO load from 
 - `POST /api/carpools/:id/sessions/skip-member` — driver skips a pending member `{ userId }`
 - `POST /api/carpools/:id/sessions/advance-phase` — `{ phase: 'destination'|'back_to_meetup'|'completed' }`
 - `POST /api/carpools/:id/sessions/cancel` — cancel active session
-- `PUT /api/carpools/:id/sessions/locations` — update meetup/destination mid-session
+- `PUT /api/carpools/:id/sessions/locations` — update pickup/destination mid-session
 
 ### Invitations
 - `GET /api/invitations` — pending invitations for current user

@@ -87,8 +87,8 @@ async function main() {
   assert(bobMember.status === 'riding', 'bob status riding');
   console.log('   ✅ OK');
 
-  // ── 7. Advance: meetup → destination ──
-  console.log('7. Advance: meetup → destination...');
+  // ── 7. Advance: pickup → destination ──
+  console.log('7. Advance: pickup → destination...');
   r = await post(`/api/carpools/${carpoolId}/sessions/advance-phase`, { phase: 'destination' }, ca);
   assert(r.status === 200, 'advance destination');
   assert(r.data.session.phase === 'destination', 'phase destination');
@@ -105,15 +105,15 @@ async function main() {
   assert(r.data.history[0].mileage > 0, 'mileage recorded');
   console.log('   ✅ alice: +1, bob: -1, mileage:', r.data.history[0].mileage.toFixed(2), 'km');
 
-  // ── 9. Advance: destination → back_to_meetup ──
-  console.log('9. Advance: destination → back_to_meetup...');
+  // ── 9. Advance: destination → dropoff ──
+  console.log('9. Advance: destination → dropoff...');
   r = await post(`/api/carpools/${carpoolId}/sessions/advance-phase`, { phase: 'back_to_meetup' }, ca);
   assert(r.status === 200, 'advance back_to_meetup');
   assert(r.data.session.phase === 'back_to_meetup', 'phase back_to_meetup');
   console.log('   ✅ OK');
 
-  // ── 10. Advance: back_to_meetup → completed ──
-  console.log('10. Advance: back_to_meetup → completed...');
+  // ── 10. Advance: dropoff → completed ──
+  console.log('10. Advance: dropoff → completed...');
   r = await post(`/api/carpools/${carpoolId}/sessions/advance-phase`, { phase: 'completed' }, ca);
   assert(r.status === 200, 'advance completed');
   assert(r.data.session.phase === 'completed', 'phase completed');
@@ -131,7 +131,7 @@ async function main() {
   console.log('12. Test invalid transitions...');
   // Start new session
   await post(`/api/carpools/${carpoolId}/sessions/start`, {}, ca);
-  // Try invalid: meetup → back_to_meetup (should fail)
+  // Try invalid: pickup → dropoff (should fail)
   r = await post(`/api/carpools/${carpoolId}/sessions/advance-phase`, { phase: 'back_to_meetup' }, ca);
   assert(r.status === 400, 'invalid transition rejected');
   console.log('   ✅ invalid transition correctly rejected');

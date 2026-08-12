@@ -858,7 +858,7 @@ app.post('/api/carpools/:id/sessions/skip-member', requireAuth, (req, res) => {
     };
     io.to('carpool:' + carpool.id).emit('session-updated', updatedSession);
     autoAdvanceCheck(carpool.id);
-    // Return the freshest state (skipping may complete the meetup/destination check)
+    // Return the freshest state (skipping may complete the pickup/destination check)
     const finalSession = {
       ...stmts.latestSession.get(carpool.id),
       members: stmts.sessionMembers.all(activeSession.id)
@@ -895,12 +895,12 @@ app.post('/api/carpools/:id/sessions/advance-phase', requireAuth, (req, res) => 
         activeSession.meetup_lat, activeSession.meetup_lng
       );
       stmts.addHistory.run(carpool.id, activeSession.id, 'back_to_meetup', activeSession.driver_id, 'phase_start', '{}', mileage,
-        'Heading back to meetup.');
+        'Heading back to dropoff.');
 
     } else if (phase === 'completed' && activeSession.phase === 'back_to_meetup') {
-      // Total mileage for the return trip already logged; just complete
+      // Total mileage for the dropoff trip already logged; just complete
       stmts.addHistory.run(carpool.id, activeSession.id, 'completed', activeSession.driver_id, 'carpool_complete', '{}', 0,
-        'Carpool completed. All members back at meetup.');
+        'Carpool completed. All members back at pickup.');
     } else {
       throw { status: 400, error: `Cannot transition from ${activeSession.phase} to ${phase}` };
     }
@@ -955,7 +955,7 @@ app.post('/api/carpools/:id/sessions/cancel', requireAuth, (req, res) => {
   }
 });
 
-// Update session locations (meetup/destination on the fly)
+// Update session locations (pickup/destination on the fly)
 app.put('/api/carpools/:id/sessions/locations', requireAuth, (req, res) => {
   try {
     const carpool = stmts.carpoolById.get(req.params.id);
@@ -1007,12 +1007,12 @@ app.post('/api/invitations/:id/decline', requireAuth, (req, res) => {
 });
 
 // ── Utility ─────────────────────────────────────────────────────────────────
-// Meetup → Destination: distribute coins, log mileage/history, set phase
+// Pickup → Destination: distribute coins, log mileage/history, set phase
 function transitionToDestination(carpool, activeSession) {
   const members = stmts.sessionMembers.all(activeSession.id);
   const driver = members.find(m => m.status === 'driving');
   const actualDriverId = driver ? driver.user_id : activeSession.driver_id;
-  // Riders: anyone riding OR arrived at the meetup (excluding the driver)
+  // Riders: anyone riding OR arrived at the pickup (excluding the driver)
   const riders = members.filter(m =>
     (m.status === 'riding' || m.status === 'arrived') && m.user_id !== actualDriverId
   );
@@ -1045,17 +1045,17 @@ function transitionToDestination(carpool, activeSession) {
   return mileage;
 }
 
-// Destination → Return: log the return trip and set phase
+// Destination → Dropoff: log the dropoff trip and set phase
 function transitionToReturn(carpool, activeSession) {
   const mileage = haversine(
     activeSession.destination_lat, activeSession.destination_lng,
     activeSession.meetup_lat, activeSession.meetup_lng
   );
   stmts.addHistory.run(carpool.id, activeSession.id, 'back_to_meetup', activeSession.driver_id, 'phase_start', '{}', mileage,
-    'Heading back to meetup.');
+    'Heading back to dropoff.');
   stmts.updateSessionPhase.run('back_to_meetup', 'back_to_meetup', activeSession.id);
 
-  // Start the return leg fresh: en route again
+  // Start the dropoff leg fresh: en route again
   const members = stmts.sessionMembers.all(activeSession.id);
   for (const m of members) {
     if (m.status === 'skip') continue;
@@ -1064,10 +1064,10 @@ function transitionToReturn(carpool, activeSession) {
   return mileage;
 }
 
-// Return → Completed: everyone's back at the meetup
+// Dropoff → Completed: everyone's back at the pickup
 function transitionToComplete(carpool, activeSession) {
   stmts.addHistory.run(carpool.id, activeSession.id, 'completed', activeSession.driver_id, 'carpool_complete', '{}', 0,
-    'Carpool completed. All members back at meetup.');
+    'Carpool completed. All members back at pickup.');
   stmts.updateSessionPhase.run('completed', 'completed', activeSession.id);
   return 0;
 }

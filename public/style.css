@@ -390,12 +390,12 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   transition: background 0.4s;
 }
 
-/* Phase track coloring (4 segments: start→meetup→dest→return) */
+/* Phase track coloring (4 segments: start→pickup→dest→dropoff) */
 /* The current leg is drawn solid by #subway-progress (measured between dots);
-   base track stays gray during meetup until arrival */
-.subway-line.phase-meetup::before     { background: var(--border-strong); }
+   base track stays gray during pickup until arrival */
+.subway-line.phase-pickup::before     { background: var(--border-strong); }
 .subway-line.phase-destination::before { background: linear-gradient(to bottom, var(--accent) 0%, var(--accent) 50%, var(--border-strong) 50%); }
-.subway-line.phase-return::before      { background: linear-gradient(to bottom, var(--accent) 0%, var(--accent) 50%, var(--warn) 50%, var(--warn) 75%, var(--border-strong) 75%); }
+.subway-line.phase-dropoff::before      { background: linear-gradient(to bottom, var(--accent) 0%, var(--accent) 50%, var(--warn) 50%, var(--warn) 75%, var(--border-strong) 75%); }
 .subway-line.phase-completed::before   { background: linear-gradient(to bottom, var(--accent) 100%); }
 
 /* Solid green progress bar for the current leg (measured between the dots) */
@@ -418,7 +418,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .subway-stop:last-child { padding-bottom: 0; }
 
-/* Clickable stops (meetup / destination) */
+/* Clickable stops (pickup / destination) */
 .subway-stop[onclick] {
   cursor: pointer;
   border-radius: 8px;

@@ -137,7 +137,7 @@
         <label>Carpool Name</label>
         <input type="text" id="new-carpool-name" required placeholder="e.g., Work Commute">
       </div>
-      <p class="text-xs text-muted mb-1">Add meetup and destination locations once inside the carpool.</p>
+      <p class="text-xs text-muted mb-1">Add pickup and destination locations once inside the carpool.</p>
       <div class="btn-group">
         <button type="submit" class="btn btn-success">Create</button>
         <button type="button" class="btn btn-outline" onclick="hideCreateCarpool()">Cancel</button>
@@ -179,7 +179,7 @@
     <button class="map-recenter" onclick="recenterMap()" title="Recenter map"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
     <div id="map-legend" class="map-legend">
       <div id="map-legend-body" class="map-legend-body hidden">
-        <div class="legend-item"><span class="legend-icon"><svg width="14" height="18" viewBox="0 0 24 32"><path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="#fff"/></svg></span>Meetup</div>
+        <div class="legend-item"><span class="legend-icon"><svg width="14" height="18" viewBox="0 0 24 32"><path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="#fff"/></svg></span>Pickup</div>
         <div class="legend-item"><span class="legend-icon"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="4.5" cy="2.5" r="1.3" fill="#B07166"/><path d="M4.5 4V23" stroke="#8A5248" stroke-width="2"/><path d="M5.5 5.5h12l-3 3.2 3 3.3H5.5z" fill="#B07166" stroke="#fff" stroke-width="0.9" stroke-linejoin="round"/></svg></span>Destination</div>
         <div class="legend-item"><span class="legend-avatar">AB</span>People <span class="legend-sub">(includes you, halo ring)</span></div>
         <div class="legend-item"><span class="legend-line"></span>Route <span class="legend-sub">(dashed = member paths)</span></div>
@@ -202,13 +202,13 @@
           <div class="stop-detail" id="subway-start-addr">Your location</div>
         </div>
       </div>
-      <!-- Stop 2: Meetup (name only) — clickable to edit/swap -->
+      <!-- Stop 2: Pickup (name only) — clickable to edit/swap -->
       <div class="subway-stop" id="subway-stop-meetup" onclick="openLocConfig('meetup')">
         <div class="dot"></div>
         <div class="stop-content">
           <div class="stop-row">
-            <span class="stop-icon" title="Meetup"><svg viewBox="0 0 24 32" width="18" height="22"><path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="#fff"/></svg></span>
-            <div class="stop-name" id="subway-meetup-name">Meetup</div>
+            <span class="stop-icon" title="Pickup"><svg viewBox="0 0 24 32" width="18" height="22"><path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="#fff"/></svg></span>
+            <div class="stop-name" id="subway-meetup-name">Pickup</div>
             <div class="stop-eta hidden" id="subway-meetup-eta"></div>
           </div>
           <div class="stop-detail" id="subway-meetup-addr"></div>
@@ -226,12 +226,12 @@
           <div class="stop-detail" id="subway-dest-addr"></div>
         </div>
       </div>
-      <!-- Stop 4: Meetup again (return) -->
+      <!-- Stop 4: Pickup again (dropoff) -->
       <div class="subway-stop" id="subway-stop-return">
         <div class="dot"></div>
         <div class="stop-content">
           <div class="stop-row">
-            <div class="stop-name" id="subway-return-name">Return</div>
+            <div class="stop-name" id="subway-return-name">Dropoff</div>
             <div class="stop-eta hidden" id="subway-return-eta"></div>
           </div>
           <div class="stop-detail" id="subway-return-addr"></div>
@@ -263,7 +263,7 @@
     <div id="session-active" class="hidden">
       <p id="session-info" class="text-sm text-muted mb-1"></p>
 
-      <!-- Phase 1: Meetup Controls -->
+      <!-- Phase 1: Pickup Controls -->
       <div id="phase-meetup-controls" class="btn-group hidden">
         <button id="btn-driving" class="btn btn-primary btn-sm" onclick="respondToSession('driving')">I'll Drive</button>
         <button id="btn-riding" class="btn btn-success btn-sm" onclick="respondToSession('riding')">I'll Ride</button>
@@ -273,7 +273,7 @@
       <!-- Phase 2-3 Controls -->
       <div id="phase-advance-controls" class="btn-group hidden">
         <button id="btn-leaving-dest" class="btn btn-primary btn-sm hidden" onclick="advancePhase('destination')" style="width:100%;">Leaving for Destination</button>
-        <button id="btn-back-to-meetup" class="btn btn-warning btn-sm hidden" onclick="advancePhase('back_to_meetup')" style="width:100%;">Back to Meetup</button>
+        <button id="btn-back-to-meetup" class="btn btn-warning btn-sm hidden" onclick="advancePhase('back_to_meetup')" style="width:100%;">Dropoff</button>
         <button id="btn-complete" class="btn btn-success btn-sm hidden" onclick="advancePhase('completed')" style="width:100%;">Complete Carpool</button>
       </div>
 
@@ -320,7 +320,7 @@
         <input type="number" id="edit-arrival-radius" min="50" max="2000" step="50" placeholder="400">
         <p class="text-xs text-muted">How close GPS must be to auto-arrive. 400m covers a block or two (parking garages).</p>
       </div>
-      <p class="text-xs text-muted mb-1">Meetup and destination are set from the subway stops.</p>
+      <p class="text-xs text-muted mb-1">Pickup and destination are set from the subway stops.</p>
     </form>
 
     <h4>Members</h4>
@@ -925,7 +925,7 @@ function renderHistory(history) {
   container.innerHTML = history.map(h => {
     const phaseNames = {
       destination: 'To Destination',
-      back_to_meetup: 'Back to Meetup',
+      back_to_meetup: 'Dropoff',
       completed: 'Completed',
       cancelled: 'Cancelled',
       phase_start: 'Phase Start'
@@ -958,17 +958,17 @@ function updateSubwayMap(data) {
   // Stop names: nickname if set, else first comma part; prompt when unset
   const hasMeetup = carpool.meetup_lat && carpool.meetup_lng;
   const hasDest = carpool.destination_lat && carpool.destination_lng;
-  const meetupName = hasMeetup ? meetupLabel(carpool) : 'Click to add meetup';
+  const meetupName = hasMeetup ? meetupLabel(carpool) : 'Click to add pickup';
   const destName = hasDest ? destLabel(carpool) : 'Click to add destination';
 
   document.getElementById('subway-start-name').textContent = 'Start';
   document.getElementById('subway-start-addr').textContent = 'Your location';
   document.getElementById('subway-meetup-name').textContent = meetupName;
-  document.getElementById('subway-meetup-addr').textContent = hasMeetup ? '' : 'Tap to set the pickup point';
+  document.getElementById('subway-meetup-addr').textContent = hasMeetup ? '' : 'Tap to set the pickup location';
   document.getElementById('subway-dest-name').textContent = destName;
   document.getElementById('subway-dest-addr').textContent = hasDest ? '' : 'Tap to set the drop-off';
-  document.getElementById('subway-return-name').textContent = hasMeetup ? meetupName : 'Return';
-  document.getElementById('subway-return-addr').textContent = 'Return';
+  document.getElementById('subway-return-name').textContent = hasMeetup ? meetupName : 'Dropoff';
+  document.getElementById('subway-return-addr').textContent = 'Dropoff';
 
   // Reset all stops
   const stopStart = document.getElementById('subway-stop-start');
@@ -990,10 +990,10 @@ function updateSubwayMap(data) {
     stopDest.classList.add('is-future');
     stopReturn.classList.add('is-future');
   } else if (session.phase === 'meetup') {
-    // When the user arrives at the meetup, the leg turns green and the dot fills in
+    // When the user arrives at the pickup, the leg turns green and the dot fills in
     const myMember = session.members ? session.members.find(m => m.user_id === currentUser.id) : null;
     const arrivedMeetup = myMember && myMember.status === 'arrived';
-    subwayLine.classList.add('phase-meetup');
+    subwayLine.classList.add('phase-pickup');
     if (arrivedMeetup) {
       stopStart.classList.add('is-past');
       stopMeetup.classList.add('is-current');
@@ -1012,7 +1012,7 @@ function updateSubwayMap(data) {
     stopDest.classList.add('is-current');
     stopReturn.classList.add('is-future');
   } else if (session.phase === 'back_to_meetup') {
-    subwayLine.classList.add('phase-return');
+    subwayLine.classList.add('phase-dropoff');
     stopStart.classList.add('is-past');
     stopMeetup.classList.add('is-past');
     stopDest.classList.add('is-past');
@@ -1170,9 +1170,9 @@ function renderSessionUI(session) {
   const btnArrived = document.getElementById('btn-arrived');
 
   // Specific arrival label per leg
-  const arrivalLabel = session && session.phase === 'meetup' ? 'Arrived at Meetup'
+  const arrivalLabel = session && session.phase === 'meetup' ? 'Arrived at Pickup'
     : session && session.phase === 'destination' ? 'Arrived at Destination'
-    : 'Arrived back at Meetup';
+    : 'Arrived at Dropoff';
   btnArrived.textContent = arrivalLabel;
 
   if (!session || session.phase === 'completed') {
@@ -1188,7 +1188,7 @@ function renderSessionUI(session) {
   // Driver info — everyone sees who's driving and where they're headed
   const driver = session.members.find(m => m.user_id === session.driver_id);
   const phaseTarget = session.phase === 'destination' ? 'the destination'
-    : session.phase === 'back_to_meetup' ? 'the meetup' : 'the meetup';
+    : session.phase === 'back_to_meetup' ? 'the pickup' : 'the pickup';
   if (driver) {
     document.getElementById('session-info').textContent =
       `Driver: ${esc(driver.username)} — en route to ${phaseTarget}`;
@@ -1212,8 +1212,8 @@ function renderSessionUI(session) {
     const myMember = session.members.find(m => m.user_id === currentUser.id);
     const active = session.members.filter(m => m.status !== 'skip');
     const allArrived = active.length > 0 && active.every(m => m.status === 'arrived');
-    const targetName = session.phase === 'meetup' ? 'the meetup'
-      : session.phase === 'destination' ? 'the destination' : 'back at the meetup';
+    const targetName = session.phase === 'meetup' ? 'the pickup'
+      : session.phase === 'destination' ? 'the destination' : 'the dropoff';
     if (myMember && myMember.status === 'arrived' && !allArrived) {
       alertEl.textContent = 'Waiting for all members to arrive ' + targetName + '...';
       alertEl.className = 'alert alert-info';
@@ -1260,7 +1260,7 @@ function renderSessionUI(session) {
     const driver = session.members.find(m => m.user_id === session.driver_id);
     const driverArrived = driver && driver.status === 'arrived';
 
-    // Only offer to leave once the driver is actually at the meetup
+    // Only offer to leave once the driver is actually at the pickup
     if (allReady && driverArrived && session.driver_id === currentUser.id) {
       phaseAdvance.classList.remove('hidden');
       btnLeaving.classList.remove('hidden');
@@ -1285,7 +1285,7 @@ function renderSessionUI(session) {
       phaseAdvance.classList.add('hidden');
     }
   } else if (session.phase === 'back_to_meetup') {
-    // Arrival step: everyone arrives back at the meetup (auto-complete when all in)
+    // Arrival step: everyone arrives back at the pickup (auto-complete when all in)
     const myMember3 = session.members.find(m => m.user_id === currentUser.id);
     const myStatus3 = myMember3 ? myMember3.status : 'pending';
     phaseMeetup.classList.remove('hidden');
@@ -1348,7 +1348,7 @@ function renderMemberStatus(session) {
   // Next driver = lowest credits, excluding the current driver
   const nonDrivers = sorted.filter(m => m.user_id !== session.driver_id);
   const nextDriverId = nonDrivers.length ? nonDrivers[0].user_id : null;
-  // No skipping once everyone has arrived at the meetup
+  // No skipping once everyone has arrived at the pickup
   const active = session.members.filter(m => m.status !== 'skip');
   const allArrived = active.length > 0 && active.every(m => m.status === 'arrived');
   const noSkip = session.phase === 'meetup' && allArrived;
@@ -1384,7 +1384,7 @@ function renderMemberStatus(session) {
       const carpool = currentCarpoolData.carpool;
       let targetLat, targetLng, targetName;
       if (activeSession.phase === 'meetup') {
-        targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'meetup';
+        targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'pickup';
       } else {
         targetLat = carpool.destination_lat; targetLng = carpool.destination_lng; targetName = 'dest';
       }
@@ -1602,7 +1602,7 @@ function updateMap(data) {
     map.fitBounds(L.latLngBounds(pts), opts);
   };
 
-  // Meetup marker (location pin icon)
+  // Pickup marker (location pin icon)
   if (carpool.meetup_lat && carpool.meetup_lng) {
     const label = meetupLabel(carpool);
     const marker = L.marker([carpool.meetup_lat, carpool.meetup_lng], {
@@ -1617,7 +1617,7 @@ function updateMap(data) {
         </div>`,
         iconAnchor: [11, 26]
       })
-    }).addTo(map).bindPopup('<b>Meetup:</b> ' + (carpool.meetup_name || ''));
+    }).addTo(map).bindPopup('<b>Pickup:</b> ' + (carpool.meetup_name || ''));
     mapMarkers.meetup = marker;
     addPoint(carpool.meetup_lat, carpool.meetup_lng);
   }
@@ -1668,7 +1668,7 @@ function updateMap(data) {
 
   // Route line — always draw actual-road route when both points exist
   if (carpool.meetup_lat && carpool.meetup_lng && carpool.destination_lat && carpool.destination_lng) {
-    // Direction: meetup→dest normally; dest→meetup during return
+    // Direction: pickup→dest normally; dest→pickup during dropoff
     const toDest = session && session.phase === 'back_to_meetup' ? false : true;
     const lat1 = toDest ? carpool.meetup_lat : carpool.destination_lat;
     const lng1 = toDest ? carpool.meetup_lng : carpool.destination_lng;
@@ -1688,7 +1688,7 @@ function updateMap(data) {
         distanceText = `${dist.toFixed(1)} mi (straight line)`;
       }
 
-      // Lighter preview line when idle/meetup, solid when in transit
+      // Lighter preview line when idle/pickup, solid when in transit
       const active = inTransit;
       const line = L.polyline(coords, {
         color: '#5F7D5B',
@@ -1978,7 +1978,7 @@ let locConfigSlot = null; // 'meetup' | 'destination'
 
 function openLocConfig(slot) {
   locConfigSlot = slot;
-  document.getElementById('loc-config-title').textContent = slot === 'meetup' ? 'Meetup' : 'Destination';
+  document.getElementById('loc-config-title').textContent = slot === 'meetup' ? 'Pickup' : 'Destination';
   document.getElementById('loc-config').classList.remove('hidden');
   loadLocConfig();
 }
@@ -2064,7 +2064,7 @@ async function addSavedLocation() {
   });
   const data = await res.json();
   if (!res.ok) { alert('Failed to add location'); return; }
-  // Save AND use it as the active meetup/destination
+  // Save AND use it as the active pickup/destination
   savedLocations.push(data.location);
   await useSavedLocation(data.location.id);
 }
@@ -2235,11 +2235,11 @@ function checkGeoFence() {
 
   let targetLat, targetLng, targetName;
   if (activeSession.phase === 'meetup') {
-    targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'the meetup';
+    targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'the pickup';
   } else if (activeSession.phase === 'destination') {
     targetLat = carpool.destination_lat; targetLng = carpool.destination_lng; targetName = 'the destination';
   } else if (activeSession.phase === 'back_to_meetup') {
-    targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'the meetup';
+    targetLat = carpool.meetup_lat; targetLng = carpool.meetup_lng; targetName = 'the pickup';
   } else {
     return;
   }
@@ -2396,7 +2396,7 @@ function esc(str) {
 }
 
 // Nickname-aware labels: nickname if set, else first comma part of the name
-function meetupLabel(c) { return (c.meetup_nickname || '').trim() || (c.meetup_name || 'Meetup').split(',')[0]; }
+function meetupLabel(c) { return (c.meetup_nickname || '').trim() || (c.meetup_name || 'Pickup').split(',')[0]; }
 function destLabel(c) { return (c.destination_nickname || '').trim() || (c.destination_name || 'Destination').split(',')[0]; }
 
 // Initials from username: first letter of first + last word (or first 2 chars)
