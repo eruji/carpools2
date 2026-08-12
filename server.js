@@ -561,10 +561,14 @@ app.get('/api/carpools/:id', requireAuth, (req, res) => {
     for (const uid of Object.keys(deltas)) {
       balances[uid] = (balances[uid] || 0) + deltas[uid];
     }
+    const completeRow = db.prepare(
+      'SELECT mileage FROM carpool_history WHERE session_id = ? AND phase = ? ORDER BY id LIMIT 1'
+    ).get(s.id, 'completed');
     trips.push({
       id: s.id,
       date: s.started_at,
       cancelled: s.phase === 'cancelled',
+      miles: completeRow ? (completeRow.mileage || 0) : 0,
       driver: driver ? driver.username : null,
       riders,
       skipped,
@@ -1120,10 +1124,20 @@ function transitionToReturn(carpool, activeSession) {
 
 // Dropoff → Completed: everyone's back at the pickup
 function transitionToComplete(carpool, activeSession) {
-  stmts.addHistory.run(carpool.id, activeSession.id, 'completed', activeSession.driver_id, 'carpool_complete', '{}', 0,
-    'Carpool completed. All members back at pickup.');
+  // Total trip miles: pickup → destination → dropoff (round trip)
+  const outbound = haversine(
+    activeSession.meetup_lat, activeSession.meetup_lng,
+    activeSession.destination_lat, activeSession.destination_lng
+  );
+  const inbound = haversine(
+    activeSession.destination_lat, activeSession.destination_lng,
+    activeSession.meetup_lat, activeSession.meetup_lng
+  );
+  const totalMiles = outbound + inbound;
+  stmts.addHistory.run(carpool.id, activeSession.id, 'completed', activeSession.driver_id, 'carpool_complete', '{}', totalMiles,
+    'Carpool completed. Total trip miles recorded.');
   stmts.updateSessionPhase.run('completed', 'completed', activeSession.id);
-  return 0;
+  return totalMiles;
 }
 
 // Auto-advance when everyone (non-skipped) has arrived at the current stop
