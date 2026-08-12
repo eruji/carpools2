@@ -1027,6 +1027,12 @@ function transitionToDestination(carpool, activeSession) {
     JSON.stringify(coinsData), mileage,
     `Departed for destination. ${riders.length} riders. Coins distributed.`);
   stmts.updateSessionPhase.run('destination', 'destination', activeSession.id);
+
+  // Start the destination leg fresh: everyone is en route again (must re-arrive)
+  for (const m of members) {
+    if (m.status === 'skip') continue;
+    stmts.updateSessionMember.run(m.user_id === actualDriverId ? 'driving' : 'riding', null, null, activeSession.id, m.user_id);
+  }
   return mileage;
 }
 
@@ -1039,6 +1045,13 @@ function transitionToReturn(carpool, activeSession) {
   stmts.addHistory.run(carpool.id, activeSession.id, 'back_to_meetup', activeSession.driver_id, 'phase_start', '{}', mileage,
     'Heading back to meetup.');
   stmts.updateSessionPhase.run('back_to_meetup', 'back_to_meetup', activeSession.id);
+
+  // Start the return leg fresh: en route again
+  const members = stmts.sessionMembers.all(activeSession.id);
+  for (const m of members) {
+    if (m.status === 'skip') continue;
+    stmts.updateSessionMember.run(m.user_id === activeSession.driver_id ? 'driving' : 'riding', null, null, activeSession.id, m.user_id);
+  }
   return mileage;
 }
 
