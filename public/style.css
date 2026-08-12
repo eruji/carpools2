@@ -738,7 +738,8 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .age-stale { color: #B07166; font-weight: 600; }
 .member-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .member-info .member-name { font-weight: 600; font-size: 0.95rem; }
-.member-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.member-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.member-eta { white-space: nowrap; }
 
 /* ── Alerts ──────────────────────────────────────────────────── */
 .alert {
