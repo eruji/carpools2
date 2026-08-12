@@ -1055,6 +1055,14 @@ function transitionToReturn(carpool, activeSession) {
   return mileage;
 }
 
+// Return → Completed: everyone's back at the meetup
+function transitionToComplete(carpool, activeSession) {
+  stmts.addHistory.run(carpool.id, activeSession.id, 'completed', activeSession.driver_id, 'carpool_complete', '{}', 0,
+    'Carpool completed. All members back at meetup.');
+  stmts.updateSessionPhase.run('completed', 'completed', activeSession.id);
+  return 0;
+}
+
 // Auto-advance when everyone (non-skipped) has arrived at the current stop
 function autoAdvanceCheck(carpoolId) {
   const session = stmts.activeSession.get(carpoolId);
@@ -1069,6 +1077,8 @@ function autoAdvanceCheck(carpoolId) {
     mileage = transitionToDestination(stmts.carpoolById.get(carpoolId), session);
   } else if (session.phase === 'destination') {
     mileage = transitionToReturn(stmts.carpoolById.get(carpoolId), session);
+  } else if (session.phase === 'back_to_meetup') {
+    mileage = transitionToComplete(stmts.carpoolById.get(carpoolId), session);
   } else {
     return false;
   }
