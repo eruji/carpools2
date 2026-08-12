@@ -425,6 +425,28 @@ let pendingInviteCode = null; // invite code from URL, joined after auth
 let myCarpools = []; // carpool list for the switcher
 let lastDriverId = null; // for driver-change toasts
 
+// ── Section registry + master renderer ────────────────────────────────────
+// Each visual section is a self-contained component. Flip a flag to false to
+// disable that section everywhere — nothing else needs to change.
+const FEATURES = {
+  map: true,
+  subway: true,
+  seatingChart: true,
+  members: true,
+  history: true
+};
+
+// Master process: re-render every section with the latest shared state.
+// Sections gate themselves on FEATURES, so disabling one is safe.
+function renderSections() {
+  if (!currentCarpoolData) return;
+  const data = { carpool: currentCarpoolData.carpool, activeSession };
+  updateMap(data);
+  updateSubwayMap(data);
+  renderSeatingChart(activeSession);
+  renderMemberStatus(activeSession);
+}
+
 // Remember the last carpool the user opened
 function saveLastCarpool(id) { localStorage.setItem('carpoolLast', String(id)); }
 function getLastCarpool() { return localStorage.getItem('carpoolLast'); }
@@ -885,14 +907,8 @@ async function loadCarpoolView(carpoolId) {
   // History
   renderHistory(data.trips || []);
 
-  // Session UI
+  // Session UI + all sections (map, subway, seating chart, members)
   renderSessionUI(data.activeSession);
-
-  // Update subway map
-  updateSubwayMap(data);
-
-  // Update real map
-  updateMap(data);
 }
 
 function renderSetupMembers(members, isOwner) {
@@ -921,6 +937,7 @@ function renderSetupMembers(members, isOwner) {
 }
 
 function renderHistory(trips) {
+  if (!FEATURES.history) return;
   const container = document.getElementById('history-list');
   if (!trips || trips.length === 0) {
     container.innerHTML = '<p class="text-muted">No trips yet.</p>';
@@ -973,6 +990,7 @@ function renderHistory(trips) {
 
 // ── Subway Map ──────────────────────────────────────────────────────────────
 function updateSubwayMap(data) {
+  if (!FEATURES.subway) return;
   const carpool = data.carpool;
   const session = data.activeSession;
 
@@ -1215,13 +1233,10 @@ function renderSessionUI(session) {
     : 'Arrived at Dropoff';
   btnArrived.textContent = arrivalLabel;
 
-  // Keep the seating chart in sync with the session
-  renderSeatingChart(session);
-
   if (!session || session.phase === 'completed') {
     idleDiv.classList.remove('hidden');
     activeDiv.classList.add('hidden');
-    renderMemberStatus(session); // shows the roster when there's no active session
+    renderSections(); // map + subway + seating chart + member roster
     return;
   }
 
@@ -1320,10 +1335,11 @@ function renderSessionUI(session) {
     else btnArrived.classList.remove('hidden');
   }
 
-  renderMemberStatus(session);
+  renderSections();
 }
 
 function renderMemberStatus(session) {
+  if (!FEATURES.members) return;
   const container = document.getElementById('member-status-list');
 
   // No active session — show the carpool roster with credits and next-driver
@@ -1448,6 +1464,7 @@ function updatePhaseIndicator() {
 
 // ── Seating Chart (standalone top-down car) ────────────────────────────────
 function renderSeatingChart(session) {
+  if (!FEATURES.seatingChart) return;
   const el = document.getElementById('seating-chart');
   if (!el) return;
 
@@ -1654,6 +1671,7 @@ function formatDuration(seconds) {
 }
 
 function updateMap(data) {
+  if (!FEATURES.map) return;
   if (!map) return;
   lastMapData = data;
   clearMapMarkers();
@@ -1833,10 +1851,6 @@ async function startSession() {
   }
   activeSession = data.session;
   renderSessionUI(activeSession);
-  if (currentCarpoolData) {
-    updateMap({ carpool: currentCarpoolData.carpool, activeSession });
-    updateSubwayMap({ carpool: currentCarpoolData.carpool, activeSession });
-  }
   // Location tracking starts once someone claims Driving/Riding (see respondToSession)
 }
 
@@ -1854,10 +1868,6 @@ async function respondToSession(status) {
   }
   activeSession = data.session;
   renderSessionUI(activeSession);
-  if (currentCarpoolData) {
-    updateMap({ carpool: currentCarpoolData.carpool, activeSession });
-    updateSubwayMap({ carpool: currentCarpoolData.carpool, activeSession });
-  }
 
   if (status === 'driving' || status === 'riding') {
     pendingLocFit = true;
@@ -1907,10 +1917,6 @@ async function advancePhase(phase) {
   }
   activeSession = data.session;
   renderSessionUI(activeSession);
-  if (currentCarpoolData) {
-    updateMap({ carpool: currentCarpoolData.carpool, activeSession });
-    updateSubwayMap({ carpool: currentCarpoolData.carpool, activeSession });
-  }
 
   if (phase === 'completed') {
     stopLocationTracking();
@@ -2366,10 +2372,6 @@ async function autoArrive(targetName, targetLat, targetLng) {
   const data = await res.json();
   activeSession = data.session;
   renderSessionUI(activeSession);
-  if (currentCarpoolData) {
-    updateMap({ carpool: currentCarpoolData.carpool, activeSession });
-    updateSubwayMap({ carpool: currentCarpoolData.carpool, activeSession });
-  }
   showToast('Auto-arrived at ' + targetName + ' (GPS within 150m)');
 }
 
@@ -2418,10 +2420,6 @@ function connectSocket() {
   socket.on('session-started', (session) => {
     activeSession = session;
     renderSessionUI(session);
-    if (currentCarpoolData) {
-      updateMap({ carpool: currentCarpoolData.carpool, activeSession: session });
-      updateSubwayMap({ carpool: currentCarpoolData.carpool, activeSession: session });
-    }
     const myMember = session.members.find(m => m.user_id === currentUser.id);
     if (myMember && (myMember.status === 'driving' || myMember.status === 'riding')) {
       startLocationTracking();
@@ -2431,10 +2429,6 @@ function connectSocket() {
   socket.on('session-updated', (session) => {
     activeSession = session;
     renderSessionUI(session);
-    if (currentCarpoolData) {
-      updateMap({ carpool: currentCarpoolData.carpool, activeSession: session });
-      updateSubwayMap({ carpool: currentCarpoolData.carpool, activeSession: session });
-    }
   });
 
   socket.on('session-cancelled', (data) => {
