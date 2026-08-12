@@ -1798,11 +1798,10 @@ function updateMap(data) {
           className: '',
           html: `<div style="display:flex;flex-direction:column;align-items:center;">
             <div style="width:34px;height:34px;border-radius:50%;background:${memberColor(car.user_id || currentUser.id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:3px solid #fff;box-shadow:0 0 0 3px #8FAE8B, 0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(label))}</div>
-            <div style="margin-top:2px;font-size:13px;">🚗</div>
           </div>`,
           iconAnchor: [17, 17]
         })
-      }).addTo(map).bindTooltip('<b>Car</b> — heading to ' + esc(targetName), { direction: 'top', offset: [0, -12] });
+      }).addTo(map).bindTooltip('<b>' + esc(isMe ? 'You' : label) + '</b> — heading to ' + esc(targetName), { direction: 'top', offset: [0, -12] });
       mapMarkers.car = marker;
       addPoint(car.location_lat, car.location_lng);
     }
@@ -2270,13 +2269,23 @@ function startLocationTracking() {
         });
         // Geo-fence: auto-arrive when close to the current target
         checkGeoFence();
-        // Refresh subway ETA + live map
+        // Refresh subway ETA + live map + member ETAs
         if (currentCarpoolData) {
+          // Keep my own member row in sync (server only broadcasts to others)
+          const me = activeSession.members.find(m => m.user_id === currentUser.id);
+          if (me) {
+            me.location_lat = myLocation.lat;
+            me.location_lng = myLocation.lng;
+          }
           updateSubwayETAs({ carpool: currentCarpoolData.carpool, activeSession });
           updateMap({ carpool: currentCarpoolData.carpool, activeSession });
           if (pendingLocFit) {
             pendingLocFit = false;
             fitMapToMyLeg();
+          }
+          if (!window._lastMemberRender || Date.now() - window._lastMemberRender > 3000) {
+            renderMemberStatus(activeSession);
+            window._lastMemberRender = Date.now();
           }
         }
       },
@@ -2303,10 +2312,19 @@ function startLocationTracking() {
           });
           checkGeoFence();
           if (currentCarpoolData) {
+            const me = activeSession.members.find(m => m.user_id === currentUser.id);
+            if (me) {
+              me.location_lat = myLocation.lat;
+              me.location_lng = myLocation.lng;
+            }
             updateMap({ carpool: currentCarpoolData.carpool, activeSession });
             if (pendingLocFit) {
               pendingLocFit = false;
               fitMapToMyLeg();
+            }
+            if (!window._lastMemberRender || Date.now() - window._lastMemberRender > 3000) {
+              renderMemberStatus(activeSession);
+              window._lastMemberRender = Date.now();
             }
           }
         },
