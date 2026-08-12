@@ -268,6 +268,7 @@
         <button id="btn-driving" class="btn btn-primary btn-sm" onclick="respondToSession('driving')">I'll Drive</button>
         <button id="btn-riding" class="btn btn-success btn-sm" onclick="respondToSession('riding')">I'll Ride</button>
         <button id="btn-arrived" class="btn btn-success btn-sm" onclick="respondToSession('arrived')">Arrived</button>
+        <button id="btn-skip" class="btn btn-outline btn-sm" onclick="respondToSession('skip')">Skip</button>
       </div>
 
       <div id="session-alert" class="hidden"></div>
@@ -1185,6 +1186,7 @@ function renderSessionUI(session) {
   const btnDriving = document.getElementById('btn-driving');
   const btnRiding = document.getElementById('btn-riding');
   const btnArrived = document.getElementById('btn-arrived');
+  const btnSkip = document.getElementById('btn-skip');
 
   // Specific arrival label per leg
   const arrivalLabel = session && session.phase === 'meetup' ? 'Arrived at Pickup'
@@ -1256,6 +1258,7 @@ function renderSessionUI(session) {
       btnDriving.classList.add('hidden');
       btnRiding.classList.add('hidden');
       btnArrived.classList.add('hidden');
+      btnSkip.classList.add('hidden');
     } else {
       // The current driver never sees the claim button — just Arrived
       if (myStatus === 'driving' || session.driver_id === currentUser.id) {
@@ -1268,6 +1271,8 @@ function renderSessionUI(session) {
       btnRiding.classList.toggle('hidden', myStatus !== 'pending');
       // Arrive: once you've picked a role
       btnArrived.classList.toggle('hidden', myStatus === 'pending');
+      // Skip: only while undecided (once a role is picked, use Skip Me in the list)
+      btnSkip.classList.toggle('hidden', myStatus !== 'pending');
     }
   } else if (session.phase === 'destination') {
     // Arrival step: everyone marks Arrived at the destination (auto-advance when all in)
@@ -1276,6 +1281,7 @@ function renderSessionUI(session) {
     phaseMeetup.classList.remove('hidden');
     btnDriving.classList.add('hidden');
     btnRiding.classList.add('hidden');
+    btnSkip.classList.add('hidden');
     if (myStatus2 === 'skip') btnArrived.classList.add('hidden');
     else btnArrived.classList.remove('hidden');
   } else if (session.phase === 'back_to_meetup') {
@@ -1285,6 +1291,7 @@ function renderSessionUI(session) {
     phaseMeetup.classList.remove('hidden');
     btnDriving.classList.add('hidden');
     btnRiding.classList.add('hidden');
+    btnSkip.classList.add('hidden');
     if (myStatus3 === 'skip') btnArrived.classList.add('hidden');
     else btnArrived.classList.remove('hidden');
   }
