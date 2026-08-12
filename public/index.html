@@ -1331,9 +1331,6 @@ function renderMemberStatus(session) {
     if (ca !== cb) return ca - cb;
     return a.username.localeCompare(b.username);
   });
-  // Next driver = lowest credits, excluding the current driver
-  const nonDrivers = sorted.filter(m => m.user_id !== session.driver_id);
-  const nextDriverId = nonDrivers.length ? nonDrivers[0].user_id : null;
   // No skipping once everyone has arrived at the pickup
   const active = session.members.filter(m => m.status !== 'skip');
   const allArrived = active.length > 0 && active.every(m => m.status === 'arrived');
@@ -1356,7 +1353,7 @@ function renderMemberStatus(session) {
     };
     const myCoins = coins[m.user_id] || 0;
     const isDriver = m.user_id === session.driver_id;
-    const isNext = m.user_id === nextDriverId;
+    const isSharing = m.user_id === currentUser.id && (m.status === 'driving' || m.status === 'riding');
     // Last-updated staleness indicator
     const ageMins = minutesAgo(m.updated_at);
     let ageText = '', ageClass = '';
@@ -1368,15 +1365,17 @@ function renderMemberStatus(session) {
     return `
       <div class="member-row ${isDriver ? 'is-driver' : ''}">
         <div class="member-info">
-          <span class="member-avatar" style="background:${memberColor(m.user_id)};">${esc(getInitials(m.username))}</span>
+          <span class="member-avatar${isDriver ? ' is-driver' : ''}" style="background:${memberColor(m.user_id)};">
+            ${esc(getInitials(m.username))}
+            ${isDriver ? '<span class="avatar-star" title="Driver">★</span>' : ''}
+            ${isSharing ? '<span class="avatar-sharing" title="Sharing your location"></span>' : ''}
+          </span>
           <span class="member-coin" title="${myCoins} credits">${myCoins}</span>
           <span class="member-name">${esc(m.username)}</span>
-          ${isDriver ? '<span class="badge badge-yellow">Driving Now</span>' : ''}
-          ${isNext ? '<span class="badge badge-blue">Next Driver</span>' : ''}
           <span class="badge ${statusColors[m.status] || 'badge-gray'}">${statusLabels[m.status] || statusLabels.pending}</span>
           ${m.status === 'arrived' && m.auto_arrived ? '<span class="badge badge-blue" title="Geo-fence arrival">Auto</span>' : ''}
           <span class="text-xs text-muted" id="member-eta-${m.user_id}"></span>
-          ${ageText ? `<span class="text-xs ${ageClass}">· updated ${ageText}</span>` : ''}
+          ${ageMins > 5 ? `<span class="text-xs ${ageClass}">· ${ageText}</span>` : ''}
         </div>
         <div class="member-actions">
           ${!noSkip && m.status !== 'skip' && m.user_id !== currentUser.id
@@ -1387,9 +1386,6 @@ function renderMemberStatus(session) {
             : ''}
           ${!noSkip && m.status !== 'skip' && m.user_id === currentUser.id && m.status !== 'pending'
             ? `<button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip Me</button>`
-            : ''}
-          ${m.user_id === currentUser.id && (m.status === 'driving' || m.status === 'riding')
-            ? '<span class="badge badge-green text-xs">Sharing</span>'
             : ''}
         </div>
       </div>
