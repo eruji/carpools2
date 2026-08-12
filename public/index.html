@@ -2391,6 +2391,13 @@ function connectSocket() {
     }
   });
 
+  // Membership changed (someone accepted/joined/left) — reload the carpool
+  socket.on('carpool-updated', (data) => {
+    if (data && data.carpoolId != null && currentCarpoolId === data.carpoolId) {
+      loadCarpoolView(currentCarpoolId);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('Socket disconnected');
   });

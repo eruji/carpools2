@@ -596,6 +596,7 @@ app.post('/api/carpools/:id/members', requireAuth, (req, res) => {
   // If a session is already active, add the new member to it as pending
   const active = stmts.activeSession.get(carpool.id);
   if (active) stmts.addSessionMember.run(active.id, user.id, 'pending');
+  io.to('carpool:' + carpool.id).emit('carpool-updated', { carpoolId: carpool.id });
   const members = stmts.carpoolMembers.all(carpool.id);
   res.json({ ok: true, members });
 });
@@ -606,6 +607,7 @@ app.delete('/api/carpools/:id/members/:userId', requireAuth, (req, res) => {
   if (carpool.owner_id !== req.session.userId) return res.status(403).json({ error: 'Only owner can remove members' });
   if (parseInt(req.params.userId) === req.session.userId) return res.status(400).json({ error: 'Cannot remove yourself' });
   stmts.removeMember.run(carpool.id, req.params.userId);
+  io.to('carpool:' + carpool.id).emit('carpool-updated', { carpoolId: carpool.id });
   const members = stmts.carpoolMembers.all(carpool.id);
   res.json({ ok: true, members });
 });
@@ -654,6 +656,7 @@ app.post('/api/carpools/join', requireAuth, (req, res) => {
     // If a session is already active, add the new member to it as pending
     const active = stmts.activeSession.get(carpool.id);
     if (active) stmts.addSessionMember.run(active.id, req.session.userId, 'pending');
+    io.to('carpool:' + carpool.id).emit('carpool-updated', { carpoolId: carpool.id });
     res.json({ ok: true, carpool, alreadyMember: false });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -998,6 +1001,7 @@ app.post('/api/invitations/:id/accept', requireAuth, (req, res) => {
   // If a session is already active, add the new member to it as pending
   const active = stmts.activeSession.get(inv.carpool_id);
   if (active) stmts.addSessionMember.run(active.id, req.session.userId, 'pending');
+  io.to('carpool:' + inv.carpool_id).emit('carpool-updated', { carpoolId: inv.carpool_id });
   res.json({ ok: true });
 });
 
