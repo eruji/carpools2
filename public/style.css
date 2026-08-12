@@ -807,45 +807,28 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .carpool-card:hover { border-color: var(--border-strong); }
 
 /* ── History ─────────────────────────────────────────────────── */
-.history-trip {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  background: var(--surface);
-}
-.history-trip-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-.history-date {
-  font-weight: 700;
-  font-size: 0.8rem;
-  color: var(--text);
-}
-.history-people {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.history-person {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 0.85rem;
 }
-.history-role {
-  width: 20px;
-  text-align: center;
-  flex-shrink: 0;
+.history-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
 }
-.history-name {
-  flex: 1;
-  font-weight: 500;
+.history-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
   color: var(--text);
+  vertical-align: middle;
 }
+.history-table tr:last-child td { border-bottom: none; }
 .history-balance {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
