@@ -436,26 +436,36 @@ const FEATURES = {
   history: true
 };
 
+// Run a section safely so one failing section never breaks the others.
+function safeRender(id, fn) {
+  try {
+    fn();
+  } catch (err) {
+    console.error('[section]', id, err);
+  }
+}
+
 // Master process: re-render every section with the latest shared state.
 // Sections gate themselves on FEATURES, so disabling one is safe.
 function renderSections() {
   if (!currentCarpoolData) return;
   const data = { carpool: currentCarpoolData.carpool, activeSession };
-  updateMap(data);
-  updateSubwayMap(data);
-  renderSeatingChart(activeSession);
-  renderMemberStatus(activeSession);
+  safeRender('map', () => updateMap(data));
+  safeRender('subway', () => updateSubwayMap(data));
+  safeRender('seatingChart', () => renderSeatingChart(activeSession));
+  safeRender('members', () => renderMemberStatus(activeSession));
 }
 
 // Single GPS feed routine: update every location-dependent section.
 // Used by both my own GPS updates and other members' location events.
 function onLocationsChanged() {
   if (!currentCarpoolData || !activeSession) return;
-  updateSubwayETAs({ carpool: currentCarpoolData.carpool, activeSession });
-  updateMap({ carpool: currentCarpoolData.carpool, activeSession });
+  const data = { carpool: currentCarpoolData.carpool, activeSession };
+  safeRender('subwayEta', () => updateSubwayETAs(data));
+  safeRender('map', () => updateMap(data));
   if (!window._lastMemberRender || Date.now() - window._lastMemberRender > 3000) {
-    renderMemberStatus(activeSession);
     window._lastMemberRender = Date.now();
+    safeRender('members', () => renderMemberStatus(activeSession));
   }
 }
 
