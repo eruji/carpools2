@@ -447,6 +447,18 @@ function renderSections() {
   renderMemberStatus(activeSession);
 }
 
+// Single GPS feed routine: update every location-dependent section.
+// Used by both my own GPS updates and other members' location events.
+function onLocationsChanged() {
+  if (!currentCarpoolData || !activeSession) return;
+  updateSubwayETAs({ carpool: currentCarpoolData.carpool, activeSession });
+  updateMap({ carpool: currentCarpoolData.carpool, activeSession });
+  if (!window._lastMemberRender || Date.now() - window._lastMemberRender > 3000) {
+    renderMemberStatus(activeSession);
+    window._lastMemberRender = Date.now();
+  }
+}
+
 // Remember the last carpool the user opened
 function saveLastCarpool(id) { localStorage.setItem('carpoolLast', String(id)); }
 function getLastCarpool() { return localStorage.getItem('carpoolLast'); }
@@ -2269,24 +2281,16 @@ function startLocationTracking() {
         });
         // Geo-fence: auto-arrive when close to the current target
         checkGeoFence();
-        // Refresh subway ETA + live map + member ETAs
-        if (currentCarpoolData) {
-          // Keep my own member row in sync (server only broadcasts to others)
-          const me = activeSession.members.find(m => m.user_id === currentUser.id);
-          if (me) {
-            me.location_lat = myLocation.lat;
-            me.location_lng = myLocation.lng;
-          }
-          updateSubwayETAs({ carpool: currentCarpoolData.carpool, activeSession });
-          updateMap({ carpool: currentCarpoolData.carpool, activeSession });
-          if (pendingLocFit) {
-            pendingLocFit = false;
-            fitMapToMyLeg();
-          }
-          if (!window._lastMemberRender || Date.now() - window._lastMemberRender > 3000) {
-            renderMemberStatus(activeSession);
-            window._lastMemberRender = Date.now();
-          }
+        // Keep my own member row in sync (server only broadcasts to others)
+        const me = activeSession.members.find(m => m.user_id === currentUser.id);
+        if (me) {
+          me.location_lat = myLocation.lat;
+          me.location_lng = myLocation.lng;
+        }
+        onLocationsChanged();
+        if (pendingLocFit) {
+          pendingLocFit = false;
+          fitMapToMyLeg();
         }
       },
       (err) => { console.log('Geolocation error:', err.message); },
@@ -2311,21 +2315,15 @@ function startLocationTracking() {
             lng: myLocation.lng
           });
           checkGeoFence();
-          if (currentCarpoolData) {
-            const me = activeSession.members.find(m => m.user_id === currentUser.id);
-            if (me) {
-              me.location_lat = myLocation.lat;
-              me.location_lng = myLocation.lng;
-            }
-            updateMap({ carpool: currentCarpoolData.carpool, activeSession });
-            if (pendingLocFit) {
-              pendingLocFit = false;
-              fitMapToMyLeg();
-            }
-            if (!window._lastMemberRender || Date.now() - window._lastMemberRender > 3000) {
-              renderMemberStatus(activeSession);
-              window._lastMemberRender = Date.now();
-            }
+          const me = activeSession.members.find(m => m.user_id === currentUser.id);
+          if (me) {
+            me.location_lat = myLocation.lat;
+            me.location_lng = myLocation.lng;
+          }
+          onLocationsChanged();
+          if (pendingLocFit) {
+            pendingLocFit = false;
+            fitMapToMyLeg();
           }
         },
         () => {},
@@ -2474,14 +2472,7 @@ function connectSocket() {
       member.location_lat = data.lat;
       member.location_lng = data.lng;
     }
-    if (currentCarpoolData) {
-      updateMap({ carpool: currentCarpoolData.carpool, activeSession });
-      updateSubwayMap({ carpool: currentCarpoolData.carpool, activeSession });
-    }
-    if (!window._lastMemberRender || Date.now() - window._lastMemberRender > 3000) {
-      renderMemberStatus(activeSession);
-      window._lastMemberRender = Date.now();
-    }
+    onLocationsChanged();
   });
 
   // Membership changed (someone accepted/joined/left) — reload the carpool
