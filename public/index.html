@@ -1544,14 +1544,22 @@ function recenterMap() {
   updateMap(lastMapData);
 }
 
-// Fit the map to just my current location and the pickup point
-function fitMapToMyLeg() {
-  if (!map || !myLocation || !currentCarpoolData) return;
+// Fit the map to the pickup point and every member's current location
+function fitMapToConverge() {
+  if (!map || !currentCarpoolData) return;
   const c = currentCarpoolData.carpool;
-  if (!c.meetup_lat || !c.meetup_lng) return;
+  const pts = [];
+  if (c.meetup_lat && c.meetup_lng) pts.push([c.meetup_lat, c.meetup_lng]);
+  if (myLocation) pts.push([myLocation.lat, myLocation.lng]);
+  if (activeSession && activeSession.members) {
+    activeSession.members.forEach(m => {
+      if (m.location_lat && m.location_lng) pts.push([m.location_lat, m.location_lng]);
+    });
+  }
+  if (pts.length < 2) return;
   const opts = { padding: [50, 50], maxZoom: 15 };
   if (window.innerWidth <= 480) opts.paddingBottomRight = [50, 420];
-  map.fitBounds(L.latLngBounds([[myLocation.lat, myLocation.lng], [c.meetup_lat, c.meetup_lng]]), opts);
+  map.fitBounds(L.latLngBounds(pts), opts);
 }
 
 function toggleMapLegend() {
@@ -1751,6 +1759,23 @@ function updateMap(data) {
     }).addTo(map).bindPopup('<b>Destination:</b> ' + (carpool.destination_name || ''));
     mapMarkers.destination = marker;
     addPoint(carpool.destination_lat, carpool.destination_lng);
+  }
+
+  // Geo-fence radius circle around the current target (visual aid)
+  if (session && session.phase !== 'idle' && session.phase !== 'completed') {
+    const gfLat = session.phase === 'destination' ? carpool.destination_lat : carpool.meetup_lat;
+    const gfLng = session.phase === 'destination' ? carpool.destination_lng : carpool.meetup_lng;
+    if (gfLat && gfLng) {
+      const gfRadius = carpool.arrival_radius || 400;
+      mapMarkers.geofence = L.circle([gfLat, gfLng], {
+        radius: gfRadius,
+        color: '#8FAE8B',
+        weight: 1.5,
+        dashArray: '5,5',
+        fillColor: '#8FAE8B',
+        fillOpacity: 0.08
+      }).addTo(map);
+    }
   }
 
   // ── People (pickup phase) or single car (transit phases) ──
@@ -2290,7 +2315,7 @@ function startLocationTracking() {
         onLocationsChanged();
         if (pendingLocFit) {
           pendingLocFit = false;
-          fitMapToMyLeg();
+          fitMapToConverge();
         }
       },
       (err) => { console.log('Geolocation error:', err.message); },
@@ -2323,7 +2348,7 @@ function startLocationTracking() {
           onLocationsChanged();
           if (pendingLocFit) {
             pendingLocFit = false;
-            fitMapToMyLeg();
+            fitMapToConverge();
           }
         },
         () => {},
@@ -2388,7 +2413,7 @@ async function autoArrive(targetName, targetLat, targetLng) {
   const data = await res.json();
   activeSession = data.session;
   renderSessionUI(activeSession);
-  showToast('Auto-arrived at ' + targetName + ' (GPS within 150m)');
+  showToast('Auto-arrived at ' + targetName);
 }
 
 // ── Toast ───────────────────────────────────────────────────────────────────
