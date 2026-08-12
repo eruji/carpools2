@@ -445,15 +445,24 @@ function safeRender(id, fn) {
   }
 }
 
+// Section registry: each visual component is listed here with an id + render.
+// The master loops this list — add/remove a section by editing the list only.
+// Each id maps to a FEATURES flag, so toggling a flag on/off enables/disables it.
+const SECTIONS = [
+  { id: 'map',          render: (ctx) => updateMap(ctx) },
+  { id: 'subway',       render: (ctx) => updateSubwayMap(ctx) },
+  { id: 'seatingChart', render: (ctx) => renderSeatingChart(ctx.activeSession) },
+  { id: 'members',      render: (ctx) => renderMemberStatus(ctx.activeSession) }
+];
+
 // Master process: re-render every section with the latest shared state.
-// Sections gate themselves on FEATURES, so disabling one is safe.
 function renderSections() {
   if (!currentCarpoolData) return;
-  const data = { carpool: currentCarpoolData.carpool, activeSession };
-  safeRender('map', () => updateMap(data));
-  safeRender('subway', () => updateSubwayMap(data));
-  safeRender('seatingChart', () => renderSeatingChart(activeSession));
-  safeRender('members', () => renderMemberStatus(activeSession));
+  const ctx = { carpool: currentCarpoolData.carpool, activeSession };
+  for (const section of SECTIONS) {
+    if (!FEATURES[section.id]) continue;
+    safeRender(section.id, () => section.render(ctx));
+  }
 }
 
 // Single GPS feed routine: update every location-dependent section.
