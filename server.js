@@ -555,7 +555,7 @@ app.get('/api/carpools/:id', requireAuth, (req, res) => {
     const skipped = sm.filter(m => m.status === 'skip').map(m => m.username);
     const coinsRow = db.prepare(
       'SELECT coins_data FROM carpool_history WHERE session_id = ? AND phase = ? ORDER BY id LIMIT 1'
-    ).get(s.id, 'completed');
+    ).get(s.id, 'destination');
     let deltas = {};
     if (coinsRow) { try { deltas = JSON.parse(coinsRow.coins_data || '{}'); } catch (e) {} }
     for (const uid of Object.keys(deltas)) {
@@ -1060,11 +1060,25 @@ app.post('/api/invitations/:id/decline', requireAuth, (req, res) => {
 });
 
 // ── Utility ─────────────────────────────────────────────────────────────────
-// Pickup → Destination: set the driver, log the leg, set phase (credits are applied at dropoff)
+// Pickup → Destination: apply credits at pickup, log the trip, set phase
 function transitionToDestination(carpool, activeSession) {
   const members = stmts.sessionMembers.all(activeSession.id);
   const driver = members.find(m => m.status === 'driving');
   const actualDriverId = driver ? driver.user_id : activeSession.driver_id;
+  // Riders: anyone riding OR arrived at the pickup (excluding the driver)
+  const riders = members.filter(m =>
+    (m.status === 'riding' || m.status === 'arrived') && m.user_id !== actualDriverId
+  );
+
+  const coinsData = {};
+  for (const rider of riders) {
+    stmts.updateCoins.run(-1, carpool.id, rider.user_id);
+    coinsData[rider.user_id] = -1;
+  }
+  if (actualDriverId) {
+    stmts.updateCoins.run(riders.length, carpool.id, actualDriverId);
+    coinsData[actualDriverId] = riders.length;
+  }
   stmts.updateSessionDriver.run(actualDriverId, activeSession.id);
 
   const mileage = haversine(
@@ -1072,8 +1086,8 @@ function transitionToDestination(carpool, activeSession) {
     activeSession.destination_lat, activeSession.destination_lng
   );
   stmts.addHistory.run(carpool.id, activeSession.id, 'destination', actualDriverId, 'phase_start',
-    '{}', mileage,
-    'Departed for destination.');
+    JSON.stringify(coinsData), mileage,
+    `Departed for destination. ${riders.length} riders. Credits applied.`);
   stmts.updateSessionPhase.run('destination', 'destination', activeSession.id);
 
   // Start the destination leg fresh: everyone is en route again (must re-arrive)
@@ -1103,26 +1117,10 @@ function transitionToReturn(carpool, activeSession) {
   return mileage;
 }
 
-// Dropoff → Completed: apply credits at dropoff and log the final snapshot
+// Dropoff → Completed: everyone's back at the pickup
 function transitionToComplete(carpool, activeSession) {
-  const members = stmts.sessionMembers.all(activeSession.id);
-  const driverId = activeSession.driver_id;
-  // Everyone is in the car — riders are non-skipped members other than the driver
-  const riders = members.filter(m => m.status !== 'skip' && m.user_id !== driverId);
-
-  const coinsData = {};
-  for (const rider of riders) {
-    stmts.updateCoins.run(-1, carpool.id, rider.user_id);
-    coinsData[rider.user_id] = -1;
-  }
-  if (driverId) {
-    stmts.updateCoins.run(riders.length, carpool.id, driverId);
-    coinsData[driverId] = riders.length;
-  }
-
-  stmts.addHistory.run(carpool.id, activeSession.id, 'completed', driverId, 'carpool_complete',
-    JSON.stringify(coinsData), 0,
-    'Carpool completed. Credits applied at dropoff.');
+  stmts.addHistory.run(carpool.id, activeSession.id, 'completed', activeSession.driver_id, 'carpool_complete', '{}', 0,
+    'Carpool completed. All members back at pickup.');
   stmts.updateSessionPhase.run('completed', 'completed', activeSession.id);
   return 0;
 }
