@@ -188,7 +188,8 @@
     </div>
   </div>
 
-  <!-- ═══════ SUBWAY-STYLE TRANSIT LINE ═══════ -->
+  <!-- ═══════ SUBWAY-STYLE TRANSIT LINE + SEATING CHART ═══════ -->
+  <div class="route-visual">
   <div class="subway-map" id="subway-map">
     <div class="subway-line" id="subway-line">
       <!-- Stop 1: Start (arbitrary) -->
@@ -240,6 +241,8 @@
       <!-- Member avatars removed — the line and stop icons represent the route -->
       <div id="subway-progress" class="subway-progress"></div>
     </div>
+  </div>
+  <div class="seating-chart" id="seating-chart" aria-label="Seating chart"></div>
   </div>
 
   <!-- ═══════ LOCATION CONFIG (tap the chevron on a stop) ═══════ -->
@@ -1212,6 +1215,9 @@ function renderSessionUI(session) {
     : 'Arrived at Dropoff';
   btnArrived.textContent = arrivalLabel;
 
+  // Keep the seating chart in sync with the session
+  renderSeatingChart(session);
+
   if (!session || session.phase === 'completed') {
     idleDiv.classList.remove('hidden');
     activeDiv.classList.add('hidden');
@@ -1440,6 +1446,63 @@ function updatePhaseIndicator() {
   // Phase indicator removed — the subway stops represent the phases
 }
 
+// ── Seating Chart (standalone top-down car) ────────────────────────────────
+function renderSeatingChart(session) {
+  const el = document.getElementById('seating-chart');
+  if (!el) return;
+
+  if (!session || session.phase === 'completed' || session.phase === 'idle') {
+    el.innerHTML = '<div class="car-empty-note text-xs">No active trip</div>';
+    return;
+  }
+
+  const members = session.members || [];
+  const driver = members.find(m => m.user_id === session.driver_id && m.status !== 'skip');
+
+  // Who's in the car (besides the driver)
+  let passengers;
+  if (session.phase === 'meetup') {
+    // Fill seats as members arrive at the pickup
+    passengers = members.filter(m => m.status === 'arrived' && m.user_id !== (driver ? driver.user_id : null));
+  } else {
+    // En route — everyone non-skipped is in the car
+    passengers = members.filter(m => m.status !== 'skip' && m.user_id !== (driver ? driver.user_id : null));
+  }
+
+  const seats = [
+    { key: 'driver', person: driver, isDriver: true },
+    { key: 'shotgun', person: passengers[0] || null },
+    { key: 'back-l', person: passengers[1] || null },
+    { key: 'back-m', person: passengers[2] || null },
+    { key: 'back-r', person: passengers[3] || null }
+  ];
+
+  const seatHTML = (s) => {
+    if (!s.person) {
+      return `<div class="car-seat ${s.isDriver ? 'driver' : ''}">${s.isDriver ? '<span class="seat-tag">D</span>' : ''}</div>`;
+    }
+    const p = s.person;
+    return `<div class="car-seat ${s.isDriver ? 'driver' : ''}" title="${esc(p.username)}">
+      ${s.isDriver ? '<span class="seat-tag">D</span>' : ''}
+      <span class="seat-avatar" style="background:${memberColor(p.user_id)}">${esc(getInitials(p.username))}</span>
+    </div>`;
+  };
+
+  el.innerHTML = `
+    <div class="car-topdown">
+      <div class="car-body">
+        <div class="car-row front">
+          ${seatHTML(seats[0])}
+          ${seatHTML(seats[1])}
+        </div>
+        <div class="car-row back">
+          ${seatHTML(seats[2])}
+          ${seatHTML(seats[3])}
+          ${seatHTML(seats[4])}
+        </div>
+      </div>
+    </div>`;
+}
 // ── Map ─────────────────────────────────────────────────────────────────────
 let lastMapData = null;
 let lastMapFitKey = null;
