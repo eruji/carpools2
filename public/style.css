@@ -81,8 +81,8 @@ header {
   z-index: 900;
 }
 header h1 { font-size: 1.35rem; font-weight: 700; }
-.logo-img { height: 1.35rem; width: auto; display: inline-block; vertical-align: middle; }
-.logo-img-hero { height: 2.1rem; }
+.logo-img { height: 1.9rem; width: auto; display: inline-block; vertical-align: middle; }
+.logo-img-hero { height: 3.2rem; }
 .app-version {
   font-size: 0.6rem;
   font-weight: 600;
@@ -1095,6 +1095,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 
   header { padding: 8px 10px; }
   header h1 { font-size: 1.1rem; }
+  .logo-img { height: 1.5rem; }
   .profile-menu-name { display: none; }
   /* Dashboard moves into the profile dropdown on mobile */
   #btn-dashboard { display: none !important; }
