@@ -1637,11 +1637,22 @@ function fetchLegRoute(lat1, lng1, lat2, lng2, cb) {
   });
 }
 
+// Center a location in the visible viewport (above the floating cards on mobile).
+function centerLocationInViewport(lat, lng, zoom) {
+  if (!map) return;
+  const z = zoom || map.getZoom();
+  const size = map.getSize();
+  const cy = window.innerWidth <= 480 ? 200 : size.y / 2;
+  const userPt = map.project([lat, lng], z);
+  const centerPt = userPt.add(L.point(0, size.y / 2 - cy));
+  map.setView(map.unproject(centerPt, z), z, { animate: true, duration: 0.4 });
+}
+
 // Keep my current location centered while a trip is active.
 function followMyLocation() {
   if (!map || !myLocation || !activeSession) return;
   if (activeSession.phase === 'idle' || activeSession.phase === 'completed') return;
-  map.panTo([myLocation.lat, myLocation.lng], { animate: true, duration: 0.4 });
+  centerLocationInViewport(myLocation.lat, myLocation.lng);
 }
 
 // Full-screen "Arrived!" flash on arrival.
@@ -1977,7 +1988,7 @@ function updateMap(data) {
         fitBounds(coords, 14);
         // …then zoom into street level around the user
         setTimeout(() => {
-          if (map && myLocation) map.setView([myLocation.lat, myLocation.lng], 15);
+          if (map && myLocation) centerLocationInViewport(myLocation.lat, myLocation.lng, 15);
         }, 1400);
       }
     });
@@ -1987,7 +1998,7 @@ function updateMap(data) {
   if (shouldFit && !inTransit) {
     fitBounds(bounds, 15);
     setTimeout(() => {
-      if (map && myLocation) map.setView([myLocation.lat, myLocation.lng], 15);
+      if (map && myLocation) centerLocationInViewport(myLocation.lat, myLocation.lng, 15);
     }, 1400);
   }
 }
