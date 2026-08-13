@@ -351,6 +351,9 @@
 <!-- TOAST                                                          -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <div id="toast" class="toast hidden"></div>
+<div id="arrival-overlay" class="arrival-overlay hidden">
+  <div class="arrival-overlay-text">Arrived</div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- PROFILE DROPDOWN (body-level so it overlays everything)        -->
@@ -1622,6 +1625,39 @@ function fitMapToConverge() {
   map.fitBounds(L.latLngBounds(pts), opts);
 }
 
+// Road route for the current leg, cached at ~111m resolution so it re-routes
+// only when the car meaningfully moves (not on every GPS tick).
+const legRouteCache = {};
+function fetchLegRoute(lat1, lng1, lat2, lng2, cb) {
+  const key = `${lat1.toFixed(3)},${lng1.toFixed(3)}-${lat2.toFixed(3)},${lng2.toFixed(3)}`;
+  if (legRouteCache[key]) { cb(legRouteCache[key]); return; }
+  fetchRoute(lat1, lng1, lat2, lng2, (route) => {
+    if (route) legRouteCache[key] = route;
+    cb(route);
+  });
+}
+
+// Keep my current location centered while a trip is active.
+function followMyLocation() {
+  if (!map || !myLocation || !activeSession) return;
+  if (activeSession.phase === 'idle' || activeSession.phase === 'completed') return;
+  map.panTo([myLocation.lat, myLocation.lng], { animate: true, duration: 0.4 });
+}
+
+// Full-screen "Arrived!" flash on arrival.
+let arrivalTimer = null;
+function showArrivedOverlay() {
+  const el = document.getElementById('arrival-overlay');
+  const text = el ? el.querySelector('.arrival-overlay-text') : null;
+  if (!el || !text) return;
+  el.classList.remove('hidden');
+  text.style.animation = 'none';
+  void text.offsetWidth; // restart the animation
+  text.style.animation = '';
+  if (arrivalTimer) clearTimeout(arrivalTimer);
+  arrivalTimer = setTimeout(() => el.classList.add('hidden'), 1500);
+}
+
 function toggleMapLegend() {
   const body = document.getElementById('map-legend-body');
   const caret = document.querySelector('.legend-caret');
@@ -1854,7 +1890,16 @@ function updateMap(data) {
       addPoint(myLocation.lat, myLocation.lng);
 
       if (hasPickup) {
-        mapPolylines['line_me'] = L.polyline([[myLocation.lat, myLocation.lng], [carpool.meetup_lat, carpool.meetup_lng]], { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 }).addTo(map);
+        const meLine = { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 };
+        mapPolylines['line_me'] = L.polyline([[myLocation.lat, myLocation.lng], [carpool.meetup_lat, carpool.meetup_lng]], meLine).addTo(map);
+        // Upgrade to the street route once fetched (no blink: straight line shows immediately)
+        fetchLegRoute(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng, (r) => {
+          if (!map || seq !== mapUpdateSeq) return;
+          if (r && r.coords) {
+            if (mapPolylines['line_me']) map.removeLayer(mapPolylines['line_me']);
+            mapPolylines['line_me'] = L.polyline(r.coords, meLine).addTo(map);
+          }
+        });
       }
     }
 
@@ -1873,7 +1918,15 @@ function updateMap(data) {
       addPoint(m.location_lat, m.location_lng);
 
       if (hasPickup) {
-        mapPolylines['line_' + m.user_id] = L.polyline([[m.location_lat, m.location_lng], [carpool.meetup_lat, carpool.meetup_lng]], { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 }).addTo(map);
+        const mLine = { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 };
+        mapPolylines['line_' + m.user_id] = L.polyline([[m.location_lat, m.location_lng], [carpool.meetup_lat, carpool.meetup_lng]], mLine).addTo(map);
+        fetchLegRoute(m.location_lat, m.location_lng, carpool.meetup_lat, carpool.meetup_lng, (r) => {
+          if (!map || seq !== mapUpdateSeq) return;
+          if (r && r.coords) {
+            if (mapPolylines['line_' + m.user_id]) map.removeLayer(mapPolylines['line_' + m.user_id]);
+            mapPolylines['line_' + m.user_id] = L.polyline(r.coords, mLine).addTo(map);
+          }
+        });
       }
     });
   } else if (inTransit) {
@@ -1899,16 +1952,18 @@ function updateMap(data) {
 
   // ── Route for the current segment only ──
   if (hasPickup && hasDest && phase !== 'meetup') {
-    // Direction: pickup→dest normally; dest→pickup during dropoff
-    const toDest = phase !== 'back_to_meetup';
-    const lat1 = toDest ? carpool.meetup_lat : carpool.destination_lat;
-    const lng1 = toDest ? carpool.meetup_lng : carpool.destination_lng;
-    const lat2 = toDest ? carpool.destination_lat : carpool.meetup_lat;
-    const lng2 = toDest ? carpool.destination_lng : carpool.meetup_lng;
+    // Direction: current location → target (re-routes as the car moves)
+    const isReturn = phase === 'back_to_meetup';
+    const targetLat = isReturn ? carpool.meetup_lat : carpool.destination_lat;
+    const targetLng = isReturn ? carpool.meetup_lng : carpool.destination_lng;
+    const fallbackLat = isReturn ? carpool.destination_lat : carpool.meetup_lat;
+    const fallbackLng = isReturn ? carpool.destination_lng : carpool.meetup_lng;
+    const lat1 = (inTransit && myLocation && myLocation.lat) ? myLocation.lat : fallbackLat;
+    const lng1 = (inTransit && myLocation && myLocation.lng) ? myLocation.lng : fallbackLng;
 
-    fetchRoute(lat1, lng1, lat2, lng2, (route) => {
+    fetchLegRoute(lat1, lng1, targetLat, targetLng, (route) => {
       if (!map || seq !== mapUpdateSeq) return;
-      const coords = route ? route.coords : [[lat1, lng1], [lat2, lng2]];
+      const coords = route ? route.coords : [[lat1, lng1], [targetLat, targetLng]];
       const line = L.polyline(coords, {
         color: '#5F7D5B',
         weight: inTransit ? 5 : 3,
@@ -1918,7 +1973,12 @@ function updateMap(data) {
       mapPolylines.route = line;
 
       if (inTransit && shouldFit) {
+        // Overview of the whole route first…
         fitBounds(coords, 14);
+        // …then zoom into street level around the user
+        setTimeout(() => {
+          if (map && myLocation) map.setView([myLocation.lat, myLocation.lng], 15);
+        }, 1400);
       }
     });
   }
@@ -1926,6 +1986,9 @@ function updateMap(data) {
   // Fit the current segment once (transit fits via the route callback above)
   if (shouldFit && !inTransit) {
     fitBounds(bounds, 15);
+    setTimeout(() => {
+      if (map && myLocation) map.setView([myLocation.lat, myLocation.lng], 15);
+    }, 1400);
   }
 }
 
@@ -1955,6 +2018,8 @@ async function respondToSession(status) {
     return;
   }
   setSession(data.session);
+
+  if (status === 'arrived') showArrivedOverlay();
 
   if (status === 'driving' || status === 'riding') {
     pendingLocFit = true;
@@ -2382,6 +2447,7 @@ function startLocationTracking() {
           me.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
         }
         onLocationsChanged();
+        followMyLocation();
         if (pendingLocFit) {
           pendingLocFit = false;
           fitMapToConverge();
@@ -2416,6 +2482,7 @@ function startLocationTracking() {
             me.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
           }
           onLocationsChanged();
+          followMyLocation();
           if (pendingLocFit) {
             pendingLocFit = false;
             fitMapToConverge();
@@ -2483,6 +2550,7 @@ async function autoArrive(targetName, targetLat, targetLng) {
   else if (myLocation) lastAutoArrivePos = { lat: myLocation.lat, lng: myLocation.lng };
   const data = await res.json();
   setSession(data.session);
+  showArrivedOverlay();
   showToast('Auto-arrived at ' + targetName);
 }
 

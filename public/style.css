@@ -54,6 +54,33 @@ input, select { font-family: inherit; }
   white-space: nowrap;
 }
 
+/* ── Arrival overlay (full-screen "Arrived" flash) ───────────── */
+.arrival-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(143, 174, 139, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.arrival-overlay-text {
+  font-size: 3.2rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 16px rgba(0,0,0,0.3);
+  animation: arrival-pop 1.5s ease-out forwards;
+}
+@keyframes arrival-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  18%  { transform: scale(1.06); opacity: 1; }
+  30%  { transform: scale(1); opacity: 1; }
+  70%  { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
+
 /* ── Scrollbar ────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
