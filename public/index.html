@@ -480,6 +480,13 @@ function onLocationsChanged() {
 
 // Single entry point for session changes: set the state and re-render.
 function setSession(session) {
+  // Reset geo-fence memory when a new session begins (prevents stale state
+  // from blocking auto-arrive in later carpools).
+  if (session && session.id !== lastAutoArriveSessionId) {
+    lastAutoArriveSessionId = session.id;
+    lastAutoArrivePos = null;
+    lastAutoArriveAt = 0;
+  }
   activeSession = session;
   renderSessionUI(session);
 }
@@ -937,6 +944,16 @@ async function loadCarpoolView(carpoolId) {
   const data = await res.json();
   currentCarpoolData = data;
   activeSession = data.activeSession;
+  // Reset geo-fence memory when switching to a different session
+  if (data.activeSession && data.activeSession.id !== lastAutoArriveSessionId) {
+    lastAutoArriveSessionId = data.activeSession.id;
+    lastAutoArrivePos = null;
+    lastAutoArriveAt = 0;
+  } else if (!data.activeSession) {
+    lastAutoArriveSessionId = null;
+    lastAutoArrivePos = null;
+    lastAutoArriveAt = 0;
+  }
   populateCarpoolSwitcher();
 
   // Gear menu: History is for everyone; Setup is owner-only
@@ -2413,6 +2430,7 @@ function startLocationTracking() {
 const GEO_FENCE_M = 400; // default meters (per-carpool override in Setup)
 let lastAutoArriveAt = 0;
 let lastAutoArrivePos = null; // { lat, lng } — where we last auto-arrived
+let lastAutoArriveSessionId = null; // reset geo-fence memory on each new session
 
 function checkGeoFence() {
   if (!activeSession || !currentCarpoolData || !myLocation) return;
