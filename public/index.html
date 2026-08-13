@@ -1837,11 +1837,7 @@ function updateMap(data) {
       addPoint(myLocation.lat, myLocation.lng);
 
       if (hasPickup) {
-        fetchRoute(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng, (r) => {
-          if (!map || seq !== mapUpdateSeq) return;
-          const coords = r ? r.coords : [[myLocation.lat, myLocation.lng], [carpool.meetup_lat, carpool.meetup_lng]];
-          mapPolylines['line_me'] = L.polyline(coords, { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 }).addTo(map);
-        });
+        mapPolylines['line_me'] = L.polyline([[myLocation.lat, myLocation.lng], [carpool.meetup_lat, carpool.meetup_lng]], { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 }).addTo(map);
       }
     }
 
@@ -1860,11 +1856,7 @@ function updateMap(data) {
       addPoint(m.location_lat, m.location_lng);
 
       if (hasPickup) {
-        fetchRoute(m.location_lat, m.location_lng, carpool.meetup_lat, carpool.meetup_lng, (r) => {
-          if (!map || seq !== mapUpdateSeq) return;
-          const coords = r ? r.coords : [[m.location_lat, m.location_lng], [carpool.meetup_lat, carpool.meetup_lng]];
-          mapPolylines['line_' + m.user_id] = L.polyline(coords, { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 }).addTo(map);
-        });
+        mapPolylines['line_' + m.user_id] = L.polyline([[m.location_lat, m.location_lng], [carpool.meetup_lat, carpool.meetup_lng]], { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 }).addTo(map);
       }
     });
   } else if (inTransit) {
