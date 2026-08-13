@@ -354,6 +354,10 @@
 <div id="arrival-overlay" class="arrival-overlay hidden">
   <div class="arrival-overlay-text">Arrived</div>
 </div>
+<div id="gps-status" class="gps-status hidden">
+  <span class="gps-dot"></span>
+  Acquiring GPS
+</div>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- PROFILE DROPDOWN (body-level so it overlays everything)        -->
@@ -2437,11 +2441,13 @@ function closeSetupModal() {
 // ── Location Tracking ───────────────────────────────────────────────────────
 function startLocationTracking() {
   if (locationWatchId) return;
+  showGpsStatus();
 
   if ('geolocation' in navigator) {
     locationWatchId = navigator.geolocation.watchPosition(
       (pos) => {
         myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        hideGpsStatus();
         if (!activeSession || !socket) return;
         socket.emit('location-update', {
           sessionId: activeSession.id,
@@ -2480,6 +2486,7 @@ function startLocationTracking() {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          hideGpsStatus();
           socket.emit('location-update', {
             sessionId: activeSession.id,
             lat: myLocation.lat,
@@ -2576,6 +2583,16 @@ function showToast(msg) {
   toastTimer = setTimeout(() => t.classList.add('hidden'), 3000);
 }
 
+// ── GPS status pill ────────────────────────────────────────────────────────
+function showGpsStatus() {
+  const el = document.getElementById('gps-status');
+  if (el) el.classList.remove('hidden');
+}
+function hideGpsStatus() {
+  const el = document.getElementById('gps-status');
+  if (el) el.classList.add('hidden');
+}
+
 function stopLocationTracking() {
   if (locationWatchId) {
     navigator.geolocation.clearWatch(locationWatchId);
@@ -2586,6 +2603,7 @@ function stopLocationTracking() {
     locationInterval = null;
   }
   myLocation = null;
+  hideGpsStatus();
 }
 
 // ── Socket.IO ───────────────────────────────────────────────────────────────

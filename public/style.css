@@ -81,6 +81,39 @@ input, select { font-family: inherit; }
   100% { transform: scale(1.15); opacity: 0; }
 }
 
+/* ── GPS status pill ─────────────────────────────────────────── */
+.gps-status {
+  position: fixed;
+  top: 122px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  padding: 7px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-2);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.gps-status .gps-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-dark);
+  animation: gps-pulse 1.2s ease-in-out infinite;
+}
+@keyframes gps-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+
 /* ── Scrollbar ────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
