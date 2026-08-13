@@ -2379,6 +2379,7 @@ function startLocationTracking() {
         if (me) {
           me.location_lat = myLocation.lat;
           me.location_lng = myLocation.lng;
+          me.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
         }
         onLocationsChanged();
         if (pendingLocFit) {
@@ -2412,6 +2413,7 @@ function startLocationTracking() {
           if (me) {
             me.location_lat = myLocation.lat;
             me.location_lng = myLocation.lng;
+            me.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
           }
           onLocationsChanged();
           if (pendingLocFit) {
@@ -2561,6 +2563,7 @@ function connectSocket() {
     if (member) {
       member.location_lat = data.lat;
       member.location_lng = data.lng;
+      member.updated_at = new Date(data.timestamp).toISOString().slice(0, 19).replace('T', ' ');
     }
     onLocationsChanged();
   });
