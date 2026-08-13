@@ -1182,6 +1182,11 @@ function etaText(mi, mins) {
 
 // The single "car" position during transit: the driver's live location, else mine
 function carPosition(session) {
+  const driverId = session ? session.driver_id : null;
+  // If I'm the driver, my own GPS is the freshest source for the car marker
+  if (driverId === currentUser.id && myLocation) {
+    return { username: currentUser.username, user_id: currentUser.id, location_lat: myLocation.lat, location_lng: myLocation.lng };
+  }
   if (session && session.members) {
     const driver = session.members.find(m => m.status === 'driving' && m.location_lat && m.location_lng);
     if (driver) return driver;
