@@ -1,5 +1,8 @@
 # 🚗 Carpool App
 
+[![Build](https://github.com/eruji/carpools2/actions/workflows/docker-build.yml/badge.svg)](https://github.com/eruji/carpools2/actions/workflows/docker-build.yml)
+[![Latest build](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2Feruji%2Fcarpools2%2Factions%2Fruns%3Fper_page%3D1&query=workflow_runs%5B0%5D.run_number&label=build&prefix=b&color=green)](https://github.com/eruji/carpools2/actions)
+
 Real-time carpool coordination with location tracking, coins economy, and multi-phase session management.
 
 ## Setup
