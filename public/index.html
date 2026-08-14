@@ -1740,8 +1740,9 @@ function initMap() {
   }).addTo(map);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-  // Auto-recenter is disabled — the map only refits when the segment changes
-  // or the user taps the recenter button.
+  // When the user zooms during a live trip, snap the view back onto them —
+  // zooming keeps the old map center by default, which loses the car/rider.
+  map.on('zoomend', followMyLocation);
 
   // Keep the full-bleed map sized correctly on orientation/resize
   window.addEventListener('resize', () => {
