@@ -188,8 +188,9 @@
     </div>
   </div>
 
-  <!-- ═══════ SUBWAY-STYLE TRANSIT LINE + SEATING CHART ═══════ -->
+  <!-- ═══════ SUBWAY-STYLE TRANSIT LINE + SEATING CHART (swipeable) ═══════ -->
   <div class="route-visual">
+    <div class="rv-track" id="rv-track">
   <div class="subway-map" id="subway-map">
     <div class="subway-line" id="subway-line">
       <!-- Stop 1: Start (arbitrary) -->
@@ -240,9 +241,15 @@
       </div>
       <!-- Member avatars removed — the line and stop icons represent the route -->
       <div id="subway-progress" class="subway-progress"></div>
+      </div>
     </div>
-  </div>
-  <div class="seating-chart" id="seating-chart" aria-label="Seating chart"></div>
+    <div class="seating-chart" id="seating-chart" aria-label="Seating chart"></div>
+    </div>
+    <div class="rv-nav">
+      <button class="rv-arrow" id="rv-prev" type="button" aria-label="Previous view">‹</button>
+      <div class="rv-dots" id="rv-dots" role="tablist" aria-label="View selector"></div>
+      <button class="rv-arrow" id="rv-next" type="button" aria-label="Next view">›</button>
+    </div>
   </div>
 
   <!-- ═══════ LOCATION CONFIG (tap the chevron on a stop) ═══════ -->
@@ -504,8 +511,48 @@ function getLastCarpool() { return localStorage.getItem('carpoolLast'); }
 function clearLastCarpool() { localStorage.removeItem('carpoolLast'); }
 
 // ── Init ────────────────────────────────────────────────────────────────────
+// ── Route visual carousel: subway ↔ seating chart (full width each) ──────
+function initRouteVisual() {
+  const track = document.getElementById('rv-track');
+  const dotsEl = document.getElementById('rv-dots');
+  const prev = document.getElementById('rv-prev');
+  const next = document.getElementById('rv-next');
+  if (!track || !dotsEl) return;
+  const slides = Array.from(track.children);
+  if (slides.length < 2) return;
+
+  // Build one dot per slide
+  dotsEl.innerHTML = '';
+  const dots = slides.map((slide, i) => {
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'rv-dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('aria-label', 'View ' + (i + 1) + ' of ' + slides.length);
+    dot.addEventListener('click', () => {
+      track.scrollTo({ left: slide.offsetLeft, behavior: 'smooth' });
+    });
+    dotsEl.appendChild(dot);
+    return dot;
+  });
+
+  // Keep dots + arrow states in sync with the swipe position
+  function sync() {
+    const idx = Math.round(track.scrollLeft / Math.max(track.clientWidth, 1));
+    dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+    if (prev) prev.disabled = idx <= 0;
+    if (next) next.disabled = idx >= slides.length - 1;
+  }
+
+  track.addEventListener('scroll', sync, { passive: true });
+  window.addEventListener('resize', sync);
+  if (prev) prev.addEventListener('click', () => track.scrollBy({ left: -track.clientWidth, behavior: 'smooth' }));
+  if (next) next.addEventListener('click', () => track.scrollBy({ left: track.clientWidth, behavior: 'smooth' }));
+  sync();
+}
+
 async function init() {
   loadVersion();
+  initRouteVisual();
 
   // Check for an invite link (?invite=CODE)
   const params = new URLSearchParams(window.location.search);
