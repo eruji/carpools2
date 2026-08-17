@@ -16,7 +16,9 @@ services:
 
   watchtower:
     image: containrrr/watchtower
-    container_name: watchtower
+    # Unique name — container names are global on the host, and rally-point's
+    # compose also used "watchtower", so the two projects fought over it.
+    container_name: watchtower-carpool
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --interval 300 carpool
