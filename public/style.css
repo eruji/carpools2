@@ -579,6 +579,145 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .car-seat.driver .seat-avatar { border-color: #C0A46A; }
 .car-empty-note { color: var(--text-3); text-align: center; }
 
+/* ── Pickup race board (position view) ── */
+.rv-track > .position-board {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+}
+.position-board {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  padding: 12px;
+}
+.race-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.race-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+.race-stats {
+  font-size: 0.65rem;
+  color: var(--text-3);
+  text-align: right;
+}
+.race-target {
+  font-size: 0.72rem;
+  color: var(--text-3);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.race-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.race-row:last-child { border-bottom: none; }
+.race-row.skipped { opacity: 0.45; }
+.race-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  flex-shrink: 0;
+}
+.race-avatar.driver { border-color: #C0A46A; }
+.race-main { flex: 1; min-width: 0; }
+.race-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 5px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.race-you { font-size: 0.62rem; color: var(--accent-deep); font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+.race-chip {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 8px;
+  line-height: 1.4;
+}
+.chip-driving { background: var(--accent-soft); color: var(--accent-deep); }
+.chip-riding { background: rgba(74,222,128,0.16); color: #2e9e57; }
+.chip-arrived { background: #C0A46A; color: #fff; }
+.chip-waiting { background: var(--border); color: var(--text-3); }
+.chip-skip { background: var(--border); color: var(--text-3); text-decoration: line-through; }
+.race-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 5px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+}
+/* Checkered finish stripe at the right edge — the finish line */
+.race-bar::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -1px;
+  bottom: -1px;
+  width: 7px;
+  background: repeating-conic-gradient(#3a3a3a 0% 25%, #fff 0% 50%) 0 0 / 7px 7px;
+  border-radius: 0 5px 5px 0;
+  opacity: 0.85;
+}
+.race-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-dark) 100%);
+  transition: width 0.6s ease;
+}
+.race-row.arrived .race-fill {
+  background: linear-gradient(90deg, #7C9A77 0%, #C0A46A 100%);
+}
+.race-row.stale .race-fill {
+  opacity: 0.55;
+  background-image: repeating-linear-gradient(45deg, var(--accent) 0 6px, var(--accent-dark) 6px 12px);
+}
+.race-eta { text-align: right; flex-shrink: 0; min-width: 56px; }
+.race-eta-min {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--accent-deep);
+  line-height: 1.2;
+}
+.race-row.arrived .race-eta-min { color: #A89050; }
+.race-eta-sub {
+  display: block;
+  font-size: 0.62rem;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
 .subway-line {
   position: relative;
   display: flex;

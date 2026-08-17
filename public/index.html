@@ -244,6 +244,7 @@
       </div>
     </div>
     <div class="seating-chart" id="seating-chart" aria-label="Seating chart"></div>
+    <div class="position-board" id="position-board" aria-label="Pickup race board"></div>
     </div>
     <div class="rv-nav">
       <button class="rv-arrow" id="rv-prev" type="button" aria-label="Previous view">‹</button>
@@ -446,6 +447,7 @@ const FEATURES = {
   map: true,
   subway: true,
   seatingChart: true,
+  positionBoard: true,
   members: true,
   history: true
 };
@@ -466,6 +468,7 @@ const SECTIONS = [
   { id: 'map',          render: (ctx) => updateMap(ctx) },
   { id: 'subway',       render: (ctx) => updateSubwayMap(ctx) },
   { id: 'seatingChart', render: (ctx) => renderSeatingChart(ctx.activeSession) },
+  { id: 'positionBoard', render: (ctx) => renderPositionBoard(ctx.activeSession) },
   { id: 'members',      render: (ctx) => renderMemberStatus(ctx.activeSession) }
 ];
 
@@ -486,6 +489,8 @@ function onLocationsChanged() {
   const data = { carpool: currentCarpoolData.carpool, activeSession };
   safeRender('subwayEta', () => updateSubwayETAs(data));
   safeRender('map', () => updateMap(data));
+  // The pickup race re-renders on every GPS check-in (mine + other members')
+  safeRender('positionBoard', () => renderPositionBoard(activeSession));
   if (!window._lastMemberRender || Date.now() - window._lastMemberRender > 3000) {
     window._lastMemberRender = Date.now();
     safeRender('members', () => renderMemberStatus(activeSession));
@@ -1626,6 +1631,166 @@ function renderSeatingChart(session) {
         </div>
       </div>
     </div>`;
+}
+
+// ── Pickup Race Board (position view) ───────────────────────────────────────
+// A race-to-pickup board: members sorted by soonest ETA, each with a progress
+// bar whose right edge is the finish line (full = arrived at pickup). Re-renders
+// on every GPS check-in via onLocationsChanged().
+const POSITION_ETA_SCALE_MIN = 10; // a 10-minute journey fills the whole bar
+const POSITION_STALE_SEC = 120;    // treat a member's GPS as stale after 2 min
+
+function renderPositionBoard(session) {
+  if (!FEATURES.positionBoard) return;
+  const el = document.getElementById('position-board');
+  if (!el) return;
+  const carpool = currentCarpoolData ? currentCarpoolData.carpool : null;
+
+  if (!session || !carpool || session.phase === 'completed' || session.phase === 'idle') {
+    el.innerHTML = '<div class="car-empty-note text-xs">No active trip</div>';
+    return;
+  }
+  const mk = carpool.meetup_lat, ml = carpool.meetup_lng;
+  if (!mk || !ml) {
+    el.innerHTML = '<div class="car-empty-note text-xs">Set a pickup location to start the race</div>';
+    return;
+  }
+
+  // The race is to the pickup point, which only matters before departure.
+  if (session.phase !== 'meetup') {
+    el.innerHTML = `<div class="car-empty-note text-xs">🏁 Race over — en route to ${esc(destLabel(carpool))}</div>`;
+    return;
+  }
+
+  // Freshest GPS: my live fix for me, session location for everyone else.
+  const locOf = (m) => {
+    if (m.user_id === currentUser.id && myLocation) {
+      return { lat: myLocation.lat, lng: myLocation.lng, stale: false };
+    }
+    if (m.location_lat && m.location_lng) {
+      const ageMin = minutesAgo(m.updated_at);
+      return { lat: m.location_lat, lng: m.location_lng, stale: ageMin != null && ageMin * 60 > POSITION_STALE_SEC };
+    }
+    return null;
+  };
+
+  const racers = (session.members || []).map((m) => {
+    const loc = locOf(m);
+    const dist = loc ? haversine(loc.lat, loc.lng, mk, ml) : null; // miles
+    return {
+      m, loc,
+      dist,
+      etaMin: dist == null ? null : dist / 0.5, // straight-line fallback @ 30mph
+      isMe: m.user_id === currentUser.id,
+      isDriver: m.user_id === session.driver_id,
+      arrived: m.status === 'arrived',
+      skipped: m.status === 'skip',
+      checkedIn: m.status === 'driving' || m.status === 'riding'
+    };
+  });
+
+  // Order: finished first, then soonest ETA, then checked-in w/o fix, then pending, skipped last
+  racers.sort((a, b) => {
+    const ka = a.arrived ? 0 : a.skipped ? 4 : a.etaMin != null ? 1 : a.checkedIn ? 2 : 3;
+    const kb = b.arrived ? 0 : b.skipped ? 4 : b.etaMin != null ? 1 : b.checkedIn ? 2 : 3;
+    if (ka !== kb) return ka - kb;
+    if (a.etaMin != null && b.etaMin != null && a.etaMin !== b.etaMin) return a.etaMin - b.etaMin;
+    return a.m.username.localeCompare(b.m.username);
+  });
+
+  // Medals go to the three soonest active racers (non-arrived, has an ETA)
+  const medals = ['🥇', '🥈', '🥉'];
+  let medalIdx = 0;
+  const leader = racers.find(r => r.etaMin != null && !r.arrived);
+
+  const counts = { enroute: 0, arrived: 0, waiting: 0, skipped: 0 };
+  racers.forEach(r => {
+    if (r.skipped) counts.skipped++;
+    else if (r.arrived) counts.arrived++;
+    else if (r.etaMin != null) counts.enroute++;
+    else counts.waiting++;
+  });
+
+  const chip = (r) => r.arrived
+    ? '<span class="race-chip chip-arrived">FINISHED</span>'
+    : r.skipped ? '<span class="race-chip chip-skip">SKIPPED</span>'
+    : r.checkedIn ? (r.isDriver
+        ? '<span class="race-chip chip-driving">DRIVING</span>'
+        : '<span class="race-chip chip-riding">RIDING</span>')
+    : '<span class="race-chip chip-waiting">WAITING</span>';
+
+  const rows = racers.map((r) => {
+    const medal = !r.arrived && r.etaMin != null && medalIdx < 3 ? medals[medalIdx++] : '';
+    const fillPct = r.arrived ? 100
+      : r.etaMin == null ? 0
+      : Math.max(0, Math.min(1, 1 - r.etaMin / POSITION_ETA_SCALE_MIN)) * 100;
+
+    let etaBig, etaSub, deltaTxt = '';
+    if (r.arrived) {
+      etaBig = '🏁';
+      etaSub = 'arrived';
+    } else if (r.etaMin == null) {
+      etaBig = r.checkedIn ? '…' : '—';
+      etaSub = r.skipped ? 'skipped' : r.loc ? 'no GPS fix' : (r.checkedIn ? 'no GPS yet' : 'not checked in');
+    } else {
+      deltaTxt = leader && r !== leader && leader.etaMin != null
+        ? ` · +${Math.max(1, Math.round(r.etaMin - leader.etaMin))}m`
+        : (r === leader ? ' · LEAD' : '');
+      etaBig = r.etaMin < 1 ? 'Now' : Math.round(r.etaMin) + 'm';
+      etaSub = `${r.dist.toFixed(1)} mi${deltaTxt}`;
+    }
+
+    const staleCls = r.loc && r.loc.stale ? ' stale' : '';
+    return `
+      <div class="race-row${r.arrived ? ' arrived' : ''}${r.skipped ? ' skipped' : ''}${staleCls}" id="race-row-${r.m.user_id}">
+        <span class="race-avatar${r.isDriver ? ' driver' : ''}" style="background:${memberColor(r.m.user_id)};">${esc(getInitials(r.m.username))}</span>
+        <div class="race-main">
+          <div class="race-name">
+            ${medal}<span>${esc(r.m.username)}</span>${r.isMe ? '<span class="race-you">you</span>' : ''}${chip(r)}
+          </div>
+          <div class="race-bar"><span class="race-fill" style="width:${fillPct.toFixed(1)}%"></span></div>
+        </div>
+          <div class="race-eta">
+          <span class="race-eta-min">${etaBig}</span>
+          <span class="race-eta-sub" data-delta="${deltaTxt}">${etaSub}</span>
+        </div>
+      </div>`;
+  });
+
+  const stats = [
+    counts.enroute ? `${counts.enroute} en route` : '',
+    counts.arrived ? `${counts.arrived} arrived` : '',
+    counts.waiting ? `${counts.waiting} waiting` : ''
+  ].filter(Boolean).join(' · ');
+
+  el.innerHTML = `
+    <div class="race-header">
+      <span class="race-title">🏁 Pickup race</span>
+      <span class="race-stats">${stats}</span>
+    </div>
+    <div class="race-target">→ ${esc(meetupLabel(carpool))}</div>
+    ${rows.join('')}
+  `;
+
+  // Upgrade each row's ETA to road routing when it resolves (cached 60s);
+  // straight-line fallback already shown, so this is a silent refresh.
+  // Coords are rounded to ~3 decimals (~111m) so GPS jitter doesn't create a
+  // fresh cache key (and a fresh router fetch) on every check-in.
+  const round3 = (n) => Math.round(n * 1000) / 1000;
+  racers.forEach((r) => {
+    if (!r.loc || r.etaMin == null) return;
+    roadEta(round3(r.loc.lat), round3(r.loc.lng), round3(mk), round3(ml), (dist, dur) => {
+      const rowEl = document.getElementById('race-row-' + r.m.user_id);
+      if (!rowEl || dist == null) return;
+      const min = dur / 60;
+      const etaEl = rowEl.querySelector('.race-eta-min');
+      const subEl = rowEl.querySelector('.race-eta-sub');
+      const fillEl = rowEl.querySelector('.race-fill');
+      if (etaEl) etaEl.textContent = min < 1 ? 'Now' : Math.round(min) + 'm';
+      if (fillEl) fillEl.style.width = (Math.max(0, Math.min(1, 1 - min / POSITION_ETA_SCALE_MIN)) * 100).toFixed(1) + '%';
+      if (subEl) subEl.textContent = `${dist.toFixed(1)} mi${subEl.dataset.delta || ''}`;
+    });
+  });
 }
 // ── Map ─────────────────────────────────────────────────────────────────────
 let lastMapData = null;
