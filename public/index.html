@@ -1834,6 +1834,20 @@ function fetchLegRoute(lat1, lng1, lat2, lng2, cb) {
   });
 }
 
+// Best route per line across renders. updateMap clears all polylines on every
+// GPS tick, so without this a line would flash back to "as the crow flies"
+// whenever the position moved into a new cache cell while the fresh route
+// loads. Draw the cached route for this spot, else the last known route, and
+// only fall back to a straight line when we have nothing at all.
+const lastLegRoutes = {};
+const legKey = (lat1, lng1, lat2, lng2) => `${lat1.toFixed(3)},${lng1.toFixed(3)}-${lat2.toFixed(3)},${lng2.toFixed(3)}`;
+function bestLegCoords(id, lat1, lng1, lat2, lng2) {
+  const cached = legRouteCache[legKey(lat1, lng1, lat2, lng2)];
+  if (cached) return cached.coords;
+  const last = lastLegRoutes[id];
+  return last ? last.coords : null;
+}
+
 // Center a location in the visible viewport (above the floating cards on mobile).
 function centerLocationInViewport(lat, lng, zoom) {
   if (!map) return;
@@ -2100,11 +2114,15 @@ function updateMap(data) {
 
       if (hasPickup) {
         const meLine = { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 };
-        mapPolylines['line_me'] = L.polyline([[myLocation.lat, myLocation.lng], [carpool.meetup_lat, carpool.meetup_lng]], meLine).addTo(map);
-        // Upgrade to the street route once fetched (no blink: straight line shows immediately)
+        // Draw the best route we have now (cached → last known → straight) so
+        // the line never flashes back to as-the-crow-flies while loading.
+        const coords = bestLegCoords('line_me', myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng)
+          || [[myLocation.lat, myLocation.lng], [carpool.meetup_lat, carpool.meetup_lng]];
+        mapPolylines['line_me'] = L.polyline(coords, meLine).addTo(map);
         fetchLegRoute(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng, (r) => {
           if (!map || seq !== mapUpdateSeq) return;
           if (r && r.coords) {
+            lastLegRoutes['line_me'] = r;
             if (mapPolylines['line_me']) map.removeLayer(mapPolylines['line_me']);
             mapPolylines['line_me'] = L.polyline(r.coords, meLine).addTo(map);
           }
@@ -2128,12 +2146,16 @@ function updateMap(data) {
 
       if (hasPickup) {
         const mLine = { color: '#5F7D5B', weight: 2.5, dashArray: '6,6', opacity: 0.75 };
-        mapPolylines['line_' + m.user_id] = L.polyline([[m.location_lat, m.location_lng], [carpool.meetup_lat, carpool.meetup_lng]], mLine).addTo(map);
+        const mId = 'line_' + m.user_id;
+        const coords = bestLegCoords(mId, m.location_lat, m.location_lng, carpool.meetup_lat, carpool.meetup_lng)
+          || [[m.location_lat, m.location_lng], [carpool.meetup_lat, carpool.meetup_lng]];
+        mapPolylines[mId] = L.polyline(coords, mLine).addTo(map);
         fetchLegRoute(m.location_lat, m.location_lng, carpool.meetup_lat, carpool.meetup_lng, (r) => {
           if (!map || seq !== mapUpdateSeq) return;
           if (r && r.coords) {
-            if (mapPolylines['line_' + m.user_id]) map.removeLayer(mapPolylines['line_' + m.user_id]);
-            mapPolylines['line_' + m.user_id] = L.polyline(r.coords, mLine).addTo(map);
+            lastLegRoutes[mId] = r;
+            if (mapPolylines[mId]) map.removeLayer(mapPolylines[mId]);
+            mapPolylines[mId] = L.polyline(r.coords, mLine).addTo(map);
           }
         });
       }
@@ -2170,20 +2192,30 @@ function updateMap(data) {
     const lat1 = (inTransit && myLocation && myLocation.lat) ? myLocation.lat : fallbackLat;
     const lng1 = (inTransit && myLocation && myLocation.lng) ? myLocation.lng : fallbackLng;
 
+    // Draw immediately with the best route we have (cached → last known →
+    // straight) and upgrade silently when the fresh route resolves.
+    const routeId = 'route_' + (isReturn ? 'back' : 'dest');
+    const style = {
+      color: '#5F7D5B',
+      weight: inTransit ? 5 : 3,
+      opacity: inTransit ? 0.95 : 0.5,
+      dashArray: inTransit ? null : '7,7'
+    };
+    const coords = bestLegCoords(routeId, lat1, lng1, targetLat, targetLng)
+      || [[lat1, lng1], [targetLat, targetLng]];
+    mapPolylines.route = L.polyline(coords, style).addTo(map);
+
     fetchLegRoute(lat1, lng1, targetLat, targetLng, (route) => {
       if (!map || seq !== mapUpdateSeq) return;
-      const coords = route ? route.coords : [[lat1, lng1], [targetLat, targetLng]];
-      const line = L.polyline(coords, {
-        color: '#5F7D5B',
-        weight: inTransit ? 5 : 3,
-        opacity: inTransit ? 0.95 : 0.5,
-        dashArray: inTransit ? null : '7,7'
-      }).addTo(map);
-      mapPolylines.route = line;
+      if (route && route.coords) {
+        lastLegRoutes[routeId] = route;
+        if (mapPolylines.route) map.removeLayer(mapPolylines.route);
+        mapPolylines.route = L.polyline(route.coords, style).addTo(map);
+      }
 
       if (inTransit && shouldFit) {
         // Overview of the whole route first…
-        fitBounds(coords, 14);
+        fitBounds(route ? route.coords : coords, 14);
         // …then zoom into street level around the user
         setTimeout(() => {
           if (map && myLocation) centerLocationInViewport(myLocation.lat, myLocation.lng, 15);
