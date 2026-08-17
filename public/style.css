@@ -620,62 +620,40 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 4px;
+  padding: 7px 2px;
   border-bottom: 1px solid var(--border);
 }
 .race-row:last-child { border-bottom: none; }
-.race-row.skipped { opacity: 0.45; }
-.race-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+.race-pos {
   flex-shrink: 0;
-}
-.race-avatar.driver { border-color: #C0A46A; }
-.race-main { flex: 1; min-width: 0; }
-.race-name {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 5px;
-  font-size: 0.83rem;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 4px;
-}
-.race-you { font-size: 0.62rem; color: var(--accent-deep); font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
-.race-chip {
-  font-size: 0.58rem;
+  width: 28px;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
-  padding: 1px 6px;
-  border-radius: 8px;
-  line-height: 1.4;
+  color: var(--text-2);
+  text-align: center;
 }
-.chip-driving { background: var(--accent-soft); color: var(--accent-deep); }
-.chip-riding { background: rgba(74,222,128,0.16); color: #2e9e57; }
-.chip-arrived { background: #C0A46A; color: #fff; }
-.chip-waiting { background: var(--border); color: var(--text-3); }
-.chip-skip { background: var(--border); color: var(--text-3); text-decoration: line-through; }
-.race-bar {
+.race-row.arrived .race-pos { font-size: 0.9rem; }
+/* Lane: a thin track with the member's avatar bubble riding on the line */
+.race-lane {
   position: relative;
-  height: 8px;
-  border-radius: 5px;
+  flex: 1;
+  min-width: 0;
+  height: 28px; /* room for the avatar bubble */
+}
+.race-lane-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 7px;
+  transform: translateY(-50%);
   background: var(--surface-alt);
   border: 1px solid var(--border-strong);
+  border-radius: 4px;
   overflow: hidden;
 }
 /* Checkered finish stripe at the right edge — the finish line */
-.race-bar::after {
+.race-lane-track::after {
   content: '';
   position: absolute;
   right: 0;
@@ -683,24 +661,67 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   bottom: -1px;
   width: 7px;
   background: repeating-conic-gradient(#3a3a3a 0% 25%, #fff 0% 50%) 0 0 / 7px 7px;
-  border-radius: 0 5px 5px 0;
+  border-radius: 0 4px 4px 0;
   opacity: 0.85;
 }
-.race-fill {
+.race-lane-fill {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  border-radius: 5px;
+  border-radius: 4px;
   background: linear-gradient(90deg, var(--accent) 0%, var(--accent-dark) 100%);
   transition: width 0.6s ease;
 }
-.race-row.arrived .race-fill {
+.race-row.arrived .race-lane-fill {
   background: linear-gradient(90deg, #7C9A77 0%, #C0A46A 100%);
 }
-.race-row.stale .race-fill {
+.race-row.stale .race-lane-fill {
   opacity: 0.55;
   background-image: repeating-linear-gradient(45deg, var(--accent) 0 6px, var(--accent-dark) 6px 12px);
+}
+.race-lane-avatar {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  z-index: 2;
+  transition: left 0.6s ease;
+}
+.race-lane-avatar.driver { border-color: #C0A46A; }
+/* Finished: gold ring so you can spot arrivals at a glance */
+.race-lane-avatar.done {
+  border-color: #C0A46A;
+  box-shadow: 0 0 0 2px rgba(192,164,106,0.45);
+}
+.race-row.stale .race-lane-avatar { opacity: 0.45; }
+/* Small ✓ badge pinned to an arrived avatar */
+.race-done {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #2e9e57;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #fff;
 }
 .race-eta { text-align: right; flex-shrink: 0; min-width: 56px; }
 .race-eta-min {

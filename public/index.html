@@ -1634,11 +1634,14 @@ function renderSeatingChart(session) {
 }
 
 // ── Pickup Race Board (position view) ───────────────────────────────────────
-// A race-to-pickup board: members sorted by soonest ETA, each with a progress
-// bar whose right edge is the finish line (full = arrived at pickup). Re-renders
-// on every GPS check-in via onLocationsChanged().
-const POSITION_ETA_SCALE_MIN = 10; // a 10-minute journey fills the whole bar
-const POSITION_STALE_SEC = 120;    // treat a member's GPS as stale after 2 min
+// A race-to-pickup board: rank on the far left (1st/2nd/3rd…), each member's
+// avatar bubble rides a progress bar measuring % of the way from their
+// starting location to the pickup, with ETA on the right. Finished members
+// pin their avatar at the finish line with a ✓ badge. Re-renders on every
+// GPS check-in via onLocationsChanged().
+const POSITION_STALE_SEC = 120;  // treat a member's GPS as stale after 2 min
+const raceStartDist = {};        // user_id -> miles to pickup at first sighting
+let raceStartSessionId = null;   // reset starting distances when the session changes
 
 function renderPositionBoard(session) {
   if (!FEATURES.positionBoard) return;
@@ -1662,6 +1665,12 @@ function renderPositionBoard(session) {
     return;
   }
 
+  // A new session = a new race: forget everyone's starting distances.
+  if (raceStartSessionId !== session.id) {
+    raceStartSessionId = session.id;
+    for (const k in raceStartDist) delete raceStartDist[k];
+  }
+
   // Freshest GPS: my live fix for me, session location for everyone else.
   const locOf = (m) => {
     if (m.user_id === currentUser.id && myLocation) {
@@ -1674,64 +1683,64 @@ function renderPositionBoard(session) {
     return null;
   };
 
-  const racers = (session.members || []).map((m) => {
-    const loc = locOf(m);
-    const dist = loc ? haversine(loc.lat, loc.lng, mk, ml) : null; // miles
-    return {
-      m, loc,
-      dist,
-      etaMin: dist == null ? null : dist / 0.5, // straight-line fallback @ 30mph
-      isMe: m.user_id === currentUser.id,
-      isDriver: m.user_id === session.driver_id,
-      arrived: m.status === 'arrived',
-      skipped: m.status === 'skip',
-      checkedIn: m.status === 'driving' || m.status === 'riding'
-    };
-  });
+  const racers = (session.members || [])
+    .map((m) => {
+      const loc = locOf(m);
+      const dist = loc ? haversine(loc.lat, loc.lng, mk, ml) : null; // miles
+      // Record where they started the race: their first GPS fix this session.
+      if (dist != null && raceStartDist[m.user_id] == null) {
+        raceStartDist[m.user_id] = dist;
+      }
+      return {
+        m, loc, dist,
+        etaMin: dist == null ? null : dist / 0.5, // straight-line fallback @ 30mph
+        isDriver: m.user_id === session.driver_id,
+        arrived: m.status === 'arrived',
+        checkedIn: m.status === 'driving' || m.status === 'riding'
+      };
+    })
+    // Only members we can place on the line: has a GPS fix, or already arrived.
+    .filter((r) => r.dist != null || r.arrived);
 
-  // Order: finished first, then soonest ETA, then checked-in w/o fix, then pending, skipped last
+  // Order: finished first, then soonest ETA.
   racers.sort((a, b) => {
-    const ka = a.arrived ? 0 : a.skipped ? 4 : a.etaMin != null ? 1 : a.checkedIn ? 2 : 3;
-    const kb = b.arrived ? 0 : b.skipped ? 4 : b.etaMin != null ? 1 : b.checkedIn ? 2 : 3;
-    if (ka !== kb) return ka - kb;
+    if (a.arrived !== b.arrived) return a.arrived ? -1 : 1;
     if (a.etaMin != null && b.etaMin != null && a.etaMin !== b.etaMin) return a.etaMin - b.etaMin;
-    return a.m.username.localeCompare(b.m.username);
+    return (a.m.username || '').localeCompare(b.m.username || '');
   });
 
-  // Medals go to the three soonest active racers (non-arrived, has an ETA)
-  const medals = ['🥇', '🥈', '🥉'];
-  let medalIdx = 0;
-  const leader = racers.find(r => r.etaMin != null && !r.arrived);
+  // % of the way from their starting point to the pickup (full = arrived).
+  const progressOf = (r) => {
+    if (r.arrived || (r.dist != null && r.dist <= 0.05)) return 100;
+    const start = raceStartDist[r.m.user_id];
+    if (start == null || start <= 0) return 0;
+    return Math.max(0, Math.min(100, (1 - r.dist / start) * 100));
+  };
 
-  const counts = { enroute: 0, arrived: 0, waiting: 0, skipped: 0 };
-  racers.forEach(r => {
-    if (r.skipped) counts.skipped++;
-    else if (r.arrived) counts.arrived++;
-    else if (r.etaMin != null) counts.enroute++;
+  const ordinal = (n) => n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th';
+
+  const counts = { enroute: 0, arrived: 0, waiting: 0 };
+  (session.members || []).forEach(m => {
+    if (m.status === 'skip') return;
+    if (m.status === 'arrived') counts.arrived++;
+    else if (m.status === 'driving' || m.status === 'riding') counts.enroute++;
     else counts.waiting++;
   });
 
-  const chip = (r) => r.arrived
-    ? '<span class="race-chip chip-arrived">FINISHED</span>'
-    : r.skipped ? '<span class="race-chip chip-skip">SKIPPED</span>'
-    : r.checkedIn ? (r.isDriver
-        ? '<span class="race-chip chip-driving">DRIVING</span>'
-        : '<span class="race-chip chip-riding">RIDING</span>')
-    : '<span class="race-chip chip-waiting">WAITING</span>';
+  const leader = racers.find(r => r.etaMin != null && !r.arrived);
+  let rank = 0;
 
   const rows = racers.map((r) => {
-    const medal = !r.arrived && r.etaMin != null && medalIdx < 3 ? medals[medalIdx++] : '';
-    const fillPct = r.arrived ? 100
-      : r.etaMin == null ? 0
-      : Math.max(0, Math.min(1, 1 - r.etaMin / POSITION_ETA_SCALE_MIN)) * 100;
+    const pct = progressOf(r);
+    const posLabel = r.arrived ? '🏁' : ordinal(++rank);
 
     let etaBig, etaSub, deltaTxt = '';
     if (r.arrived) {
       etaBig = '🏁';
-      etaSub = 'arrived';
+      etaSub = 'done';
     } else if (r.etaMin == null) {
       etaBig = r.checkedIn ? '…' : '—';
-      etaSub = r.skipped ? 'skipped' : r.loc ? 'no GPS fix' : (r.checkedIn ? 'no GPS yet' : 'not checked in');
+      etaSub = r.loc ? 'no GPS fix' : 'no GPS yet';
     } else {
       deltaTxt = leader && r !== leader && leader.etaMin != null
         ? ` · +${Math.max(1, Math.round(r.etaMin - leader.etaMin))}m`
@@ -1742,15 +1751,13 @@ function renderPositionBoard(session) {
 
     const staleCls = r.loc && r.loc.stale ? ' stale' : '';
     return `
-      <div class="race-row${r.arrived ? ' arrived' : ''}${r.skipped ? ' skipped' : ''}${staleCls}" id="race-row-${r.m.user_id}">
-        <span class="race-avatar${r.isDriver ? ' driver' : ''}" style="background:${memberColor(r.m.user_id)};">${esc(getInitials(r.m.username))}</span>
-        <div class="race-main">
-          <div class="race-name">
-            ${medal}<span>${esc(r.m.username)}</span>${r.isMe ? '<span class="race-you">you</span>' : ''}${chip(r)}
-          </div>
-          <div class="race-bar"><span class="race-fill" style="width:${fillPct.toFixed(1)}%"></span></div>
+      <div class="race-row${r.arrived ? ' arrived' : ''}${staleCls}" id="race-row-${r.m.user_id}">
+        <span class="race-pos">${posLabel}</span>
+        <div class="race-lane">
+          <div class="race-lane-track"><span class="race-lane-fill" style="width:${pct.toFixed(1)}%"></span></div>
+          <span class="race-lane-avatar${r.isDriver ? ' driver' : ''}${r.arrived ? ' done' : ''}" style="left:${Math.max(4, Math.min(96, pct)).toFixed(1)}%;background:${memberColor(r.m.user_id)};">${esc(getInitials(r.m.username))}${r.arrived ? '<span class="race-done">✓</span>' : ''}</span>
         </div>
-          <div class="race-eta">
+        <div class="race-eta">
           <span class="race-eta-min">${etaBig}</span>
           <span class="race-eta-sub" data-delta="${deltaTxt}">${etaSub}</span>
         </div>
@@ -1772,23 +1779,18 @@ function renderPositionBoard(session) {
     ${rows.join('')}
   `;
 
-  // Upgrade each row's ETA to road routing when it resolves (cached 60s);
-  // straight-line fallback already shown, so this is a silent refresh.
-  // Coords are rounded to ~3 decimals (~111m) so GPS jitter doesn't create a
-  // fresh cache key (and a fresh router fetch) on every check-in.
+  // Upgrade each row's ETA to road routing when it resolves (cached 60s).
+  // The bar stays haversine-based (consistent start→pickup ratio), so only
+  // the minute readout is refreshed. Coords rounded to ~111m so GPS jitter
+  // doesn't trigger a fresh router fetch on every check-in.
   const round3 = (n) => Math.round(n * 1000) / 1000;
   racers.forEach((r) => {
     if (!r.loc || r.etaMin == null) return;
     roadEta(round3(r.loc.lat), round3(r.loc.lng), round3(mk), round3(ml), (dist, dur) => {
       const rowEl = document.getElementById('race-row-' + r.m.user_id);
       if (!rowEl || dist == null) return;
-      const min = dur / 60;
       const etaEl = rowEl.querySelector('.race-eta-min');
-      const subEl = rowEl.querySelector('.race-eta-sub');
-      const fillEl = rowEl.querySelector('.race-fill');
-      if (etaEl) etaEl.textContent = min < 1 ? 'Now' : Math.round(min) + 'm';
-      if (fillEl) fillEl.style.width = (Math.max(0, Math.min(1, 1 - min / POSITION_ETA_SCALE_MIN)) * 100).toFixed(1) + '%';
-      if (subEl) subEl.textContent = `${dist.toFixed(1)} mi${subEl.dataset.delta || ''}`;
+      if (etaEl) etaEl.textContent = (dur / 60) < 1 ? 'Now' : Math.round(dur / 60) + 'm';
     });
   });
 }
