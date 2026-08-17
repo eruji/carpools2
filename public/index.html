@@ -1636,12 +1636,15 @@ function renderSeatingChart(session) {
 // ── Pickup Race Board (position view) ───────────────────────────────────────
 // A race-to-pickup board: rank on the far left (1st/2nd/3rd…), each member's
 // avatar bubble rides a progress bar measuring % of the way from their
-// starting location to the pickup, with ETA on the right. Finished members
-// pin their avatar at the finish line with a ✓ badge. Re-renders on every
-// GPS check-in via onLocationsChanged().
+// starting location to the pickup, with ETA on the right. Ranks freeze at
+// arrival (first to arrive keeps 1st, second keeps 2nd…) and the final
+// standings stay up after the carpool departs. Re-renders on every GPS
+// check-in via onLocationsChanged().
 const POSITION_STALE_SEC = 120;  // treat a member's GPS as stale after 2 min
 const raceStartDist = {};        // user_id -> miles to pickup at first sighting
-let raceStartSessionId = null;   // reset starting distances when the session changes
+const raceFinishSeq = {};        // user_id -> arrival sequence (rank, frozen on arrival)
+let raceStartSessionId = null;   // reset race state when the session changes
+let raceFinishSeqCounter = 0;    // next arrival sequence number
 
 function renderPositionBoard(session) {
   if (!FEATURES.positionBoard) return;
@@ -1659,17 +1662,17 @@ function renderPositionBoard(session) {
     return;
   }
 
-  // The race is to the pickup point, which only matters before departure.
-  if (session.phase !== 'meetup') {
-    el.innerHTML = `<div class="car-empty-note text-xs">🏁 Race over — en route to ${esc(destLabel(carpool))}</div>`;
-    return;
-  }
-
-  // A new session = a new race: forget everyone's starting distances.
+  // A new session = a new race: forget starting distances + frozen ranks.
   if (raceStartSessionId !== session.id) {
     raceStartSessionId = session.id;
     for (const k in raceStartDist) delete raceStartDist[k];
+    for (const k in raceFinishSeq) delete raceFinishSeq[k];
+    raceFinishSeqCounter = 0;
   }
+
+  // Once the carpool departs, the pickup race is settled — keep showing the
+  // final standings (everyone done) instead of blanking the board.
+  const raceOver = session.phase !== 'meetup';
 
   // Freshest GPS: my live fix for me, session location for everyone else.
   const locOf = (m) => {
@@ -1684,6 +1687,7 @@ function renderPositionBoard(session) {
   };
 
   const racers = (session.members || [])
+    .filter((m) => m.status !== 'skip')
     .map((m) => {
       const loc = locOf(m);
       const dist = loc ? haversine(loc.lat, loc.lng, mk, ml) : null; // miles
@@ -1691,27 +1695,48 @@ function renderPositionBoard(session) {
       if (dist != null && raceStartDist[m.user_id] == null) {
         raceStartDist[m.user_id] = dist;
       }
+      const finished = raceOver || m.status === 'arrived';
       return {
         m, loc, dist,
         etaMin: dist == null ? null : dist / 0.5, // straight-line fallback @ 30mph
         isDriver: m.user_id === session.driver_id,
-        arrived: m.status === 'arrived',
+        finished,
         checkedIn: m.status === 'driving' || m.status === 'riding'
       };
     })
-    // Only members we can place on the line: has a GPS fix, or already arrived.
-    .filter((r) => r.dist != null || r.arrived);
+    // Only members we can place on the line: has a GPS fix, or has finished.
+    .filter((r) => r.finished || r.dist != null);
 
-  // Order: finished first, then soonest ETA.
-  racers.sort((a, b) => {
-    if (a.arrived !== b.arrived) return a.arrived ? -1 : 1;
-    if (a.etaMin != null && b.etaMin != null && a.etaMin !== b.etaMin) return a.etaMin - b.etaMin;
+  const etaCompare = (a, b) => {
+    const ea = a.etaMin == null ? Infinity : a.etaMin;
+    const eb = b.etaMin == null ? Infinity : b.etaMin;
+    if (ea !== eb) return ea - eb;
     return (a.m.username || '').localeCompare(b.m.username || '');
+  };
+
+  // Freeze ranks at arrival (arrival order): first to arrive keeps 1st, second
+  // keeps 2nd… so nobody gets renumbered when someone finishes. Simultaneous
+  // arrivals are sequenced by ETA for a stable order.
+  if (!raceOver) {
+    const newFin = racers.filter(r => r.finished && raceFinishSeq[r.m.user_id] == null).sort(etaCompare);
+    for (const r of newFin) raceFinishSeq[r.m.user_id] = ++raceFinishSeqCounter;
+  } else {
+    // Race settled: give anyone without a sequence their place by ETA so the
+    // final standings are complete (late joiners / no-GPS members).
+    racers.filter(r => raceFinishSeq[r.m.user_id] == null).sort(etaCompare)
+      .forEach(r => { raceFinishSeq[r.m.user_id] = ++raceFinishSeqCounter; });
+  }
+
+  // Order: finished (by arrival sequence) first, then racers by ETA.
+  racers.sort((a, b) => {
+    if (a.finished !== b.finished) return a.finished ? -1 : 1;
+    if (a.finished) return (raceFinishSeq[a.m.user_id] ?? Infinity) - (raceFinishSeq[b.m.user_id] ?? Infinity);
+    return etaCompare(a, b);
   });
 
   // % of the way from their starting point to the pickup (full = arrived).
   const progressOf = (r) => {
-    if (r.arrived || (r.dist != null && r.dist <= 0.05)) return 100;
+    if (r.finished || (r.dist != null && r.dist <= 0.05)) return 100;
     const start = raceStartDist[r.m.user_id];
     if (start == null || start <= 0) return 0;
     return Math.max(0, Math.min(100, (1 - r.dist / start) * 100));
@@ -1722,20 +1747,20 @@ function renderPositionBoard(session) {
   const counts = { enroute: 0, arrived: 0, waiting: 0 };
   (session.members || []).forEach(m => {
     if (m.status === 'skip') return;
-    if (m.status === 'arrived') counts.arrived++;
+    if (raceOver || m.status === 'arrived') counts.arrived++;
     else if (m.status === 'driving' || m.status === 'riding') counts.enroute++;
     else counts.waiting++;
   });
 
-  const leader = racers.find(r => r.etaMin != null && !r.arrived);
-  let rank = 0;
+  const leader = racers.find(r => r.etaMin != null && !r.finished);
 
-  const rows = racers.map((r) => {
+  const rows = racers.map((r, i) => {
     const pct = progressOf(r);
-    const posLabel = r.arrived ? '🏁' : ordinal(++rank);
+    // Finished members keep their frozen arrival rank; racers take the next slots.
+    const posLabel = r.finished ? ordinal(raceFinishSeq[r.m.user_id] ?? i + 1) : ordinal(i + 1);
 
     let etaBig, etaSub, deltaTxt = '';
-    if (r.arrived) {
+    if (r.finished) {
       etaBig = '🏁';
       etaSub = 'done';
     } else if (r.etaMin == null) {
@@ -1749,13 +1774,13 @@ function renderPositionBoard(session) {
       etaSub = `${r.dist.toFixed(1)} mi${deltaTxt}`;
     }
 
-    const staleCls = r.loc && r.loc.stale ? ' stale' : '';
+    const staleCls = r.loc && r.loc.stale && !r.finished ? ' stale' : '';
     return `
-      <div class="race-row${r.arrived ? ' arrived' : ''}${staleCls}" id="race-row-${r.m.user_id}">
+      <div class="race-row${r.finished ? ' arrived' : ''}${staleCls}" id="race-row-${r.m.user_id}">
         <span class="race-pos">${posLabel}</span>
         <div class="race-lane">
           <div class="race-lane-track"><span class="race-lane-fill" style="width:${pct.toFixed(1)}%"></span></div>
-          <span class="race-lane-avatar${r.isDriver ? ' driver' : ''}${r.arrived ? ' done' : ''}" style="left:${Math.max(4, Math.min(96, pct)).toFixed(1)}%;background:${memberColor(r.m.user_id)};">${esc(getInitials(r.m.username))}${r.arrived ? '<span class="race-done">✓</span>' : ''}</span>
+          <span class="race-lane-avatar${r.isDriver ? ' driver' : ''}${r.finished ? ' done' : ''}" style="left:${Math.max(4, Math.min(96, pct)).toFixed(1)}%;background:${memberColor(r.m.user_id)};">${esc(getInitials(r.m.username))}${r.finished ? '<span class="race-done">✓</span>' : ''}</span>
         </div>
         <div class="race-eta">
           <span class="race-eta-min">${etaBig}</span>
@@ -1773,19 +1798,19 @@ function renderPositionBoard(session) {
   el.innerHTML = `
     <div class="race-header">
       <span class="race-title">🏁 Pickup race</span>
-      <span class="race-stats">${stats}</span>
+      <span class="race-stats">${raceOver ? '🏁 complete · ' : ''}${stats}</span>
     </div>
     <div class="race-target">→ ${esc(meetupLabel(carpool))}</div>
     ${rows.join('')}
   `;
 
-  // Upgrade each row's ETA to road routing when it resolves (cached 60s).
+  // Upgrade each racing row's ETA to road routing when it resolves (cached 60s).
   // The bar stays haversine-based (consistent start→pickup ratio), so only
   // the minute readout is refreshed. Coords rounded to ~111m so GPS jitter
   // doesn't trigger a fresh router fetch on every check-in.
   const round3 = (n) => Math.round(n * 1000) / 1000;
   racers.forEach((r) => {
-    if (!r.loc || r.etaMin == null) return;
+    if (r.finished || !r.loc || r.etaMin == null) return;
     roadEta(round3(r.loc.lat), round3(r.loc.lng), round3(mk), round3(ml), (dist, dur) => {
       const rowEl = document.getElementById('race-row-' + r.m.user_id);
       if (!rowEl || dist == null) return;
