@@ -75,8 +75,14 @@ async function main() {
   r = await post(`/api/carpools/${carpoolId}/sessions/start`, {}, ca);
   assert(r.status === 200, 'start session');
   assert(r.data.session.phase === 'meetup', 'phase meetup');
-  assert(r.data.session.driver_id === 1, 'alice is driver');
   assert(r.data.session.members.length === 2, '2 members in session');
+  console.log('   ✅ OK');
+
+  // ── 5b. Alice claims driving ──
+  console.log('5b. Alice claims driving...');
+  r = await post(`/api/carpools/${carpoolId}/sessions/respond`, { status: 'driving' }, ca);
+  assert(r.status === 200, 'alice driving');
+  assert(r.data.session.driver_id === 1, 'alice is driver');
   console.log('   ✅ OK');
 
   // ── 6. Bob responds riding ──
@@ -105,47 +111,60 @@ async function main() {
   assert(r.data.history[0].mileage > 0, 'mileage recorded');
   console.log('   ✅ alice: +1, bob: -1, mileage:', r.data.history[0].mileage.toFixed(2), 'km');
 
-  // ── 9. Advance: destination → dropoff ──
-  console.log('9. Advance: destination → dropoff...');
-  r = await post(`/api/carpools/${carpoolId}/sessions/advance-phase`, { phase: 'back_to_meetup' }, ca);
-  assert(r.status === 200, 'advance back_to_meetup');
-  assert(r.data.session.phase === 'back_to_meetup', 'phase back_to_meetup');
-  console.log('   ✅ OK');
-
-  // ── 10. Advance: dropoff → completed ──
-  console.log('10. Advance: dropoff → completed...');
+  // ── 9. Advance: destination → completed (no return leg) ──
+  console.log('9. Advance: destination → completed (no return leg)...');
   r = await post(`/api/carpools/${carpoolId}/sessions/advance-phase`, { phase: 'completed' }, ca);
-  assert(r.status === 200, 'advance completed');
+  assert(r.status === 200, 'advance completed from destination');
   assert(r.data.session.phase === 'completed', 'phase completed');
   assert(r.data.session.ended_at !== null, 'ended_at set');
   console.log('   ✅ OK');
 
-  // ── 11. Verify final state ──
-  console.log('11. Verify final state...');
+  // ── 10. Verify final state ──
+  console.log('10. Verify final state...');
   r = await get(`/api/carpools/${carpoolId}`, ca);
   assert(r.data.activeSession === null, 'no active session');
-  assert(r.data.history.length === 3, '3 history entries');
+  assert(r.data.history.length === 2, '2 history entries');
   console.log('   ✅ history entries:', r.data.history.length);
 
-  // ── 12. Invalid transitions ──
-  console.log('12. Test invalid transitions...');
+  // ── 11. Invalid transitions ──
+  console.log('11. Test invalid transitions...');
   // Start new session
   await post(`/api/carpools/${carpoolId}/sessions/start`, {}, ca);
-  // Try invalid: pickup → dropoff (should fail)
+  // Try invalid: pickup → dropoff/return (should fail)
   r = await post(`/api/carpools/${carpoolId}/sessions/advance-phase`, { phase: 'back_to_meetup' }, ca);
   assert(r.status === 400, 'invalid transition rejected');
-  console.log('   ✅ invalid transition correctly rejected');
+  // Advance to destination, then try invalid: destination → return (should fail)
+  r = await post(`/api/carpools/${carpoolId}/sessions/advance-phase`, { phase: 'destination' }, ca);
+  assert(r.status === 200, 'advance to destination');
+  r = await post(`/api/carpools/${carpoolId}/sessions/advance-phase`, { phase: 'back_to_meetup' }, ca);
+  assert(r.status === 400, 'return leg rejected');
+  console.log('   ✅ invalid transitions correctly rejected');
   // Cancel the test session
   await post(`/api/carpools/${carpoolId}/sessions/cancel`, {}, ca);
 
-  // ── 13. Cancel session test ──
-  console.log('13. Test cancel session...');
+  // ── 12. Cancel session test ──
+  console.log('12. Test cancel session...');
   await post(`/api/carpools/${carpoolId}/sessions/start`, {}, ca);
   r = await post(`/api/carpools/${carpoolId}/sessions/cancel`, {}, ca);
   assert(r.status === 200, 'cancel session');
   r = await get(`/api/carpools/${carpoolId}`, ca);
   assert(r.data.activeSession === null, 'no active session after cancel');
   console.log('   ✅ cancel works');
+
+  // ── 13. Auto-complete: arriving at the destination ends the trip ──
+  console.log('13. Auto-complete on arrival at destination (no return leg)...');
+  await post(`/api/carpools/${carpoolId}/sessions/start`, {}, ca);
+  r = await post(`/api/carpools/${carpoolId}/sessions/respond`, { status: 'driving' }, ca);
+  assert(r.status === 200, 'alice driving');
+  r = await post(`/api/carpools/${carpoolId}/sessions/respond`, { status: 'riding' }, cb);
+  assert(r.status === 200, 'bob riding');
+  r = await post(`/api/carpools/${carpoolId}/sessions/advance-phase`, { phase: 'destination' }, ca);
+  assert(r.status === 200 && r.data.session.phase === 'destination', 'en route to destination');
+  // One arrival at the destination marks the whole group (same car) and auto-completes
+  r = await post(`/api/carpools/${carpoolId}/sessions/respond`, { status: 'arrived' }, ca);
+  assert(r.status === 200, 'arrive at destination');
+  assert(r.data.session.phase === 'completed', 'trip auto-completed at destination');
+  console.log('   ✅ trip ended at the destination');
 
   console.log('\n🎉 All tests passed!');
 }

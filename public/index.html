@@ -228,8 +228,8 @@
           <div class="stop-detail" id="subway-dest-addr"></div>
         </div>
       </div>
-      <!-- Stop 4: Pickup again (dropoff) -->
-      <div class="subway-stop" id="subway-stop-return">
+      <!-- Stop 4: Pickup again (dropoff) — return leg disabled: trip ends at the destination -->
+      <div class="subway-stop" id="subway-stop-return" style="display:none;">
         <div class="dot"></div>
         <div class="stop-content">
           <div class="stop-row">
@@ -1127,16 +1127,15 @@ function updateSubwayMap(data) {
   document.getElementById('subway-meetup-addr').textContent = hasMeetup ? '' : 'Tap to set the pickup location';
   document.getElementById('subway-dest-name').textContent = destName;
   document.getElementById('subway-dest-addr').textContent = hasDest ? '' : 'Tap to set the drop-off';
-  document.getElementById('subway-return-name').textContent = hasMeetup ? meetupName : 'Dropoff';
-  document.getElementById('subway-return-addr').textContent = 'Dropoff';
 
-  // Reset all stops
+  // Reset all stops (the return/dropoff stop is disabled — the trip ends at the destination)
   const stopStart = document.getElementById('subway-stop-start');
   const stopMeetup = document.getElementById('subway-stop-meetup');
   const stopDest = document.getElementById('subway-stop-dest');
   const stopReturn = document.getElementById('subway-stop-return');
   const subwayLine = document.getElementById('subway-line');
   [stopStart, stopMeetup, stopDest, stopReturn].forEach(s => s.className = 'subway-stop');
+  stopReturn.style.display = 'none';
   subwayLine.className = 'subway-line';
 
   // Reset ETAs
@@ -1158,20 +1157,19 @@ function updateSubwayMap(data) {
       stopStart.classList.add('is-past');
       stopMeetup.classList.add('is-current');
       stopDest.classList.add('is-future');
-      stopReturn.classList.add('is-future');
     } else {
       stopStart.classList.add('is-current');
       stopMeetup.classList.add('is-future');
       stopDest.classList.add('is-future');
-      stopReturn.classList.add('is-future');
     }
   } else if (session.phase === 'destination') {
+    // The destination is the final stop — everyone arriving here completes the trip
     subwayLine.classList.add('phase-destination');
     stopStart.classList.add('is-past');
     stopMeetup.classList.add('is-past');
     stopDest.classList.add('is-current');
-    stopReturn.classList.add('is-future');
   } else if (session.phase === 'back_to_meetup') {
+    // Legacy sessions only — the return leg is disabled for new trips
     subwayLine.classList.add('phase-dropoff');
     stopStart.classList.add('is-past');
     stopMeetup.classList.add('is-past');
@@ -1201,9 +1199,8 @@ function positionSubwayProgress() {
       const myMember = session.members.find(m => m.user_id === currentUser.id);
       if (myMember && myMember.status === 'arrived') { fromId = 'subway-stop-start'; toId = 'subway-stop-meetup'; }
     } else if (session.phase === 'destination') {
+      // Final leg: pickup → destination. The trip ends here — no return leg.
       fromId = 'subway-stop-meetup'; toId = 'subway-stop-dest';
-    } else if (session.phase === 'back_to_meetup') {
-      fromId = 'subway-stop-dest'; toId = 'subway-stop-return';
     }
   }
 
@@ -1281,7 +1278,6 @@ function updateSubwayETAs(data) {
   const startEta = document.getElementById('subway-start-eta');
   const meetupEta = document.getElementById('subway-meetup-eta');
   const destEta = document.getElementById('subway-dest-eta');
-  const returnEta = document.getElementById('subway-return-eta');
 
   if (!session || session.phase === 'completed' || session.phase === 'idle') return;
 
@@ -1312,11 +1308,9 @@ function updateSubwayETAs(data) {
         if (has(dk, dl)) {
           pair(mk, ml, dk, dl, (leg) => {
             show(destEta, fmt(a.dist + leg.dist, a.min + leg.min));
-            show(returnEta, fmt(a.dist + leg.dist * 2, a.min + leg.min * 2));
           });
         } else {
           show(destEta, fmt(a.dist, a.min));
-          show(returnEta, fmt(a.dist, a.min));
         }
       });
     }
@@ -1325,19 +1319,6 @@ function updateSubwayETAs(data) {
     if (mL && has(dk, dl)) {
       pair(mL.lat, mL.lng, dk, dl, (a) => {
         show(destEta, fmt(a.dist, a.min));
-        if (has(mk, ml)) {
-          pair(dk, dl, mk, ml, (leg) => {
-            show(returnEta, fmt(a.dist + leg.dist, a.min + leg.min));
-          });
-        }
-      });
-    }
-  } else if (session.phase === 'back_to_meetup') {
-    hide(meetupEta);
-    hide(destEta);
-    if (mL && has(mk, ml)) {
-      pair(mL.lat, mL.lng, mk, ml, (a) => {
-        show(returnEta, fmt(a.dist, a.min));
       });
     }
   }
@@ -2110,11 +2091,12 @@ async function skipMember(userId) {
 
 async function advancePhase(phase) {
   if (!currentCarpoolId || !activeSession) return;
-  // Guard against stale buttons: only allow the valid next step from the current phase
+  // Guard against stale buttons: only allow the valid next step from the current phase.
+  // The trip ends at the destination — no return leg.
   const validNext = {
     meetup: ['destination'],
-    destination: ['back_to_meetup'],
-    back_to_meetup: ['completed']
+    destination: ['completed'],
+    back_to_meetup: ['completed'] // legacy sessions already on the return leg
   };
   if (!validNext[activeSession.phase] || !validNext[activeSession.phase].includes(phase)) {
     return;

@@ -195,9 +195,9 @@ const stmts = {
   activeSession: db.prepare(`
     SELECT * FROM carpool_sessions
     WHERE carpool_id = ? AND phase != 'idle' AND phase != 'completed'
-    ORDER BY created_at DESC LIMIT 1
+    ORDER BY id DESC LIMIT 1
   `),
-  latestSession: db.prepare('SELECT * FROM carpool_sessions WHERE carpool_id=? ORDER BY created_at DESC LIMIT 1'),
+  latestSession: db.prepare('SELECT * FROM carpool_sessions WHERE carpool_id=? ORDER BY id DESC LIMIT 1'),
   updateSessionPhase: db.prepare('UPDATE carpool_sessions SET phase=?, ended_at=CASE WHEN ? = \'completed\' THEN datetime(\'now\') ELSE ended_at END WHERE id=?'),
   updateSessionDriver: db.prepare('UPDATE carpool_sessions SET driver_id=? WHERE id=?'),
   updateSessionLocations: db.prepare('UPDATE carpool_sessions SET meetup_lat=?, meetup_lng=?, meetup_name=?, destination_lat=?, destination_lng=?, destination_name=? WHERE id=?'),
@@ -946,16 +946,11 @@ app.post('/api/carpools/:id/sessions/advance-phase', requireAuth, (req, res) => 
     // Phase transitions
     if (phase === 'destination' && activeSession.phase === 'meetup') {
       mileage = transitionToDestination(carpool, activeSession);
-    } else if (phase === 'back_to_meetup' && activeSession.phase === 'destination') {
-      mileage = haversine(
-        activeSession.destination_lat, activeSession.destination_lng,
-        activeSession.meetup_lat, activeSession.meetup_lng
-      );
-      stmts.addHistory.run(carpool.id, activeSession.id, 'back_to_meetup', activeSession.driver_id, 'phase_start', '{}', mileage,
-        'Heading back to dropoff.');
-
+    } else if (phase === 'completed' && activeSession.phase === 'destination') {
+      // No return leg — arriving at the destination ends the trip
+      mileage = transitionToComplete(carpool, activeSession);
     } else if (phase === 'completed' && activeSession.phase === 'back_to_meetup') {
-      // Total mileage for the dropoff trip already logged; just complete
+      // Legacy sessions already on the return leg still finish normally
       stmts.addHistory.run(carpool.id, activeSession.id, 'completed', activeSession.driver_id, 'carpool_complete', '{}', 0,
         'Carpool completed. All members back at pickup.');
     } else {
@@ -1103,26 +1098,7 @@ function transitionToDestination(carpool, activeSession) {
   return mileage;
 }
 
-// Destination → Dropoff: log the dropoff trip and set phase
-function transitionToReturn(carpool, activeSession) {
-  const mileage = haversine(
-    activeSession.destination_lat, activeSession.destination_lng,
-    activeSession.meetup_lat, activeSession.meetup_lng
-  );
-  stmts.addHistory.run(carpool.id, activeSession.id, 'back_to_meetup', activeSession.driver_id, 'phase_start', '{}', mileage,
-    'Heading back to dropoff.');
-  stmts.updateSessionPhase.run('back_to_meetup', 'back_to_meetup', activeSession.id);
-
-  // Start the dropoff leg fresh: en route again
-  const members = stmts.sessionMembers.all(activeSession.id);
-  for (const m of members) {
-    if (m.status === 'skip') continue;
-    stmts.updateSessionMember.run(m.user_id === activeSession.driver_id ? 'driving' : 'riding', null, null, activeSession.id, m.user_id);
-  }
-  return mileage;
-}
-
-// Dropoff → Completed: everyone's back at the pickup
+// Destination → Completed: everyone's arrived at the destination, trip ends
 function transitionToComplete(carpool, activeSession) {
   // Track miles only when the carpool had at least one rider (miles "saved"
   // by carpooling). A solo driver saves nothing, so record 0 miles.
@@ -1130,19 +1106,14 @@ function transitionToComplete(carpool, activeSession) {
   const riderCount = members.filter(m => m.status !== 'skip' && m.user_id !== activeSession.driver_id).length;
   let totalMiles = 0;
   if (riderCount > 0) {
-    // Total trip miles: pickup → destination → dropoff (round trip)
-    const outbound = haversine(
+    // One-way trip: pickup → destination (no return leg)
+    totalMiles = haversine(
       activeSession.meetup_lat, activeSession.meetup_lng,
       activeSession.destination_lat, activeSession.destination_lng
     );
-    const inbound = haversine(
-      activeSession.destination_lat, activeSession.destination_lng,
-      activeSession.meetup_lat, activeSession.meetup_lng
-    );
-    totalMiles = outbound + inbound;
   }
   stmts.addHistory.run(carpool.id, activeSession.id, 'completed', activeSession.driver_id, 'carpool_complete', '{}', totalMiles,
-    'Carpool completed. Miles recorded only when riders were present.');
+    'Carpool completed at the destination. Miles recorded only when riders were present.');
   stmts.updateSessionPhase.run('completed', 'completed', activeSession.id);
   return totalMiles;
 }
@@ -1160,8 +1131,10 @@ function autoAdvanceCheck(carpoolId) {
   if (session.phase === 'meetup') {
     mileage = transitionToDestination(stmts.carpoolById.get(carpoolId), session);
   } else if (session.phase === 'destination') {
-    mileage = transitionToReturn(stmts.carpoolById.get(carpoolId), session);
+    // Arriving at the destination ends the trip — no return leg
+    mileage = transitionToComplete(stmts.carpoolById.get(carpoolId), session);
   } else if (session.phase === 'back_to_meetup') {
+    // Legacy sessions already on the return leg still finish normally
     mileage = transitionToComplete(stmts.carpoolById.get(carpoolId), session);
   } else {
     return false;

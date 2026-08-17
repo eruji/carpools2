@@ -28,7 +28,7 @@ Open `http://localhost:3000` in a browser. Leaflet maps and Socket.IO load from 
 3. **Invite members** — they accept from the dashboard
 4. **Start a session** — driver clicks "I'm Driving!"
 5. **Members respond** — driving, riding, skip, or arrived
-6. **Phase flow:** Pickup → Destination → Dropoff → Complete
+6. **Phase flow:** Pickup → Destination → Complete (the trip ends when everyone arrives at the destination — no return leg)
 7. **Coins** are distributed when leaving for destination: driver gets +1 per rider, riders pay -1 each
 8. **Real-time map** shows member locations and route during active sessions
 
