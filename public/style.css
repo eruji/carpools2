@@ -460,9 +460,16 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   border-radius: 12px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.04);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 12px;
+}
+.sc-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--text);
+  margin-bottom: 8px;
 }
 
 /* ── Carousel nav: arrows + dots ── */
@@ -737,6 +744,13 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   font-size: 0.62rem;
   color: var(--text-3);
   white-space: nowrap;
+}
+.race-eta-clock {
+  display: block;
+  font-size: 0.62rem;
+  color: var(--text-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .subway-line {
@@ -1098,6 +1112,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   border: 1px solid var(--border); border-radius: 10px;
   transition: border-color 0.2s;
   gap: 6px;
+  min-height: 40px; /* stable row height — layout never pops when ETA text lands */
 }
 .member-row:hover { border-color: var(--border-strong); }
 .member-row.is-driver {
@@ -1110,7 +1125,17 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .member-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .member-info .member-name { font-weight: 600; font-size: 0.95rem; }
 .member-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.member-eta { white-space: nowrap; }
+/* Fixed-width ETA slot: the ETA arrives async after each GPS re-render, so
+   without reserved space the row would widen/shrink and the info column
+   would wrap, making the bar taller and shorter in a loop. */
+.member-eta {
+  white-space: nowrap;
+  display: inline-block;
+  width: 104px;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ── Alerts ──────────────────────────────────────────────────── */
 .alert {
