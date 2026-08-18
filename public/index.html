@@ -1897,18 +1897,31 @@ function followMyLocation() {
   centerLocationInViewport(myLocation.lat, myLocation.lng);
 }
 
-// Full-screen "Arrived!" flash on arrival.
+// Full-screen arrival flash. During the pickup race, "message" is the
+// finisher's place (e.g. "1st place! 🥇") — destination arrivals stay plain.
 let arrivalTimer = null;
-function showArrivedOverlay() {
+function showArrivedOverlay(message) {
   const el = document.getElementById('arrival-overlay');
   const text = el ? el.querySelector('.arrival-overlay-text') : null;
   if (!el || !text) return;
+  text.textContent = message || 'Arrived';
   el.classList.remove('hidden');
   text.style.animation = 'none';
   void text.offsetWidth; // restart the animation
   text.style.animation = '';
   if (arrivalTimer) clearTimeout(arrivalTimer);
   arrivalTimer = setTimeout(() => el.classList.add('hidden'), 1500);
+}
+
+// The current user's finishing place in the pickup race, from the rank frozen
+// by the position board (raceFinishSeq). Returns null when not racing, so the
+// caller falls back to the plain "Arrived".
+function arrivalPlaceLabel() {
+  const seq = raceFinishSeq[currentUser.id];
+  if (seq == null) return null;
+  const medal = seq === 1 ? ' 🥇' : seq === 2 ? ' 🥈' : seq === 3 ? ' 🥉' : '';
+  const ord = seq === 1 ? '1st' : seq === 2 ? '2nd' : seq === 3 ? '3rd' : seq + 'th';
+  return `${ord} place!${medal}`;
 }
 
 function toggleMapLegend() {
@@ -2279,6 +2292,9 @@ async function startSession() {
 
 async function respondToSession(status) {
   if (!currentCarpoolId || !activeSession) return;
+  // Captured before the fetch: the session may auto-advance out of meetup when
+  // the last member arrives, but the placement notification is for the pickup.
+  const arrivingAtPickup = status === 'arrived' && activeSession.phase === 'meetup';
   const res = await fetch(`/api/carpools/${currentCarpoolId}/sessions/respond`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -2291,7 +2307,10 @@ async function respondToSession(status) {
   }
   setSession(data.session);
 
-  if (status === 'arrived') showArrivedOverlay();
+  if (status === 'arrived') {
+    const place = arrivingAtPickup ? arrivalPlaceLabel() : null;
+    showArrivedOverlay(place || 'Arrived');
+  }
 
   if (status === 'driving' || status === 'riding') {
     pendingLocFit = true;
@@ -2826,8 +2845,10 @@ async function autoArrive(targetName, targetLat, targetLng) {
   else if (myLocation) lastAutoArrivePos = { lat: myLocation.lat, lng: myLocation.lng };
   const data = await res.json();
   setSession(data.session);
-  showArrivedOverlay();
-  showToast('Auto-arrived at ' + targetName);
+  // Placement is a pickup-race thing — destination/dropoff arrivals stay plain.
+  const place = targetName === 'the pickup' ? arrivalPlaceLabel() : null;
+  showArrivedOverlay(place || 'Arrived');
+  showToast(place ? '🏁 ' + place : 'Auto-arrived at ' + targetName);
 }
 
 // ── Toast ───────────────────────────────────────────────────────────────────
