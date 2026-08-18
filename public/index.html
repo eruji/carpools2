@@ -1246,11 +1246,28 @@ function roadEta(lat1, lng1, lat2, lng2, cb) {
 }
 
 // Shared arrival-time text used by the subway stops and the member list
+function fmtClock(date) {
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
 function etaClock(mins) {
-  return new Date(Date.now() + Math.max(0, Math.round(mins)) * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return fmtClock(new Date(Date.now() + Math.max(0, Math.round(mins)) * 60000));
 }
 function etaText(mi, mins) {
   return `${Math.round(mi)}mi ${etaClock(mins)}`;
+}
+// Frozen arrival time for a finished racer: the server-recorded arrived_at
+// (UTC "YYYY-MM-DD HH:MM:SS" → parsed as UTC so the local clock is right, and
+// it survives reloads), else the client-frozen detection time. Null when the
+// member finished without a recorded arrival (legacy rows).
+function arrivalClockOf(r) {
+  const at = r.m && r.m.arrived_at;
+  if (at) {
+    const d = new Date(at.includes('T') ? at : at.replace(' ', 'T') + 'Z');
+    if (!isNaN(d.getTime())) return d;
+  }
+  const t = raceFinishTime[r.m.user_id];
+  if (t != null) return new Date(t);
+  return null;
 }
 
 // The single "car" position during transit: the driver's live location, else mine
@@ -1639,11 +1656,13 @@ function renderSeatingChart(session) {
 // avatar bubble rides a progress bar measuring % of the way from their
 // starting location to the pickup, with ETA on the right. Ranks freeze at
 // arrival (first to arrive keeps 1st, second keeps 2nd…) and the final
-// standings stay up after the carpool departs. Re-renders on every GPS
-// check-in via onLocationsChanged().
+// standings — each finisher's frozen "arrived <clock>" included — stay up
+// after the carpool departs and through trip completion. Re-renders on every
+// GPS check-in via onLocationsChanged().
 const POSITION_STALE_SEC = 120;  // treat a member's GPS as stale after 2 min
 const raceStartDist = {};        // user_id -> miles to pickup at first sighting
 const raceFinishSeq = {};        // user_id -> arrival sequence (rank, frozen on arrival)
+const raceFinishTime = {};       // user_id -> epoch ms of arrival (frozen on arrival)
 let raceStartSessionId = null;   // reset race state when the session changes
 let raceFinishSeqCounter = 0;    // next arrival sequence number
 
@@ -1653,7 +1672,7 @@ function renderPositionBoard(session) {
   if (!el) return;
   const carpool = currentCarpoolData ? currentCarpoolData.carpool : null;
 
-  if (!session || !carpool || session.phase === 'completed' || session.phase === 'idle') {
+  if (!session || !carpool || session.phase === 'idle') {
     el.innerHTML = '<div class="car-empty-note text-xs">No active trip</div>';
     return;
   }
@@ -1668,6 +1687,7 @@ function renderPositionBoard(session) {
     raceStartSessionId = session.id;
     for (const k in raceStartDist) delete raceStartDist[k];
     for (const k in raceFinishSeq) delete raceFinishSeq[k];
+    for (const k in raceFinishTime) delete raceFinishTime[k];
     raceFinishSeqCounter = 0;
   }
 
@@ -1720,7 +1740,12 @@ function renderPositionBoard(session) {
   // arrivals are sequenced by ETA for a stable order.
   if (!raceOver) {
     const newFin = racers.filter(r => r.finished && raceFinishSeq[r.m.user_id] == null).sort(etaCompare);
-    for (const r of newFin) raceFinishSeq[r.m.user_id] = ++raceFinishSeqCounter;
+    for (const r of newFin) {
+      raceFinishSeq[r.m.user_id] = ++raceFinishSeqCounter;
+      // Freeze the arrival clock the moment the rank freezes, so everyone
+      // sees the same time even before the server round-trip lands.
+      if (raceFinishTime[r.m.user_id] == null) raceFinishTime[r.m.user_id] = Date.now();
+    }
   } else {
     // Race settled: give anyone without a sequence their place by ETA so the
     // final standings are complete (late joiners / no-GPS members).
@@ -1786,7 +1811,9 @@ function renderPositionBoard(session) {
         <div class="race-eta">
           <span class="race-eta-min">${etaBig}</span>
           <span class="race-eta-sub" data-delta="${deltaTxt}">${etaSub}</span>
-          ${r.etaMin != null && !r.finished ? `<span class="race-eta-clock">arr ${etaClock(r.etaMin)}</span>` : ''}
+          ${r.finished
+            ? (arrivalClockOf(r) ? `<span class="race-eta-arrived">arrived ${fmtClock(arrivalClockOf(r))}</span>` : '')
+            : r.etaMin != null ? `<span class="race-eta-clock">arr ${etaClock(r.etaMin)}</span>` : ''}
         </div>
       </div>`;
   });

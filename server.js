@@ -145,6 +145,11 @@ const smCols = db.prepare('PRAGMA table_info(session_members)').all().map(c => c
 if (!smCols.includes('auto_arrived')) {
   db.exec('ALTER TABLE session_members ADD COLUMN auto_arrived INTEGER DEFAULT 0');
 }
+// First-arrival timestamp so the race board can show "arrived <clock>" that
+// survives reloads (COALESCE keeps it frozen on later re-arrivals)
+if (!smCols.includes('arrived_at')) {
+  db.exec('ALTER TABLE session_members ADD COLUMN arrived_at DATETIME');
+}
 
 // ── Invite code generator ───────────────────────────────────────────────────
 function generateInviteCode() {
@@ -211,6 +216,7 @@ const stmts = {
     WHERE sm.session_id = ?
   `),
   sessionMemberByUser: db.prepare('SELECT * FROM session_members WHERE session_id=? AND user_id=?'),
+  markArrivedAt: db.prepare("UPDATE session_members SET arrived_at = COALESCE(arrived_at, datetime('now')) WHERE session_id=? AND user_id=?"),
 
   // History
   addHistory: db.prepare('INSERT INTO carpool_history (carpool_id, session_id, phase, driver_id, event, coins_data, mileage, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
@@ -863,10 +869,14 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
       for (const m of members) {
         if (m.status !== 'skip') {
           stmts.updateSessionMember.run('arrived', null, null, activeSession.id, m.user_id);
+          stmts.markArrivedAt.run(activeSession.id, m.user_id);
         }
       }
     } else {
       stmts.updateSessionMember.run(status, null, null, activeSession.id, req.session.userId);
+      if (status === 'arrived') {
+        stmts.markArrivedAt.run(activeSession.id, req.session.userId);
+      }
     }
 
     // Mark geo-fence arrivals so the UI can show it
