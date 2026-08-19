@@ -14,17 +14,5 @@ services:
       - DB_PATH=/data/carpool.db
     restart: unless-stopped
 
-  watchtower:
-    image: containrrr/watchtower
-    # Single host-wide watcher: no container filter, so it monitors every
-    # container on this host (carpool, rally-point, scrab, cloudflared, …)
-    # and recreates any whose registry image changed. Per-project watchers
-    # were removed from the other projects' compose files — run this one only.
-    container_name: watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 300
-    restart: unless-stopped
-
 volumes:
   carpool_data:
