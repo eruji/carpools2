@@ -589,14 +589,16 @@ async function loadVersion() {
   try {
     const res = await fetch('/api/version');
     const data = await res.json();
-    const buildNum = data.buildNum ? '· b' + data.buildNum : '';
-    const sha = data.build ? '· ' + data.build.slice(0, 7) : '';
+    const buildNum = data.buildNum ? '#' + data.buildNum : '';
+    const sha = data.build ? data.build.slice(0, 7) : '';
+    const builtAt = data.builtAt || '';
     const el = document.getElementById('app-version');
-    if (el) el.textContent = 'v' + data.version + buildNum + sha;
-    document.getElementById('app-title').title = 'v' + data.version + buildNum + sha + (data.builtAt ? ' · ' + data.builtAt : '');
+    if (el) el.textContent = buildNum;
+    // Full details live in the title hover tooltip
+    document.getElementById('app-title').title = 'build ' + buildNum + ' · ' + sha + (builtAt ? ' · ' + builtAt : '');
   } catch (e) {
     const el = document.getElementById('app-version');
-    if (el) el.textContent = 'v?';
+    if (el) el.textContent = '?';
   }
 }
 
