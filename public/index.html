@@ -1663,8 +1663,66 @@ const POSITION_STALE_SEC = 120;  // treat a member's GPS as stale after 2 min
 const raceStartDist = {};        // user_id -> miles to pickup at first sighting
 const raceFinishSeq = {};        // user_id -> arrival sequence (rank, frozen on arrival)
 const raceFinishTime = {};       // user_id -> epoch ms of arrival (frozen on arrival)
+const raceSpeed = {};            // user_id -> { fixes:[{lat,lng,ts}], maxMph, distMi, startTs, lastMph }
+const raceSpeedResult = {};      // user_id -> { maxMph, avgMph } frozen at arrival
 let raceStartSessionId = null;   // reset race state when the session changes
 let raceFinishSeqCounter = 0;    // next arrival sequence number
+
+// ── Live speed tracking (mph) ───────────────────────────────────────────────
+// Feeds every GPS fix (mine + broadcast member fixes) into a small ring
+// buffer per member and derives: lastMph (realtime), maxMph (fastest),
+// distMi + startTs (for average speed). Frozen at arrival, then the results
+// are sent to the server for the end results.
+function feedSpeedFix(userId, lat, lng, ts) {
+  if (!activeSession || activeSession.phase === 'completed' || activeSession.phase === 'idle') return;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  const tr = raceSpeed[userId] || (raceSpeed[userId] = { fixes: [], maxMph: 0, distMi: 0, startTs: ts, lastMph: null });
+  const last = tr.fixes[tr.fixes.length - 1];
+  if (last) {
+    const dtSec = (ts - last.ts) / 1000;
+    // Skip fixes landing too close together (GPS jitter); require a minimum
+    // movement so parked jitter reads as 0 mph instead of noise.
+    if (dtSec >= 4) {
+      const mi = haversine(last.lat, last.lng, lat, lng);
+      const mph = mi < 0.008 ? 0 : mi / (dtSec / 3600); // <13m ≈ stationary
+      if (mi >= 0.008) tr.distMi += mi;
+      if (Number.isFinite(mph)) {
+        const capped = Math.min(150, Math.max(0, mph));
+        tr.lastMph = capped;
+        if (capped > tr.maxMph) tr.maxMph = capped;
+      }
+    }
+  } else {
+    tr.startTs = ts;
+  }
+  tr.fixes.push({ lat, lng, ts });
+  if (tr.fixes.length > 8) tr.fixes.shift();
+}
+
+// Live fastest + average for the current user, sent with the arrival request
+// so the server stores them in the end results.
+function currentRaceSpeeds() {
+  const sp = raceSpeed[currentUser.id];
+  if (!sp) return {};
+  const elapsedH = Math.max(30, (Date.now() - sp.startTs) / 1000) / 3600; // seconds → hours, 30s floor
+  return {
+    maxMph: sp.maxMph > 0 ? Math.round(sp.maxMph * 10) / 10 : null,
+    avgMph: sp.distMi > 0 ? Math.round((sp.distMi / elapsedH) * 10) / 10 : null
+  };
+}
+
+// Frozen "fastest · avg" line for a finished racer: client-frozen values,
+// falling back to the server-stored ones (survive reloads).
+function speedResultHtml(r) {
+  const frozen = raceSpeedResult[r.m.user_id] || {};
+  const maxMph = frozen.maxMph != null ? frozen.maxMph : (Number.isFinite(r.m.max_mph) ? r.m.max_mph : null);
+  const avgMph = frozen.avgMph != null ? frozen.avgMph : (Number.isFinite(r.m.avg_mph) ? r.m.avg_mph : null);
+  if (maxMph == null && avgMph == null) return '';
+  const parts = [];
+  if (maxMph != null) parts.push(`${Math.round(maxMph)} mph fastest`);
+  if (avgMph != null) parts.push(`${Math.round(avgMph)} mph avg`);
+  return `<span class="race-eta-speed">${parts.join(' · ')}</span>`;
+}
 
 function renderPositionBoard(session) {
   if (!FEATURES.positionBoard) return;
@@ -1688,6 +1746,8 @@ function renderPositionBoard(session) {
     for (const k in raceStartDist) delete raceStartDist[k];
     for (const k in raceFinishSeq) delete raceFinishSeq[k];
     for (const k in raceFinishTime) delete raceFinishTime[k];
+    for (const k in raceSpeed) delete raceSpeed[k];
+    for (const k in raceSpeedResult) delete raceSpeedResult[k];
     raceFinishSeqCounter = 0;
   }
 
@@ -1745,6 +1805,15 @@ function renderPositionBoard(session) {
       // Freeze the arrival clock the moment the rank freezes, so everyone
       // sees the same time even before the server round-trip lands.
       if (raceFinishTime[r.m.user_id] == null) raceFinishTime[r.m.user_id] = Date.now();
+      // Same freeze for the speed results (fastest + average).
+      if (raceSpeedResult[r.m.user_id] == null && raceSpeed[r.m.user_id]) {
+        const sp = raceSpeed[r.m.user_id];
+        const elapsedH = Math.max(30, (Date.now() - sp.startTs) / 1000) / 3600; // seconds → hours, 30s floor
+        raceSpeedResult[r.m.user_id] = {
+          maxMph: sp.maxMph > 0 ? Math.round(sp.maxMph * 10) / 10 : 0,
+          avgMph: sp.distMi > 0 ? Math.round((sp.distMi / elapsedH) * 10) / 10 : 0
+        };
+      }
     }
   } else {
     // Race settled: give anyone without a sequence their place by ETA so the
@@ -1812,8 +1881,8 @@ function renderPositionBoard(session) {
           <span class="race-eta-min">${etaBig}</span>
           <span class="race-eta-sub" data-delta="${deltaTxt}">${etaSub}</span>
           ${r.finished
-            ? (arrivalClockOf(r) ? `<span class="race-eta-arrived">arrived ${fmtClock(arrivalClockOf(r))}</span>` : '')
-            : r.etaMin != null ? `<span class="race-eta-clock">arr ${etaClock(r.etaMin)}</span>` : ''}
+            ? `${arrivalClockOf(r) ? `<span class="race-eta-arrived">arrived ${fmtClock(arrivalClockOf(r))}</span>` : ''}${speedResultHtml(r)}`
+            : `${r.etaMin != null ? `<span class="race-eta-clock">arr ${etaClock(r.etaMin)}</span>` : ''}${r.etaMin != null && raceSpeed[r.m.user_id] && raceSpeed[r.m.user_id].lastMph != null ? `<span class="race-mph">${Math.round(raceSpeed[r.m.user_id].lastMph)} mph</span>` : ''}`}
         </div>
       </div>`;
   });
@@ -2322,10 +2391,11 @@ async function respondToSession(status) {
   // Captured before the fetch: the session may auto-advance out of meetup when
   // the last member arrives, but the placement notification is for the pickup.
   const arrivingAtPickup = status === 'arrived' && activeSession.phase === 'meetup';
+  const speeds = status === 'arrived' ? currentRaceSpeeds() : {};
   const res = await fetch(`/api/carpools/${currentCarpoolId}/sessions/respond`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status })
+    body: JSON.stringify({ status, ...speeds })
   });
   const data = await res.json();
   if (!res.ok) {
@@ -2760,6 +2830,7 @@ function startLocationTracking() {
         });
         // Geo-fence: auto-arrive when close to the current target
         checkGeoFence();
+        feedSpeedFix(currentUser.id, myLocation.lat, myLocation.lng, Date.now());
         // Keep my own member row in sync (server only broadcasts to others)
         const me = activeSession.members.find(m => m.user_id === currentUser.id);
         if (me) {
@@ -2797,6 +2868,7 @@ function startLocationTracking() {
             lng: myLocation.lng
           });
           checkGeoFence();
+          feedSpeedFix(currentUser.id, myLocation.lat, myLocation.lng, Date.now());
           const me = activeSession.members.find(m => m.user_id === currentUser.id);
           if (me) {
             me.location_lat = myLocation.lat;
@@ -2864,7 +2936,7 @@ async function autoArrive(targetName, targetLat, targetLng) {
   const res = await fetch(`/api/carpools/${currentCarpoolId}/sessions/respond`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status: 'arrived', auto: true })
+    body: JSON.stringify({ status: 'arrived', auto: true, ...currentRaceSpeeds() })
   });
   if (!res.ok) return;
   // Remember where we auto-arrived so the next stop isn't skipped while still here
@@ -2968,6 +3040,7 @@ function connectSocket() {
       member.location_lng = data.lng;
       member.updated_at = new Date(data.timestamp).toISOString().slice(0, 19).replace('T', ' ');
     }
+    feedSpeedFix(data.userId, data.lat, data.lng, data.timestamp || Date.now());
     onLocationsChanged();
   });
 
