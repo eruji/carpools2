@@ -597,28 +597,28 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-  padding: 12px;
+  padding: 16px;
 }
 .race-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 .race-title {
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: 1.2rem;
   color: var(--text);
 }
 .race-stats {
-  font-size: 0.65rem;
+  font-size: 0.85rem;
   color: var(--text-3);
   text-align: right;
 }
 .race-target {
-  font-size: 0.72rem;
+  font-size: 0.92rem;
   color: var(--text-3);
-  margin-bottom: 6px;
+  margin-bottom: 10px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -626,37 +626,37 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .race-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 7px 2px;
+  gap: 12px;
+  padding: 12px 2px;
   border-bottom: 1px solid var(--border);
 }
 .race-row:last-child { border-bottom: none; }
 .race-pos {
   flex-shrink: 0;
-  width: 28px;
-  font-size: 0.72rem;
+  width: 42px;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--text-2);
   text-align: center;
 }
-.race-row.arrived .race-pos { font-size: 0.9rem; }
+.race-row.arrived .race-pos { font-size: 1.25rem; }
 /* Lane: a thin track with the member's avatar bubble riding on the line */
 .race-lane {
   position: relative;
   flex: 1;
   min-width: 0;
-  height: 28px; /* room for the avatar bubble */
+  height: 42px; /* room for the avatar bubble */
 }
 .race-lane-track {
   position: absolute;
   left: 0;
   right: 0;
   top: 50%;
-  height: 7px;
+  height: 10px;
   transform: translateY(-50%);
   background: var(--surface-alt);
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: 5px;
   overflow: hidden;
 }
 /* Checkered finish stripe at the right edge — the finish line */
@@ -666,9 +666,9 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   right: 0;
   top: -1px;
   bottom: -1px;
-  width: 7px;
-  background: repeating-conic-gradient(#3a3a3a 0% 25%, #fff 0% 50%) 0 0 / 7px 7px;
-  border-radius: 0 4px 4px 0;
+  width: 10px;
+  background: repeating-conic-gradient(#3a3a3a 0% 25%, #fff 0% 50%) 0 0 / 10px 10px;
+  border-radius: 0 5px 5px 0;
   opacity: 0.85;
 }
 .race-lane-fill {
@@ -676,7 +676,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   left: 0;
   top: 0;
   bottom: 0;
-  border-radius: 4px;
+  border-radius: 5px;
   background: linear-gradient(90deg, var(--accent) 0%, var(--accent-dark) 100%);
   transition: width 0.6s ease;
 }
@@ -685,23 +685,23 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .race-row.stale .race-lane-fill {
   opacity: 0.55;
-  background-image: repeating-linear-gradient(45deg, var(--accent) 0 6px, var(--accent-dark) 6px 12px);
+  background-image: repeating-linear-gradient(45deg, var(--accent) 0 8px, var(--accent-dark) 8px 16px);
 }
 .race-lane-avatar {
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 26px;
-  height: 26px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 10px;
+  font-size: 14px;
   letter-spacing: 0.02em;
-  border: 2px solid #fff;
+  border: 2.5px solid #fff;
   box-shadow: 0 1px 3px rgba(0,0,0,0.25);
   z-index: 2;
   transition: left 0.6s ease;
@@ -710,30 +710,30 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 /* Finished: gold ring so you can spot arrivals at a glance */
 .race-lane-avatar.done {
   border-color: #C0A46A;
-  box-shadow: 0 0 0 2px rgba(192,164,106,0.45);
+  box-shadow: 0 0 0 3px rgba(192,164,106,0.45);
 }
 .race-row.stale .race-lane-avatar { opacity: 0.45; }
 /* Small ✓ badge pinned to an arrived avatar */
 .race-done {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  width: 14px;
-  height: 14px;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #2e9e57;
   color: #fff;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid #fff;
+  border: 2px solid #fff;
 }
-.race-eta { text-align: right; flex-shrink: 0; min-width: 56px; }
+.race-eta { text-align: right; flex-shrink: 0; min-width: 88px; }
 .race-eta-min {
   display: block;
-  font-size: 0.95rem;
+  font-size: 1.3rem;
   font-weight: 800;
   color: var(--accent-deep);
   line-height: 1.2;
@@ -741,20 +741,20 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .race-row.arrived .race-eta-min { color: #A89050; }
 .race-eta-sub {
   display: block;
-  font-size: 0.62rem;
+  font-size: 0.85rem;
   color: var(--text-3);
   white-space: nowrap;
 }
 .race-eta-clock {
   display: block;
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   color: var(--text-2);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .race-eta-arrived {
   display: block;
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--accent-deep);
   white-space: nowrap;
@@ -762,7 +762,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .race-mph {
   display: block;
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--accent-dark);
   white-space: nowrap;
@@ -770,7 +770,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .race-eta-speed {
   display: block;
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   color: var(--text-2);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
