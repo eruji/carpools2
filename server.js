@@ -995,11 +995,16 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
       }
     }
 
-    // Notify the driver when a member arrives (skip when the driver self-arrives)
-    if (status === 'arrived' && activeSession.driver_id && activeSession.driver_id !== req.session.userId) {
+    // Pickup arrivals: notify the whole group. The driver showing up is the
+    // important one ("time to head out"); other arrivals tell everyone who's here.
+    // No push for destination arrivals — the group is together in the car by then.
+    if (status === 'arrived' && activeSession.phase === 'meetup') {
       const arriver = stmts.userById.get(req.session.userId);
-      const place = activeSession.phase === 'meetup' ? 'at the pickup' : 'at the destination';
-      sendPush(activeSession.driver_id, 'Member arrived 📍', `${arriver.username} arrived ${place}`, `/?carpool=${carpool.id}`);
+      if (activeSession.driver_id === req.session.userId) {
+        pushToCarpoolMembers(carpool.id, req.session.userId, 'Driver is here 🚘', `${arriver.username} is waiting at the pickup — time to head out!`, `/?carpool=${carpool.id}`);
+      } else {
+        pushToCarpoolMembers(carpool.id, req.session.userId, 'Member arrived 📍', `${arriver.username} arrived at the pickup`, `/?carpool=${carpool.id}`);
+      }
     }
 
     // Mark geo-fence arrivals so the UI can show it
