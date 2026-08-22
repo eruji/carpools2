@@ -5,7 +5,9 @@ const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 const { execSync } = require('child_process');
+const webpush = require('web-push');
 const pkg = require('./package.json');
 
 // In Docker these come from build args; locally derive them from git
@@ -113,6 +115,15 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE TABLE IF NOT EXISTS carpool_locations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     carpool_id INTEGER NOT NULL REFERENCES carpools(id) ON DELETE CASCADE,
@@ -175,6 +186,15 @@ const stmts = {
   userByEmail: db.prepare('SELECT * FROM users WHERE email = ?'),
   createUser: db.prepare('INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)'),
   searchUsers: db.prepare('SELECT id, username, email FROM users WHERE (username LIKE ? OR email LIKE ?) AND id != ? LIMIT 20'),
+
+  // Push subscriptions
+  pushSubsForUser: db.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?'),
+  upsertPushSub: db.prepare(`
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)
+    ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth
+  `),
+  deletePushSubs: db.prepare('DELETE FROM push_subscriptions WHERE user_id = ?'),
+  deletePushSubByEndpoint: db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?'),
 
   // Carpools
   createCarpool: db.prepare('INSERT INTO carpools (name, owner_id, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname, invite_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
@@ -295,6 +315,72 @@ function requireAuth(req, res, next) {
   }
   next();
 }
+
+// ── Push Notifications ──────────────────────────────────────────────────────
+// VAPID keys: use env vars, or generate once and persist next to the DB.
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:push@vroommates.local';
+let vapidKeys = { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY };
+if (!vapidKeys.publicKey || !vapidKeys.privateKey) {
+  const keyPath = path.join(path.dirname(dbPath), 'vapid-keys.json');
+  try {
+    vapidKeys = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
+  } catch (e) {
+    vapidKeys = webpush.generateVAPIDKeys();
+    try { fs.writeFileSync(keyPath, JSON.stringify(vapidKeys, null, 2)); }
+    catch (e2) { /* read-only fs — keys are valid for this process only */ }
+  }
+}
+webpush.setVapidDetails(VAPID_SUBJECT, vapidKeys.publicKey, vapidKeys.privateKey);
+
+function sendPush(userId, title, body, url) {
+  const subs = stmts.pushSubsForUser.all(userId);
+  for (const s of subs) {
+    const sub = { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } };
+    webpush.sendNotification(sub, JSON.stringify({ title, body, url }))
+      .catch((err) => {
+        // 404/410 = subscription expired or revoked — clean it up
+        if (err.statusCode === 404 || err.statusCode === 410) {
+          stmts.deletePushSubByEndpoint.run(s.endpoint);
+        }
+      });
+  }
+}
+
+function pushToCarpoolMembers(carpoolId, excludeUserId, title, body, url) {
+  const members = stmts.carpoolMembers.all(carpoolId);
+  for (const m of members) {
+    if (m.id !== excludeUserId) sendPush(m.id, title, body, url);
+  }
+}
+
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ publicKey: vapidKeys.publicKey });
+});
+
+app.post('/api/push/subscribe', requireAuth, (req, res) => {
+  try {
+    const { subscription } = req.body;
+    if (!subscription || !subscription.endpoint || !subscription.keys || !subscription.keys.p256dh || !subscription.keys.auth) {
+      return res.status(400).json({ error: 'Invalid subscription' });
+    }
+    stmts.upsertPushSub.run(req.session.userId, subscription.endpoint, subscription.keys.p256dh, subscription.keys.auth);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/push/subscribe', requireAuth, (req, res) => {
+  const { endpoint } = req.body;
+  if (endpoint) stmts.deletePushSubByEndpoint.run(endpoint);
+  else stmts.deletePushSubs.run(req.session.userId);
+  res.json({ ok: true });
+});
+
+app.post('/api/push/test', requireAuth, (req, res) => {
+  sendPush(req.session.userId, 'VroomMates 🔔', 'Test notification — push is working!', '/');
+  res.json({ ok: true });
+});
 
 // ── Auth Routes ─────────────────────────────────────────────────────────────
 app.post('/api/register', (req, res) => {
@@ -651,6 +737,9 @@ app.post('/api/carpools/:id/members', requireAuth, (req, res) => {
   stmts.addMember.run(carpool.id, user.id);
   // Also create an invitation record
   stmts.createInvitation.run(carpool.id, user.id, req.session.userId);
+  // Notify the invited user
+  const inviter = stmts.userById.get(req.session.userId);
+  sendPush(user.id, 'New carpool invitation', `${inviter.username} invited you to join "${carpool.name}"`, `/?carpool=${carpool.id}`);
   // If a session is already active, add the new member to it as pending
   const active = stmts.activeSession.get(carpool.id);
   if (active) stmts.addSessionMember.run(active.id, user.id, 'pending');
@@ -827,6 +916,10 @@ app.post('/api/carpools/:id/sessions/start', requireAuth, (req, res) => {
       stmts.addSessionMember.run(sessionId, m.id, 'pending');
     }
 
+    // Notify everyone else that a session is starting
+    const starter = stmts.userById.get(req.session.userId);
+    pushToCarpoolMembers(carpool.id, req.session.userId, 'Session started 🚗', `${starter.username} started a session for "${carpool.name}"`, `/?carpool=${carpool.id}`);
+
     const session = { ...stmts.latestSession.get(carpool.id), members: stmts.sessionMembers.all(sessionId) };
 
     // Notify via socket
@@ -871,6 +964,12 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
       stmts.updateSessionDriver.run(req.session.userId, activeSession.id);
     }
 
+    // Notify the group that someone claimed driving
+    if (status === 'driving') {
+      const driver = stmts.userById.get(req.session.userId);
+      pushToCarpoolMembers(carpool.id, req.session.userId, 'Driver claimed 🚘', `${driver.username} is driving — time to head out!`, `/?carpool=${carpool.id}`);
+    }
+
     // Once the carpool is en route, everyone is in the same car — one "Arrived"
     // marks the whole group so any member can advance the leg.
     if (status === 'arrived' && (activeSession.phase === 'destination' || activeSession.phase === 'back_to_meetup')) {
@@ -896,6 +995,13 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
       }
     }
 
+    // Notify the driver when a member arrives (skip when the driver self-arrives)
+    if (status === 'arrived' && activeSession.driver_id && activeSession.driver_id !== req.session.userId) {
+      const arriver = stmts.userById.get(req.session.userId);
+      const place = activeSession.phase === 'meetup' ? 'at the pickup' : 'at the destination';
+      sendPush(activeSession.driver_id, 'Member arrived 📍', `${arriver.username} arrived ${place}`, `/?carpool=${carpool.id}`);
+    }
+
     // Mark geo-fence arrivals so the UI can show it
     if (status === 'arrived' && auto) {
       db.prepare('UPDATE session_members SET auto_arrived = 1 WHERE session_id = ? AND user_id = ?')
@@ -912,6 +1018,11 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
     // Auto-advance may move the phase — return the freshest state so the client
     // never reverts to a stale phase (e.g., stuck on destination after advancing to return)
     autoAdvanceCheck(carpool.id);
+
+    // Notify the group when the trip auto-completes (everyone arrived)
+    if (stmts.latestSession.get(carpool.id).phase === 'completed') {
+      pushToCarpoolMembers(carpool.id, null, 'Trip complete 🎉', `Carpool "${carpool.name}" is done. See you next time!`, `/?carpool=${carpool.id}`);
+    }
     const finalSession = {
       ...stmts.latestSession.get(carpool.id),
       members: stmts.sessionMembers.all(activeSession.id)
@@ -1006,6 +1117,13 @@ app.post('/api/carpools/:id/sessions/advance-phase', requireAuth, (req, res) => 
       mileage
     });
 
+    // Notify the group on phase changes
+    if (phase === 'destination') {
+      pushToCarpoolMembers(carpool.id, null, 'En route 🚗', `Carpool "${carpool.name}" departed for the destination.`, `/?carpool=${carpool.id}`);
+    } else if (phase === 'completed') {
+      pushToCarpoolMembers(carpool.id, null, 'Trip complete 🎉', `Carpool "${carpool.name}" is done. See you next time!`, `/?carpool=${carpool.id}`);
+    }
+
     res.json({ ok: true, session: updatedSession });
   } catch (err) {
     if (err.status) {
@@ -1028,6 +1146,7 @@ app.post('/api/carpools/:id/sessions/cancel', requireAuth, (req, res) => {
     stmts.updateSessionPhase.run('completed', 'completed', activeSession.id);
     stmts.addHistory.run(carpool.id, activeSession.id, 'cancelled', activeSession.driver_id, 'session_cancelled', '{}', 0, 'Session cancelled');
     io.to('carpool:' + carpool.id).emit('session-cancelled', { sessionId: activeSession.id });
+    pushToCarpoolMembers(carpool.id, req.session.userId, 'Session cancelled', `Carpool "${carpool.name}" session was cancelled.`, `/?carpool=${carpool.id}`);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

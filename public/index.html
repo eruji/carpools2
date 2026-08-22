@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>VroomMates</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#8FAE8B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -375,6 +381,8 @@
   <div class="profile-menu-email" id="profile-menu-email"></div>
   <button class="btn btn-outline btn-sm mobile-dashboard hidden" style="width:100%;justify-content:flex-start;" onclick="goToDashboard()">Dashboard</button>
   <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openProfileModal()">Edit Profile</button>
+  <button id="btn-push-toggle" class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="togglePushNotifications()">🔔 Notifications: Off</button>
+  <button id="btn-push-test" class="btn btn-outline btn-sm hidden" style="width:100%;justify-content:flex-start;" onclick="sendTestPush()">Send test notification</button>
   <button class="btn btn-danger btn-sm" style="width:100%;justify-content:flex-start;" onclick="logout()">Logout</button>
 </div>
 <div class="profile-dropdown hidden" id="carpool-menu-dropdown">
@@ -579,6 +587,15 @@ async function init() {
       pendingInviteCode = null;
     }
     await loadDashboard(true);
+
+    // Deep link from a push notification (?carpool=ID)
+    const notifCarpool = params.get('carpool');
+    if (notifCarpool) {
+      history.replaceState(null, '', window.location.pathname);
+      goToCarpool(notifCarpool);
+    }
+
+    initPushNotifications();
   } else {
     showAuth();
   }
@@ -628,6 +645,110 @@ function renderProfileIcon() {
   if (name) name.textContent = currentUser.username;
   const email = document.getElementById('profile-menu-email');
   if (email) email.textContent = currentUser.email || '';
+}
+
+// ── Push Notifications ──────────────────────────────────────────────────────
+function pushSupported() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+
+async function initPushNotifications() {
+  if (!pushSupported()) return;
+  try { await navigator.serviceWorker.ready; } catch (e) { return; }
+  // Ask once — the browser never re-prompts after deny, so this is safe to call on load.
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+  if (Notification.permission === 'granted') {
+    await enablePush();
+  }
+  refreshPushToggle();
+}
+
+async function enablePush() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const keyRes = await fetch('/api/push/vapid-public-key');
+    const { publicKey } = await keyRes.json();
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub.toJSON() })
+    });
+    refreshPushToggle();
+  } catch (err) {
+    console.warn('Push subscription failed:', err);
+  }
+}
+
+async function disablePush() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await fetch('/api/push/subscribe', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: sub.endpoint })
+      });
+      await sub.unsubscribe();
+    }
+    refreshPushToggle();
+  } catch (err) {
+    console.warn('Push unsubscribe failed:', err);
+  }
+}
+
+async function togglePushNotifications() {
+  if (!pushSupported()) {
+    alert('This browser does not support push notifications. Use Chrome, or Safari 16.4+ with the app installed to your home screen.');
+    return;
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (sub) {
+    await disablePush();
+  } else {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') await enablePush();
+    refreshPushToggle();
+  }
+}
+
+async function sendTestPush() {
+  await fetch('/api/push/test', { method: 'POST' });
+  const btn = document.getElementById('btn-push-test');
+  if (btn) {
+    btn.textContent = 'Sent — check your notifications';
+    setTimeout(() => { btn.textContent = 'Send test notification'; }, 2500);
+  }
+}
+
+async function refreshPushToggle() {
+  const btn = document.getElementById('btn-push-toggle');
+  const testBtn = document.getElementById('btn-push-test');
+  if (!btn || !pushSupported()) return;
+  let on = false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    on = !!(await reg.pushManager.getSubscription());
+  } catch (e) { /* SW not ready yet */ }
+  btn.textContent = on ? '🔔 Notifications: On' : '🔔 Notifications: Off';
+  if (testBtn) testBtn.classList.toggle('hidden', !on);
+}
+
+// VAPID keys are base64url — convert to a Uint8Array for pushManager.subscribe
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
 }
 
 function toggleProfileMenu() {
@@ -859,6 +980,7 @@ async function handleRegister(e) {
 }
 
 async function logout() {
+  disablePush().catch(() => {});
   await fetch('/api/logout', { method: 'POST' });
   currentUser = null;
   if (socket) socket.disconnect();
@@ -3254,6 +3376,17 @@ document.addEventListener('click', (e) => {
 
 // ── Bootstrap ───────────────────────────────────────────────────────────────
 init();
+</script>
+
+<!-- Service worker: installable PWA shell + offline fallback (see sw.js) -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Service worker registration failed:', err);
+    });
+  });
+}
 </script>
 </body>
 </html>
