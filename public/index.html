@@ -381,6 +381,7 @@
   <div class="profile-menu-email" id="profile-menu-email"></div>
   <button class="btn btn-outline btn-sm mobile-dashboard hidden" style="width:100%;justify-content:flex-start;" onclick="goToDashboard()">Dashboard</button>
   <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openProfileModal()">Edit Profile</button>
+  <button id="btn-install-app" class="btn btn-outline btn-sm hidden" style="width:100%;justify-content:flex-start;" onclick="installApp()">📲 Install app</button>
   <button id="btn-push-toggle" class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="togglePushNotifications()">🔔 Notifications: Off</button>
   <button id="btn-push-test" class="btn btn-outline btn-sm hidden" style="width:100%;justify-content:flex-start;" onclick="sendTestPush()">Send test notification</button>
   <button class="btn btn-danger btn-sm" style="width:100%;justify-content:flex-start;" onclick="logout()">Logout</button>
@@ -645,6 +646,35 @@ function renderProfileIcon() {
   if (name) name.textContent = currentUser.username;
   const email = document.getElementById('profile-menu-email');
   if (email) email.textContent = currentUser.email || '';
+}
+
+// ── Install PWA ─────────────────────────────────────────────────────────────
+// Chrome fires beforeinstallprompt when the site is installable. We capture it
+// (instead of letting Chrome decide when to prompt) and surface an explicit
+// "Install app" button in the profile menu. If this button never appears,
+// Chrome's installability check is failing (usually the service worker).
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); // keep Chrome's auto-prompt; we offer our own button
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('btn-install-app');
+  if (btn) btn.classList.remove('hidden');
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  const btn = document.getElementById('btn-install-app');
+  if (btn) btn.classList.add('hidden');
+});
+
+async function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  try { await deferredInstallPrompt.userChoice; } catch (e) { /* dismissed */ }
+  deferredInstallPrompt = null;
+  const btn = document.getElementById('btn-install-app');
+  if (btn) btn.classList.add('hidden');
 }
 
 // ── Push Notifications ──────────────────────────────────────────────────────
