@@ -1830,7 +1830,7 @@ let raceFinishSeqCounter = 0;    // next arrival sequence number
 function feedSpeedFix(userId, lat, lng, ts) {
   if (!activeSession || activeSession.phase === 'completed' || activeSession.phase === 'idle') return;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-  const tr = raceSpeed[userId] || (raceSpeed[userId] = { fixes: [], maxMph: 0, distMi: 0, startTs: ts, lastMph: null });
+  const tr = raceSpeed[userId] || (raceSpeed[userId] = { fixes: [], maxMph: 0, distMi: 0, moveSec: 0, lastMph: null, prevHigh: null });
   const last = tr.fixes[tr.fixes.length - 1];
   if (last) {
     const dtSec = (ts - last.ts) / 1000;
@@ -1838,16 +1838,33 @@ function feedSpeedFix(userId, lat, lng, ts) {
     // movement so parked jitter reads as 0 mph instead of noise.
     if (dtSec >= 4) {
       const mi = haversine(last.lat, last.lng, lat, lng);
-      const mph = mi < 0.008 ? 0 : mi / (dtSec / 3600); // <13m ≈ stationary
-      if (mi >= 0.008) tr.distMi += mi;
+      const moving = mi >= 0.008; // <13m ≈ stationary
+      const mph = moving ? mi / (dtSec / 3600) : 0;
+      if (moving) {
+        tr.distMi += mi;
+        // Count only time spent moving — waiting at the pickup or GPS gaps
+        // no longer dilute the average speed.
+        tr.moveSec += dtSec;
+      }
       if (Number.isFinite(mph)) {
         const capped = Math.min(150, Math.max(0, mph));
         tr.lastMph = capped;
-        if (capped > tr.maxMph) tr.maxMph = capped;
+        // Top speed must be corroborated by a second sample within 20 mph
+        // (4+ s later) — a single GPS position jump is ignored. Sustained
+        // fast driving still gets recorded, just one sample later.
+        if (tr.prevHigh != null) {
+          if (Math.abs(capped - tr.prevHigh) <= 20) {
+            const candidate = Math.max(tr.prevHigh, capped);
+            if (candidate > tr.maxMph) tr.maxMph = candidate;
+            tr.prevHigh = null;
+          } else {
+            tr.prevHigh = capped; // new candidate, old one was a spike
+          }
+        } else if (capped > tr.maxMph) {
+          tr.prevHigh = capped;
+        }
       }
     }
-  } else {
-    tr.startTs = ts;
   }
   tr.fixes.push({ lat, lng, ts });
   if (tr.fixes.length > 8) tr.fixes.shift();
@@ -1858,10 +1875,10 @@ function feedSpeedFix(userId, lat, lng, ts) {
 function currentRaceSpeeds() {
   const sp = raceSpeed[currentUser.id];
   if (!sp) return {};
-  const elapsedH = Math.max(30, (Date.now() - sp.startTs) / 1000) / 3600; // seconds → hours, 30s floor
+  const movingH = Math.max(30, sp.moveSec) / 3600; // seconds → hours, 30s floor
   return {
     maxMph: sp.maxMph > 0 ? Math.round(sp.maxMph * 10) / 10 : null,
-    avgMph: sp.distMi > 0 ? Math.round((sp.distMi / elapsedH) * 10) / 10 : null
+    avgMph: sp.distMi > 0 ? Math.round((sp.distMi / movingH) * 10) / 10 : null
   };
 }
 
