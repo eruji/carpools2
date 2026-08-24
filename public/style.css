@@ -1366,7 +1366,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   letter-spacing: -0.02em;
 }
 
-/* ── Mobile: immersive full-bleed map with floating content ──── */
+/* ── Mobile: full-bleed map, cards + controls docked to the bottom ── */
 @media (max-width: 480px) {
   /* The map fills the whole screen as a background layer */
   #map-container {
@@ -1379,26 +1379,37 @@ tr:hover td { background: rgba(0,0,0,0.015); }
     z-index: 1;
     pointer-events: auto;
   }
-  /* Content floats on top; gaps let touches reach the map */
+  /* Content column hugs the bottom of the viewport: the toolbar is fixed
+     at the top; the carousel + session controls dock low so thumbs can
+     reach them. The map shows through above the dock. */
   #view-carpool {
     position: relative;
-    /* Reserve the map's usual space at the top so it's visible behind the cards */
-    padding: 330px 10px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 0 10px calc(12px + env(safe-area-inset-bottom, 0px));
     pointer-events: none;
   }
-  /* Floating cards sit above the map and stay interactive */
+  /* Docked cards sit above the map and stay interactive */
   #view-carpool > * { pointer-events: auto; }
   #view-carpool > .route-visual,
   #view-carpool > .phase-panel,
-  #view-carpool > .card,
-  #view-carpool > .loc-modal {
+  #view-carpool > .card {
     position: relative;
     z-index: 2;
+    margin-bottom: 8px;
   }
-  /* Title row (carpool name + gear) floats over the map at the top */
+  /* Keep a tall roster from towering over the dock */
+  #view-carpool .member-list {
+    max-height: 30vh;
+    overflow-y: auto;
+  }
+  /* Toolbar (switcher + avatar + gear) floats at the very top — no header */
   #view-carpool > .flex-between {
     position: fixed;
-    top: 58px;
+    top: 10px;
     left: 10px;
     right: 10px;
     z-index: 900;
@@ -1411,12 +1422,11 @@ tr:hover td { background: rgba(0,0,0,0.015); }
     padding: 6px 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.12);
   }
-  /* Map controls stay accessible above the content */
-  .map-recenter { position: fixed; top: 112px; right: 12px; z-index: 950; pointer-events: auto; }
-  .map-legend { position: fixed; left: 10px; bottom: 12px; z-index: 950; pointer-events: auto; }
-  /* Move the zoom control above the floating subway/seating cards */
+  /* Map controls stack under the toolbar, clear of the bottom dock */
+  .map-recenter { position: fixed; top: 70px; right: 12px; z-index: 950; pointer-events: auto; }
+  .map-legend { position: fixed; top: 116px; left: 10px; bottom: auto; z-index: 950; pointer-events: auto; }
   .leaflet-bottom.leaflet-right {
-    top: 160px;
+    top: 116px;
     bottom: auto;
     right: 12px;
   }
@@ -1424,12 +1434,10 @@ tr:hover td { background: rgba(0,0,0,0.015); }
     margin-bottom: 0;
     margin-right: 0;
   }
+  /* Modals stay true overlays on top of everything (was in-flow on mobile) */
+  #view-carpool > .loc-modal { z-index: 1000; }
 
-  header { padding: 8px 10px; }
-  header h1 { font-size: 1.1rem; }
-  .logo-img { height: 1.5rem; }
   .profile-menu-name { display: none; }
-  /* Dashboard moves into the profile dropdown on mobile */
   #btn-dashboard { display: none !important; }
   .mobile-dashboard { display: flex !important; }
 }
