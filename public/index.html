@@ -3400,8 +3400,10 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('.autocomplete-wrapper')) {
     document.querySelectorAll('.autocomplete-dropdown').forEach(d => d.classList.add('hidden'));
   }
-  // Close the profile/carpool dropdowns when clicking outside them
-  if (!e.target.closest('.profile-menu') && !e.target.closest('.carpool-menu') && !e.target.closest('.profile-dropdown')) {
+  // Close the profile/carpool dropdowns when clicking outside them.
+  // The profile avatar lives outside .profile-menu now (toolbar rows), so
+  // treat taps on it as inside — otherwise the dropdown closes instantly.
+  if (!e.target.closest('.profile-menu') && !e.target.closest('.profile-icon') && !e.target.closest('.carpool-menu') && !e.target.closest('.profile-dropdown')) {
     document.getElementById('profile-dropdown').classList.add('hidden');
     document.getElementById('carpool-menu-dropdown').classList.add('hidden');
   }
