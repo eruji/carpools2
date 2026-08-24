@@ -918,7 +918,7 @@ app.post('/api/carpools/:id/sessions/start', requireAuth, (req, res) => {
 
     // Notify everyone else that a session is starting
     const starter = stmts.userById.get(req.session.userId);
-    pushToCarpoolMembers(carpool.id, req.session.userId, 'Session started 🚗', `${starter.username} started a session for "${carpool.name}"`, `/?carpool=${carpool.id}`);
+    pushToCarpoolMembers(carpool.id, req.session.userId, 'Session started 🚗', `${starter.username} started the carpool`, `/?carpool=${carpool.id}`);
 
     const session = { ...stmts.latestSession.get(carpool.id), members: stmts.sessionMembers.all(sessionId) };
 
