@@ -1394,11 +1394,18 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   }
   /* Docked cards sit above the map and stay interactive */
   #view-carpool > * { pointer-events: auto; }
-  #view-carpool > .route-visual,
-  #view-carpool > .phase-panel,
-  #view-carpool > .card {
-    position: relative;
+  /* The dock hugs the viewport bottom — sticky keeps it pinned there even
+     when its content (roster, active session) is taller than the screen:
+     the chat-bar pattern. margin-top:auto parks it at the bottom of the
+     flex column when there's free space. */
+  .mobile-dock {
+    margin-top: auto;
+    position: sticky;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     z-index: 2;
+  }
+  .mobile-dock > .route-visual,
+  .mobile-dock > .phase-panel {
     margin-bottom: 8px;
   }
   /* Keep a tall roster from towering over the dock */
@@ -1435,7 +1442,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
     margin-right: 0;
   }
   /* Modals stay true overlays on top of everything (was in-flow on mobile) */
-  #view-carpool > .loc-modal { z-index: 1000; }
+  .loc-modal { z-index: 1000; }
 
   .profile-menu-name { display: none; }
   #btn-dashboard { display: none !important; }
