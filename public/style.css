@@ -447,10 +447,25 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .rv-track::-webkit-scrollbar { display: none; }
 .rv-track > .subway-map,
-.rv-track > .seating-chart {
+.rv-track > .seating-chart,
+.rv-track > .member-panel {
   flex: 0 0 100%;
   min-width: 0;
   scroll-snap-align: start;
+}
+/* Members slide: roster card inside the carousel */
+.member-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.member-panel h4 {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
 }
 .route-visual .subway-map {
   margin-bottom: 0;

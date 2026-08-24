@@ -14,27 +14,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=5">
+<link rel="stylesheet" href="/style.css?v=6">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
-
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- HEADER                                                        -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<header id="app-header" class="hidden">
-  <div class="header-inner">
-    <h1 id="app-title" title=""><img src="/logo.png" alt="VroomMates" class="logo-img"><span id="app-version" class="app-version"></span></h1>
-    <nav>
-      <button class="btn btn-outline btn-sm" onclick="goToDashboard()" id="btn-dashboard" style="color:#6F6F66;border-color:#C9C9BF;">Dashboard</button>
-      <div class="profile-menu">
-        <button class="profile-icon" id="profile-icon" onclick="toggleProfileMenu()" title="Profile"></button>
-      </div>
-    </nav>
-  </div>
-</header>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- AUTH VIEW                                                      -->
@@ -114,9 +99,10 @@
 <div id="view-dashboard" class="app-container hidden">
   <div class="flex-between mb-2">
     <h2>My Carpools</h2>
-    <div style="display:flex;gap:8px;">
+    <div style="display:flex;gap:8px;align-items:center;">
       <button class="btn btn-outline btn-sm" onclick="showJoinCarpool()">Join</button>
       <button class="btn btn-primary" onclick="showCreateCarpool()">+ New</button>
+      <button class="profile-icon" id="profile-icon-dash" onclick="toggleProfileMenu(this)" title="Profile"></button>
     </div>
   </div>
 
@@ -172,8 +158,11 @@
       <select id="carpool-switcher" onchange="switchCarpool(this.value)" aria-label="Switch carpool"></select>
       <span id="carpool-count-badge" class="badge badge-gray hidden"></span>
     </div>
-    <div class="carpool-menu">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="profile-icon" id="profile-icon-carpool" onclick="toggleProfileMenu(this)" title="Profile"></button>
+      <div class="carpool-menu">
       <button class="gear-btn hidden" id="btn-carpool-gear" onclick="toggleCarpoolMenu()" title="Carpool menu"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    </div>
     </div>
   </div>
 
@@ -197,6 +186,11 @@
   <!-- ═══════ SUBWAY-STYLE TRANSIT LINE + SEATING CHART (swipeable) ═══════ -->
   <div class="route-visual">
     <div class="rv-track" id="rv-track">
+    <!-- Slide 1: Members — the roster lives in the carousel now -->
+    <div class="member-panel">
+      <h4>Members</h4>
+      <div id="member-status-list" class="member-list"></div>
+    </div>
   <div class="subway-map" id="subway-map">
     <div class="subway-line" id="subway-line">
       <!-- Stop 1: Start (arbitrary) -->
@@ -290,10 +284,6 @@
 
       <div id="session-alert" class="hidden"></div>
     </div>
-
-    <!-- Members (always visible — skip handled here) -->
-    <h4>Members</h4>
-    <div id="member-status-list" class="member-list"></div>
   </div>
 </div>
 
@@ -379,7 +369,7 @@
 <div class="profile-dropdown hidden" id="profile-dropdown">
   <div class="profile-menu-name" id="profile-menu-name"></div>
   <div class="profile-menu-email" id="profile-menu-email"></div>
-  <button class="btn btn-outline btn-sm mobile-dashboard hidden" style="width:100%;justify-content:flex-start;" onclick="goToDashboard()">Dashboard</button>
+  <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="goToDashboard()">Dashboard</button>
   <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openProfileModal()">Edit Profile</button>
   <button id="btn-install-app" class="btn btn-outline btn-sm hidden" style="width:100%;justify-content:flex-start;" onclick="installApp()">📲 Install app</button>
   <button id="btn-push-toggle" class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="togglePushNotifications()">🔔 Notifications: Off</button>
@@ -612,8 +602,6 @@ async function loadVersion() {
     const builtAt = data.builtAt || '';
     const el = document.getElementById('app-version');
     if (el) el.textContent = buildNum;
-    // Full details live in the title hover tooltip
-    document.getElementById('app-title').title = 'build ' + buildNum + ' · ' + sha + (builtAt ? ' · ' + builtAt : '');
   } catch (e) {
     const el = document.getElementById('app-version');
     if (el) el.textContent = '?';
@@ -625,23 +613,21 @@ function showAuth() {
   document.getElementById('view-auth').classList.remove('hidden');
   document.getElementById('view-dashboard').classList.add('hidden');
   document.getElementById('view-carpool').classList.add('hidden');
-  document.getElementById('app-header').classList.add('hidden');
   stopLocationTracking();
 }
 
 function showApp() {
-  document.getElementById('app-header').classList.remove('hidden');
   renderProfileIcon();
   document.getElementById('view-auth').classList.add('hidden');
 }
 
 // ── Profile ─────────────────────────────────────────────────────────────────
 function renderProfileIcon() {
-  const icon = document.getElementById('profile-icon');
-  if (icon) {
+  // All .profile-icon buttons (dashboard + carpool toolbars) show the same avatar
+  document.querySelectorAll('.profile-icon').forEach((icon) => {
     icon.textContent = getInitials(currentUser.username);
     icon.style.background = memberColor(currentUser.id);
-  }
+  });
   const name = document.getElementById('profile-menu-name');
   if (name) name.textContent = currentUser.username;
   const email = document.getElementById('profile-menu-email');
@@ -781,9 +767,9 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
-function toggleProfileMenu() {
+function toggleProfileMenu(trigger) {
   const dd = document.getElementById('profile-dropdown');
-  positionDropdown(document.getElementById('profile-icon'), dd);
+  positionDropdown(trigger || document.querySelector('.profile-icon'), dd);
   dd.classList.toggle('hidden');
 }
 
@@ -873,7 +859,6 @@ function closeProfileDropdownOnOutside(e) {
 function showDashboard() {
   document.getElementById('view-dashboard').classList.remove('hidden');
   document.getElementById('view-carpool').classList.add('hidden');
-  document.getElementById('btn-dashboard').classList.add('hidden');
   // Close any body-level overlays (setup/history/location modals, dropdowns)
   ['loc-config', 'history-modal', 'setup-modal', 'profile-modal', 'profile-dropdown', 'carpool-menu-dropdown'].forEach(id => {
     const el = document.getElementById(id);
@@ -891,7 +876,6 @@ function showDashboard() {
 function showCarpool(carpoolId) {
   document.getElementById('view-dashboard').classList.add('hidden');
   document.getElementById('view-carpool').classList.remove('hidden');
-  document.getElementById('btn-dashboard').classList.remove('hidden');
   currentCarpoolId = carpoolId;
   saveLastCarpool(carpoolId);
   populateCarpoolSwitcher();
