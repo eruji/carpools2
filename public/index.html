@@ -437,7 +437,8 @@ let mapPolylines = {};
 let socket = null;
 let locationWatchId = null;
 let locationInterval = null;
-let myLocation = null; // { lat, lng }
+let myLocation = null; // { lat, lng, accuracy }
+let lastGpsFixAt = 0; // epoch ms of the most recent GPS fix (watchdog)
 let pendingInviteCode = null; // invite code from URL, joined after auth
 let myCarpools = []; // carpool list for the switcher
 let lastDriverId = null; // for driver-change toasts
@@ -510,6 +511,10 @@ function setSession(session) {
   }
   activeSession = session;
   renderSessionUI(session);
+  // Refresh every card (race, occupancy, members) immediately on any session
+  // update — e.g. someone joining mid-drive — instead of waiting for the next
+  // GPS tick to re-render.
+  renderSections();
 }
 
 // Remember the last carpool the user opened
@@ -3007,7 +3012,8 @@ function startLocationTracking() {
   if ('geolocation' in navigator) {
     locationWatchId = navigator.geolocation.watchPosition(
       (pos) => {
-        myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        lastGpsFixAt = Date.now();
         hideGpsStatus();
         if (!activeSession || !socket) return;
         socket.emit('location-update', {
@@ -3040,6 +3046,9 @@ function startLocationTracking() {
   // Fallback interval — also keeps the clock-time ETAs ticking
   locationInterval = setInterval(() => {
     if (!activeSession) return;
+    // Watchdog: if GPS has gone quiet (fix lost, tab throttled, stuck cache)
+    // re-show the "Acquiring GPS" pill so staleness is obvious.
+    if (lastGpsFixAt && Date.now() - lastGpsFixAt > 45000) showGpsStatus();
     if (currentCarpoolData) {
       updateSubwayETAs({ carpool: currentCarpoolData.carpool, activeSession });
     }
@@ -3047,7 +3056,8 @@ function startLocationTracking() {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+          lastGpsFixAt = Date.now();
           hideGpsStatus();
           socket.emit('location-update', {
             sessionId: activeSession.id,
@@ -3069,8 +3079,12 @@ function startLocationTracking() {
             fitMapToConverge();
           }
         },
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
+        (err) => {
+          // Fix failed/timed out — surface it instead of silently going stale
+          if (lastGpsFixAt && Date.now() - lastGpsFixAt > 15000) showGpsStatus();
+          console.log('GPS fallback:', err.message);
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
       );
     }
   }, 10000);
@@ -3103,6 +3117,8 @@ function checkGeoFence() {
 
   // Per-carpool radius (default 400m) so garages/parking a block over still count
   const radius = carpool.arrival_radius || GEO_FENCE_M;
+  // Don't auto-arrive on a poor fix (1-2 blocks of error) — wait for a better one
+  if (myLocation.accuracy && myLocation.accuracy > 300) return;
   const distM = haversine(myLocation.lat, myLocation.lng, targetLat, targetLng) * 1609.34;
   if (distM <= radius) {
     // Don't auto-arrive the next stop while still parked at the previous one
