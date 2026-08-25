@@ -1468,9 +1468,45 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   /* Modals stay true overlays on top of everything (was in-flow on mobile) */
   .loc-modal { z-index: 1000; }
 
+  /* Minimized: dock hides so the map fills the screen; the toolbar stays
+     put so the same button (now pointing up) expands again */
+  #view-carpool.dock-minimized .route-visual,
+  #view-carpool.dock-minimized .rv-nav,
+  #view-carpool.dock-minimized .phase-panel {
+    display: none;
+  }
+  #view-carpool.dock-minimized .mobile-dock {
+    position: static;
+    margin-top: 0;
+  }
+  #view-carpool.dock-minimized #btn-minimize svg { transform: rotate(180deg); }
+
   .profile-menu-name { display: none; }
   #btn-dashboard { display: none !important; }
   .mobile-dashboard { display: flex !important; }
+}
+
+/* ── Minimized (desktop): cards collapse, map expands to fill ── */
+@media (min-width: 481px) {
+  #view-carpool.dock-minimized {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 40px);
+  }
+  #view-carpool.dock-minimized .map-wrap {
+    flex: 1 1 auto;
+    min-height: 320px;
+  }
+  #view-carpool.dock-minimized #map-container {
+    height: 100%;
+    margin-bottom: 0;
+  }
+  #view-carpool.dock-minimized .route-visual,
+  #view-carpool.dock-minimized .rv-nav,
+  #view-carpool.dock-minimized .phase-panel {
+    display: none;
+  }
+  #view-carpool.dock-minimized #btn-minimize svg { transform: rotate(180deg); }
 }
 
 /* ── Desktop adjustments ─────────────────────────────────────── */

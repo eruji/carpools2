@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=9">
+<link rel="stylesheet" href="/style.css?v=10">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -163,6 +163,7 @@
       <div class="carpool-menu">
       <button class="gear-btn hidden" id="btn-carpool-gear" onclick="toggleCarpoolMenu()" title="Carpool menu"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </div>
+      <button class="gear-btn" id="btn-minimize" onclick="toggleDockMinimized()" title="Minimize interface" aria-label="Minimize interface"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
     </div>
   </div>
 
@@ -559,6 +560,11 @@ function initRouteVisual() {
 async function init() {
   loadVersion();
   initRouteVisual();
+
+  // Restore the dock-minimized preference (view-carpool lives for the session)
+  if (localStorage.getItem('dockMinimized') === '1') {
+    document.getElementById('view-carpool').classList.add('dock-minimized');
+  }
 
   // Check for an invite link (?invite=CODE)
   const params = new URLSearchParams(window.location.search);
@@ -2962,6 +2968,16 @@ function toggleCarpoolMenu() {
   const dd = document.getElementById('carpool-menu-dropdown');
   positionDropdown(document.getElementById('btn-carpool-gear'), dd);
   dd.classList.toggle('hidden');
+}
+
+// Collapse the carousel + session controls so the map fills the screen.
+// The toolbar stays put, so the same button (now pointing up) expands again.
+function toggleDockMinimized() {
+  const view = document.getElementById('view-carpool');
+  view.classList.toggle('dock-minimized');
+  localStorage.setItem('dockMinimized', view.classList.contains('dock-minimized') ? '1' : '0');
+  // Desktop: the map container grew — let Leaflet re-measure.
+  if (map) setTimeout(() => map.invalidateSize(), 60);
 }
 
 function openHistoryModal() {
