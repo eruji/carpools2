@@ -601,6 +601,30 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .car-seat.driver .seat-avatar { border-color: #C0A46A; }
 .car-empty-note { color: var(--text-3); text-align: center; }
+/* Riders not in the car yet (meetup phase) render greyed-out */
+.car-seat.waiting .seat-avatar,
+.car-overflow .seat-avatar.waiting {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+.car-seat.waiting { border-style: dashed; }
+/* Riders beyond the 5 seats are listed under the car */
+.car-overflow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-strong);
+}
+.car-overflow-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  margin-right: 2px;
+}
 
 /* ── Pickup race board (position view) ── */
 .rv-track > .position-board {

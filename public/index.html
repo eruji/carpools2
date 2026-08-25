@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=8">
+<link rel="stylesheet" href="/style.css?v=9">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -1743,24 +1743,27 @@ function renderSeatingChart(session) {
   }
 
   const members = session.members || [];
+  const isMeetup = session.phase === 'meetup';
   const driver = members.find(m => m.user_id === session.driver_id && m.status !== 'skip');
 
-  // Who's in the car (besides the driver)
-  let passengers;
-  if (session.phase === 'meetup') {
-    // Fill seats as members arrive at the pickup
-    passengers = members.filter(m => m.status === 'arrived' && m.user_id !== (driver ? driver.user_id : null));
-  } else {
-    // En route — everyone non-skipped is in the car
-    passengers = members.filter(m => m.status !== 'skip' && m.user_id !== (driver ? driver.user_id : null));
-  }
+  // Every non-skipped member is visible: arrived members board the car first,
+  // everyone else fills the remaining seats as "waiting" (meetup phase) or
+  // riding (en route). Riders past the 5 seats are listed under the car.
+  const statusRank = { arrived: 0, driving: 1, riding: 1, pending: 2 };
+  const passengers = members
+    .filter(m => m.status !== 'skip' && m.user_id !== (driver ? driver.user_id : null))
+    .sort((a, b) =>
+      (statusRank[a.status] ?? 3) - (statusRank[b.status] ?? 3) || a.username.localeCompare(b.username)
+    );
+
+  const waiting = (p) => !!p && isMeetup && p.status !== 'arrived';
 
   const seats = [
-    { key: 'driver', person: driver, isDriver: true },
-    { key: 'shotgun', person: passengers[0] || null },
-    { key: 'back-l', person: passengers[1] || null },
-    { key: 'back-m', person: passengers[2] || null },
-    { key: 'back-r', person: passengers[3] || null }
+    { key: 'driver', person: driver, isDriver: true, waiting: false },
+    { key: 'shotgun', person: passengers[0] || null, waiting: waiting(passengers[0]) },
+    { key: 'back-l', person: passengers[1] || null, waiting: waiting(passengers[1]) },
+    { key: 'back-m', person: passengers[2] || null, waiting: waiting(passengers[2]) },
+    { key: 'back-r', person: passengers[3] || null, waiting: waiting(passengers[3]) }
   ];
 
   const seatHTML = (s) => {
@@ -1768,11 +1771,19 @@ function renderSeatingChart(session) {
       return `<div class="car-seat ${s.isDriver ? 'driver' : ''}">${s.isDriver ? '<span class="seat-tag">D</span>' : ''}</div>`;
     }
     const p = s.person;
-    return `<div class="car-seat ${s.isDriver ? 'driver' : ''}" title="${esc(p.username)}">
+    return `<div class="car-seat ${s.isDriver ? 'driver' : ''}${s.waiting ? ' waiting' : ''}" title="${esc(p.username)}${s.waiting ? ' · waiting' : ''}">
       ${s.isDriver ? '<span class="seat-tag">D</span>' : ''}
       <span class="seat-avatar" style="background:${memberColor(p.user_id)}">${esc(getInitials(p.username))}</span>
     </div>`;
   };
+
+  // Riders beyond the 5 seats are listed under the car so nobody is hidden.
+  const overflow = passengers.slice(4);
+  const overflowHTML = overflow.length
+    ? `<div class="car-overflow"><span class="car-overflow-label">${isMeetup ? 'waiting' : 'in the car'}</span>${overflow.map(p =>
+        `<span class="seat-avatar${waiting(p) ? ' waiting' : ''}" title="${esc(p.username)}" style="background:${memberColor(p.user_id)}">${esc(getInitials(p.username))}</span>`
+      ).join('')}</div>`
+    : '';
 
   el.innerHTML = `
     <div class="sc-title">Occupancy</div>
@@ -1788,7 +1799,8 @@ function renderSeatingChart(session) {
           ${seatHTML(seats[4])}
         </div>
       </div>
-    </div>`;
+    </div>
+    ${overflowHTML}`;
 }
 
 // ── Pickup Race Board (position view) ───────────────────────────────────────
@@ -1942,8 +1954,9 @@ function renderPositionBoard(session) {
         checkedIn: m.status === 'driving' || m.status === 'riding'
       };
     })
-    // Only members we can place on the line: has a GPS fix, or has finished.
-    .filter((r) => r.finished || r.dist != null);
+    // Every non-skipped member stays on the board — those without a GPS fix
+    // yet render in a "no GPS yet" state at the bottom (Infinity ETA sorts
+    // them last) instead of disappearing from the race.
 
   const etaCompare = (a, b) => {
     const ea = a.etaMin == null ? Infinity : a.etaMin;
@@ -2009,7 +2022,8 @@ function renderPositionBoard(session) {
   const rows = racers.map((r, i) => {
     const pct = progressOf(r);
     // Finished members keep their frozen arrival rank; racers take the next slots.
-    const posLabel = r.finished ? ordinal(raceFinishSeq[r.m.user_id] ?? i + 1) : ordinal(i + 1);
+    // Members with no GPS fix yet don't claim a rank — show a dash.
+    const posLabel = !r.finished && r.dist == null ? '—' : (r.finished ? ordinal(raceFinishSeq[r.m.user_id] ?? i + 1) : ordinal(i + 1));
 
     let etaBig, etaSub, deltaTxt = '';
     if (r.finished) {
