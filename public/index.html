@@ -1756,25 +1756,20 @@ function renderSeatingChart(session) {
   const members = session.members || [];
   const isMeetup = session.phase === 'meetup';
   const driver = members.find(m => m.user_id === session.driver_id && m.status !== 'skip');
+  const driverId = driver ? driver.user_id : null;
 
-  // Every non-skipped member is visible: arrived members board the car first,
-  // everyone else fills the remaining seats as "waiting" (meetup phase) or
-  // riding (en route). Riders past the 5 seats are listed under the car.
-  const statusRank = { arrived: 0, driving: 1, riding: 1, pending: 2 };
+  // Occupancy boards only people actually on the trip: during meetup, only
+  // members who have arrived at the pickup; en route, everyone non-skipped.
   const passengers = members
-    .filter(m => m.status !== 'skip' && m.user_id !== (driver ? driver.user_id : null))
-    .sort((a, b) =>
-      (statusRank[a.status] ?? 3) - (statusRank[b.status] ?? 3) || a.username.localeCompare(b.username)
-    );
-
-  const waiting = (p) => !!p && isMeetup && p.status !== 'arrived';
+    .filter(m => m.status !== 'skip' && m.user_id !== driverId)
+    .filter(m => !isMeetup || m.status === 'arrived');
 
   const seats = [
-    { key: 'driver', person: driver, isDriver: true, waiting: false },
-    { key: 'shotgun', person: passengers[0] || null, waiting: waiting(passengers[0]) },
-    { key: 'back-l', person: passengers[1] || null, waiting: waiting(passengers[1]) },
-    { key: 'back-m', person: passengers[2] || null, waiting: waiting(passengers[2]) },
-    { key: 'back-r', person: passengers[3] || null, waiting: waiting(passengers[3]) }
+    { key: 'driver', person: driver, isDriver: true },
+    { key: 'shotgun', person: passengers[0] || null },
+    { key: 'back-l', person: passengers[1] || null },
+    { key: 'back-m', person: passengers[2] || null },
+    { key: 'back-r', person: passengers[3] || null }
   ];
 
   const seatHTML = (s) => {
@@ -1782,17 +1777,17 @@ function renderSeatingChart(session) {
       return `<div class="car-seat ${s.isDriver ? 'driver' : ''}">${s.isDriver ? '<span class="seat-tag">D</span>' : ''}</div>`;
     }
     const p = s.person;
-    return `<div class="car-seat ${s.isDriver ? 'driver' : ''}${s.waiting ? ' waiting' : ''}" title="${esc(p.username)}${s.waiting ? ' · waiting' : ''}">
+    return `<div class="car-seat ${s.isDriver ? 'driver' : ''}" title="${esc(p.username)}">
       ${s.isDriver ? '<span class="seat-tag">D</span>' : ''}
       <span class="seat-avatar" style="background:${memberColor(p.user_id)}">${esc(getInitials(p.username))}</span>
     </div>`;
   };
 
-  // Riders beyond the 5 seats are listed under the car so nobody is hidden.
+  // Riders beyond the 5 seats are listed under the car.
   const overflow = passengers.slice(4);
   const overflowHTML = overflow.length
-    ? `<div class="car-overflow"><span class="car-overflow-label">${isMeetup ? 'waiting' : 'in the car'}</span>${overflow.map(p =>
-        `<span class="seat-avatar${waiting(p) ? ' waiting' : ''}" title="${esc(p.username)}" style="background:${memberColor(p.user_id)}">${esc(getInitials(p.username))}</span>`
+    ? `<div class="car-overflow"><span class="car-overflow-label">${isMeetup ? 'arrived' : 'in the car'}</span>${overflow.map(p =>
+        `<span class="seat-avatar" title="${esc(p.username)}" style="background:${memberColor(p.user_id)}">${esc(getInitials(p.username))}</span>`
       ).join('')}</div>`
     : '';
 
@@ -1956,12 +1951,15 @@ function renderPositionBoard(session) {
       if (dist != null && raceStartDist[m.user_id] == null) {
         raceStartDist[m.user_id] = dist;
       }
-      const finished = raceOver || m.status === 'arrived';
+      // Pending members (haven't accepted driving/riding yet) never count as
+      // finished — they sleep at the start line with a 💤 indicator instead.
+      const finished = (raceOver && m.status !== 'pending') || m.status === 'arrived';
       return {
         m, loc, dist,
         etaMin: dist == null ? null : dist / 0.5, // straight-line fallback @ 30mph
         isDriver: m.user_id === session.driver_id,
         finished,
+        pending: m.status === 'pending',
         checkedIn: m.status === 'driving' || m.status === 'riding'
       };
     })
@@ -1998,8 +1996,9 @@ function renderPositionBoard(session) {
     }
   } else {
     // Race settled: give anyone without a sequence their place by ETA so the
-    // final standings are complete (late joiners / no-GPS members).
-    racers.filter(r => raceFinishSeq[r.m.user_id] == null).sort(etaCompare)
+    // final standings are complete (late joiners / no-GPS members). Members
+    // who never accepted a role stay out of the ranks.
+    racers.filter(r => raceFinishSeq[r.m.user_id] == null && !r.pending).sort(etaCompare)
       .forEach(r => { raceFinishSeq[r.m.user_id] = ++raceFinishSeqCounter; });
   }
 
@@ -2037,7 +2036,11 @@ function renderPositionBoard(session) {
     const posLabel = !r.finished && r.dist == null ? '—' : (r.finished ? ordinal(raceFinishSeq[r.m.user_id] ?? i + 1) : ordinal(i + 1));
 
     let etaBig, etaSub, deltaTxt = '';
-    if (r.finished) {
+    if (r.pending) {
+      // Hasn't accepted driving/riding yet — sleeping at the start line
+      etaBig = '💤';
+      etaSub = 'not driving yet';
+    } else if (r.finished) {
       etaBig = '🏁';
       etaSub = 'done';
     } else if (r.etaMin == null) {
@@ -2053,7 +2056,7 @@ function renderPositionBoard(session) {
 
     const staleCls = r.loc && r.loc.stale && !r.finished ? ' stale' : '';
     return `
-      <div class="race-row${r.finished ? ' arrived' : ''}${staleCls}" id="race-row-${r.m.user_id}">
+      <div class="race-row${r.pending ? ' pending' : ''}${r.finished ? ' arrived' : ''}${staleCls}" id="race-row-${r.m.user_id}">
         <span class="race-pos">${posLabel}</span>
         <div class="race-lane">
           <div class="race-lane-track"><span class="race-lane-fill" style="width:${pct.toFixed(1)}%"></span></div>
@@ -2586,6 +2589,11 @@ async function respondToSession(status) {
   }
   setSession(data.session);
 
+  // Accepting a role — if they're already at the target (e.g. the pickup is
+  // their home), mark them arrived right away instead of waiting for the
+  // next GPS tick to re-check the geo-fence.
+  if (status === 'driving' || status === 'riding') checkGeoFence();
+
   if (status === 'arrived') {
     const place = arrivingAtPickup ? arrivalPlaceLabel() : null;
     showArrivedOverlay(place || 'Arrived');
@@ -3117,8 +3125,6 @@ function checkGeoFence() {
 
   // Per-carpool radius (default 400m) so garages/parking a block over still count
   const radius = carpool.arrival_radius || GEO_FENCE_M;
-  // Don't auto-arrive on a poor fix (1-2 blocks of error) — wait for a better one
-  if (myLocation.accuracy && myLocation.accuracy > 300) return;
   const distM = haversine(myLocation.lat, myLocation.lng, targetLat, targetLng) * 1609.34;
   if (distM <= radius) {
     // Don't auto-arrive the next stop while still parked at the previous one

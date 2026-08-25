@@ -601,13 +601,6 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 }
 .car-seat.driver .seat-avatar { border-color: #C0A46A; }
 .car-empty-note { color: var(--text-3); text-align: center; }
-/* Riders not in the car yet (meetup phase) render greyed-out */
-.car-seat.waiting .seat-avatar,
-.car-overflow .seat-avatar.waiting {
-  opacity: 0.45;
-  filter: grayscale(0.6);
-}
-.car-seat.waiting { border-style: dashed; }
 /* Riders beyond the 5 seats are listed under the car */
 .car-overflow {
   display: flex;
@@ -669,6 +662,14 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   gap: 12px;
   padding: 12px 2px;
   border-bottom: 1px solid var(--border);
+}
+/* Members who haven't accepted driving/riding yet — sleeping at the start line */
+.race-row.pending .race-lane-avatar {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+.race-row.pending .race-pos {
+  color: var(--text-3);
 }
 .race-row:last-child { border-bottom: none; }
 .race-pos {
