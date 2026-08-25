@@ -571,6 +571,26 @@ async function init() {
     document.getElementById('view-carpool').classList.add('dock-minimized');
   }
 
+  // Mobile: the dock's height changes with the minimize toggle, carousel
+  // slides, and session controls — recompute the map's visible center when it
+  // does, so my marker stays in the visible area instead of behind the dock.
+  if (window.innerWidth <= 480 && 'ResizeObserver' in window) {
+    const dock = document.querySelector('.mobile-dock');
+    if (dock) {
+      let t;
+      new ResizeObserver(() => {
+        clearTimeout(t);
+        t = setTimeout(() => {
+          if (!map) return;
+          map.invalidateSize();
+          if (myLocation && activeSession && activeSession.phase !== 'idle' && activeSession.phase !== 'completed') {
+            followMyLocation();
+          }
+        }, 200);
+      }).observe(dock);
+    }
+  }
+
   // Check for an invite link (?invite=CODE)
   const params = new URLSearchParams(window.location.search);
   const inviteCode = params.get('invite');
@@ -2130,7 +2150,9 @@ function fitMapToConverge() {
   }
   if (pts.length < 2) return;
   const opts = { padding: [50, 50], maxZoom: 15 };
-  if (window.innerWidth <= 480) opts.paddingBottomRight = [50, 420];
+  // Keep the fitted points above the dock (its height varies with the
+  // roster/session/minimize state, so measure it instead of hardcoding).
+  if (window.innerWidth <= 480) opts.paddingBottomRight = [50, mobileDockHeight() + 60];
   map.fitBounds(L.latLngBounds(pts), opts);
 }
 
@@ -2160,12 +2182,29 @@ function bestLegCoords(id, lat1, lng1, lat2, lng2) {
   return last ? last.coords : null;
 }
 
-// Center a location in the visible viewport (above the floating cards on mobile).
+// Center a location in the visible viewport (above the dock on mobile).
+// Height of the bottom dock in px — 0 when minimized or on desktop, so the
+// visible center is then the true viewport center.
+function mobileDockHeight() {
+  if (window.innerWidth > 480) return 0;
+  const view = document.getElementById('view-carpool');
+  if (!view || view.classList.contains('dock-minimized')) return 0;
+  const dock = view.querySelector('.mobile-dock');
+  return dock ? dock.getBoundingClientRect().height : 0;
+}
+// Vertical center (px from top) of the map area not covered by the dock.
+function visibleMapCenterY(size) {
+  const s = size || (map ? map.getSize() : null);
+  const h = s ? s.y : window.innerHeight;
+  return (h - mobileDockHeight()) / 2;
+}
 function centerLocationInViewport(lat, lng, zoom) {
   if (!map) return;
   const z = zoom || map.getZoom();
   const size = map.getSize();
-  const cy = window.innerWidth <= 480 ? 200 : size.y / 2;
+  // Center in the visible area — above the dock on mobile (its height changes
+  // with the roster/session/minimize state), true center otherwise.
+  const cy = visibleMapCenterY(size);
   const userPt = map.project([lat, lng], z);
   const centerPt = userPt.add(L.point(0, size.y / 2 - cy));
   map.setView(map.unproject(centerPt, z), z, { animate: true, duration: 0.4 });
@@ -2229,9 +2268,15 @@ function initMap() {
   // zooming keeps the old map center by default, which loses the car/rider.
   map.on('zoomend', followMyLocation);
 
-  // Keep the full-bleed map sized correctly on orientation/resize
+  // Keep the full-bleed map sized correctly on orientation/resize, and
+  // recompute the visible center when the viewport/browser chrome changes.
   window.addEventListener('resize', () => {
     if (map) map.invalidateSize();
+    setTimeout(() => {
+      if (myLocation && activeSession && activeSession.phase !== 'idle' && activeSession.phase !== 'completed') {
+        followMyLocation();
+      }
+    }, 150);
   });
 }
 
@@ -2357,8 +2402,8 @@ function updateMap(data) {
   const fitBounds = (pts, maxZ) => {
     if (!pts || !pts.length) return;
     const opts = { padding: [50, 50], maxZoom: maxZ || 15 };
-    // On mobile, bias the fit toward the visible top area (above the floating cards)
-    if (window.innerWidth <= 480) opts.paddingBottomRight = [50, 420];
+    // On mobile, bias the fit toward the visible area above the dock
+    if (window.innerWidth <= 480) opts.paddingBottomRight = [50, mobileDockHeight() + 60];
     map.fitBounds(L.latLngBounds(pts), opts);
   };
 
@@ -2989,8 +3034,17 @@ function toggleDockMinimized() {
   const view = document.getElementById('view-carpool');
   view.classList.toggle('dock-minimized');
   localStorage.setItem('dockMinimized', view.classList.contains('dock-minimized') ? '1' : '0');
-  // Desktop: the map container grew — let Leaflet re-measure.
-  if (map) setTimeout(() => map.invalidateSize(), 60);
+  // Dock collapsed/expanded (or desktop map box resized) — the visible map
+  // area changed, so recompute the center: keep following me on an active
+  // trip, otherwise refit so the route/group is framed in the new viewport.
+  if (map) setTimeout(() => {
+    map.invalidateSize();
+    if (myLocation && activeSession && activeSession.phase !== 'idle' && activeSession.phase !== 'completed') {
+      followMyLocation();
+    } else if (currentCarpoolData) {
+      recenterMap();
+    }
+  }, 60);
 }
 
 function openHistoryModal() {
