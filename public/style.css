@@ -448,7 +448,8 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .rv-track::-webkit-scrollbar { display: none; }
 .rv-track > .subway-map,
 .rv-track > .seating-chart,
-.rv-track > .member-panel {
+.rv-track > .member-panel,
+.rv-track > .gps-panel {
   flex: 0 0 100%;
   min-width: 0;
   scroll-snap-align: start;
@@ -467,6 +468,85 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   letter-spacing: 0.05em;
   color: var(--text-2);
 }
+/* ── GPS Diagnostics card ────────────────────────────────────── */
+.gps-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.gps-panel h4 {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+}
+.gps-me {
+  background: var(--accent-soft);
+  border: 1px solid rgba(143,174,139,0.3);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.gps-me-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  padding: 1px 0;
+  color: var(--text-2);
+}
+.gps-dot-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.gps-dot-status.ok { background: #6BA368; }
+.gps-dot-status.bad { background: #C0504A; }
+.gps-dot-status.idle { background: var(--text-3); }
+.gps-section-title {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  margin: 8px 0 4px;
+}
+.gps-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.78rem;
+}
+.gps-row-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.gps-row-name { font-weight: 600; color: var(--text); flex-shrink: 0; }
+.gps-row-stats { color: var(--text-2); margin-left: auto; text-align: right; }
+.gps-row.stale .gps-row-stats { color: var(--accent-red, #C0504A); }
+.gps-events {
+  max-height: 130px;
+  overflow-y: auto;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.gps-event { display: flex; gap: 8px; }
+.gps-event-time { color: var(--text-3); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.gps-event.err .gps-event-time { color: var(--accent-red, #C0504A); }
+.gps-event.net .gps-event-time { color: var(--accent-deep); }
 .route-visual .subway-map {
   margin-bottom: 0;
 }

@@ -1384,6 +1384,7 @@ io.on('connection', (socket) => {
         username: user.username,
         lat,
         lng,
+        acc: data.acc,
         timestamp: Date.now()
       });
     }

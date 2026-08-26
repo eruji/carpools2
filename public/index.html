@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=11">
+<link rel="stylesheet" href="/style.css?v=12">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -247,6 +247,11 @@
     </div>
     <div class="position-board" id="position-board" aria-label="Pickup race board"></div>
     <div class="seating-chart" id="seating-chart" aria-label="Occupancy"></div>
+    <!-- GPS diagnostics — verbose per-member GPS health + recent events -->
+    <div class="gps-panel">
+      <h4>GPS Diagnostics</h4>
+      <div id="gps-diag" class="gps-diag"></div>
+    </div>
     </div>
     <div class="rv-nav">
       <button class="rv-arrow" id="rv-prev" type="button" aria-label="Previous view">‹</button>
@@ -452,6 +457,7 @@ const FEATURES = {
   seatingChart: true,
   positionBoard: true,
   members: true,
+  gps: true,
   history: true
 };
 
@@ -472,7 +478,8 @@ const SECTIONS = [
   { id: 'subway',       render: (ctx) => updateSubwayMap(ctx) },
   { id: 'seatingChart', render: (ctx) => renderSeatingChart(ctx.activeSession) },
   { id: 'positionBoard', render: (ctx) => renderPositionBoard(ctx.activeSession) },
-  { id: 'members',      render: (ctx) => renderMemberStatus(ctx.activeSession) }
+  { id: 'members',      render: (ctx) => renderMemberStatus(ctx.activeSession) },
+  { id: 'gps',          render: () => renderGpsDiag() }
 ];
 
 // Master process: re-render every section with the latest shared state.
@@ -590,6 +597,14 @@ async function init() {
       }).observe(dock);
     }
   }
+
+  // Keep the GPS diagnostics card fresh while the carpool view is open
+  setInterval(() => {
+    if (!FEATURES.gps) return;
+    const view = document.getElementById('view-carpool');
+    if (!view || view.classList.contains('hidden')) return;
+    renderGpsDiag();
+  }, 2500);
 
   // Check for an invite link (?invite=CODE)
   const params = new URLSearchParams(window.location.search);
@@ -3067,14 +3082,93 @@ function closeSetupModal() {
 }
 
 // ── Location Tracking ───────────────────────────────────────────────────────
+// Verbose GPS instrumentation: every poll/fix/error lands in a ring buffer
+// and per-member stats are tracked, surfaced in the GPS Diagnostics card.
+const gpsDiag = {
+  entries: [],      // { t, kind, msg } — recent GPS events
+  members: {},      // user_id -> { count, lastAt, acc, lat, lng, source }
+  maxEntries: 250
+};
+function gpsLog(kind, msg) {
+  gpsDiag.entries.push({ t: Date.now(), kind, msg });
+  if (gpsDiag.entries.length > gpsDiag.maxEntries) gpsDiag.entries.shift();
+}
+function gpsMemberStat(userId, username, lat, lng, acc, source) {
+  const s = gpsDiag.members[userId] || { count: 0 };
+  s.count++;
+  s.lastAt = Date.now();
+  s.lat = lat; s.lng = lng;
+  if (acc != null) s.acc = Math.round(acc);
+  s.source = source;
+  if (username) s.username = username;
+  gpsDiag.members[userId] = s;
+}
+const fmtDur = (sec) => sec < 90 ? Math.round(sec) + 's' : Math.round(sec / 60) + 'm';
+
+function renderGpsDiag() {
+  if (!FEATURES.gps) return;
+  const el = document.getElementById('gps-diag');
+  if (!el) return;
+  const now = Date.now();
+
+  // Self status: socket / secure context / tracking state
+  const selfStat = currentUser ? gpsDiag.members[currentUser.id] : null;
+  const socketOk = socket ? socket.connected : false;
+  const trackingOn = locationWatchId != null || locationInterval != null;
+  const meHtml = `<div class="gps-me">
+    <div class="gps-me-line"><span class="gps-dot-status ${socketOk ? 'ok' : 'bad'}"></span> socket ${socketOk ? 'connected' : 'DISCONNECTED'}</div>
+    <div class="gps-me-line"><span class="gps-dot-status ${window.isSecureContext ? 'ok' : 'bad'}"></span> HTTPS ${window.isSecureContext ? 'ok' : 'BLOCKED — geolocation unavailable'}</div>
+    <div class="gps-me-line"><span class="gps-dot-status ${trackingOn ? 'ok' : 'idle'}"></span> tracking ${trackingOn ? 'active' : 'off — start a session or respond'}</div>
+    ${selfStat
+      ? `<div class="gps-me-line">last fix ${fmtDur((now - selfStat.lastAt) / 1000)} ago · ±${selfStat.acc != null ? selfStat.acc : '?'}m · ${selfStat.count} fixes</div>`
+      : '<div class="gps-me-line">no fix received yet</div>'}
+  </div>`;
+
+  // One row per member of the carpool
+  const members = (activeSession && activeSession.members) || (currentCarpoolData ? currentCarpoolData.members : []) || [];
+  const rowsHtml = members.map((m) => {
+    const st = gpsDiag.members[m.user_id];
+    const isMe = m.user_id === currentUser.id;
+    const liveSec = st ? (now - st.lastAt) / 1000 : null;
+    const dbAgeMin = m.updated_at ? minutesAgo(m.updated_at) : null;
+    const age = liveSec != null ? fmtDur(liveSec) : (dbAgeMin != null ? fmtDur(dbAgeMin * 60) : 'no fix');
+    const stale = (liveSec != null && liveSec > POSITION_STALE_SEC) || (dbAgeMin != null && dbAgeMin * 60 > POSITION_STALE_SEC);
+    const acc = st && st.acc != null ? '±' + st.acc + 'm' : '—';
+    const src = st ? (st.source === 'rx' ? 'broadcast' : st.source) : '—';
+    const cnt = st ? st.count : 0;
+    return `<div class="gps-row${stale ? ' stale' : ''}">
+      <span class="gps-row-avatar" style="background:${memberColor(m.user_id)}">${esc(getInitials(m.username))}</span>
+      <span class="gps-row-name">${esc(m.username)}${isMe ? ' (you)' : ''} · ${m.status || '?'}</span>
+      <span class="gps-row-stats">fix ${age} · ${acc} · ${cnt} updates · ${src}</span>
+    </div>`;
+  }).join('');
+
+  // Recent events, newest first
+  const eventsHtml = gpsDiag.entries.slice(-12).reverse().map((e) => {
+    const t = new Date(e.t);
+    const hh = String(t.getHours()).padStart(2, '0');
+    const mm = String(t.getMinutes()).padStart(2, '0');
+    const ss = String(t.getSeconds()).padStart(2, '0');
+    return `<div class="gps-event ${e.kind}"><span class="gps-event-time">${hh}:${mm}:${ss}</span> ${esc(e.msg)}</div>`;
+  }).join('');
+
+  el.innerHTML = `${meHtml}
+    <div class="gps-section-title">Members</div>
+    ${rowsHtml || '<div class="text-xs text-muted">No members</div>'}
+    <div class="gps-section-title">Recent GPS events</div>
+    <div class="gps-events">${eventsHtml || '<div class="text-xs text-muted">No events yet — GPS events appear here once tracking starts</div>'}</div>`;
+}
+
 function startLocationTracking() {
   if (locationWatchId) return;
   showGpsStatus();
+  gpsLog('start', 'tracking started');
 
   // Android Chrome/Brave silently block geolocation on insecure (HTTP)
   // origins — surface it instead of failing silently.
   if (!window.isSecureContext) {
     console.warn('[GPS] insecure context — geolocation blocked (open over HTTPS)');
+    gpsLog('err', 'insecure context — geolocation blocked (HTTPS required)');
     const el = document.getElementById('gps-status');
     if (el) {
       el.classList.remove('hidden');
@@ -3089,11 +3183,14 @@ function startLocationTracking() {
         myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
         lastGpsFixAt = Date.now();
         hideGpsStatus();
+        gpsMemberStat(currentUser.id, currentUser.username, myLocation.lat, myLocation.lng, pos.coords.accuracy, 'watch');
+        gpsLog('fix', 'watch fix ±' + (pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : '?') + 'm');
         if (!activeSession || !socket) return;
         socket.emit('location-update', {
           sessionId: activeSession.id,
           lat: myLocation.lat,
-          lng: myLocation.lng
+          lng: myLocation.lng,
+          acc: pos.coords.accuracy
         });
         // Geo-fence: auto-arrive when close to the current target
         checkGeoFence();
@@ -3112,7 +3209,7 @@ function startLocationTracking() {
           fitMapToConverge();
         }
       },
-      (err) => { console.log('Geolocation error:', err.message); },
+      (err) => { gpsLog('err', 'watch error: ' + (err.message || err.code)); console.log('Geolocation error:', err.message); },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
   }
@@ -3141,10 +3238,13 @@ function startLocationTracking() {
           myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
           lastGpsFixAt = Date.now();
           hideGpsStatus();
+          gpsMemberStat(currentUser.id, currentUser.username, myLocation.lat, myLocation.lng, pos.coords.accuracy, 'poll');
+          gpsLog('fix', 'poll fix ±' + (pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : '?') + 'm');
           socket.emit('location-update', {
             sessionId: activeSession.id,
             lat: myLocation.lat,
-            lng: myLocation.lng
+            lng: myLocation.lng,
+            acc: pos.coords.accuracy
           });
           checkGeoFence();
           feedSpeedFix(currentUser.id, myLocation.lat, myLocation.lng, Date.now());
@@ -3164,6 +3264,7 @@ function startLocationTracking() {
         (err) => {
           // Fix failed/timed out — surface it instead of silently going stale
           if (lastGpsFixAt && Date.now() - lastGpsFixAt > 15000) showGpsStatus();
+          gpsLog('err', 'poll error: ' + (err.message || err.code));
           console.log('GPS fallback:', err.message);
         },
         { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
@@ -3273,6 +3374,7 @@ function connectSocket() {
   socket = io();
 
   socket.on('connect', () => {
+    gpsLog('net', 'socket connected');
     socket.emit('authenticate', {
       userId: currentUser.id,
       username: currentUser.username
@@ -3326,8 +3428,11 @@ function connectSocket() {
     if (member) {
       member.location_lat = data.lat;
       member.location_lng = data.lng;
+      member.acc = data.acc;
       member.updated_at = new Date(data.timestamp).toISOString().slice(0, 19).replace('T', ' ');
     }
+    gpsMemberStat(data.userId, data.username, data.lat, data.lng, data.acc, 'rx');
+    gpsLog('rx', 'RX ' + data.username + ' ±' + (data.acc != null ? Math.round(data.acc) : '?') + 'm');
     feedSpeedFix(data.userId, data.lat, data.lng, data.timestamp || Date.now());
     onLocationsChanged();
   });
@@ -3340,6 +3445,7 @@ function connectSocket() {
   });
 
   socket.on('disconnect', () => {
+    gpsLog('net', 'socket DISCONNECTED');
     console.log('Socket disconnected');
   });
 }
