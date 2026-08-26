@@ -1189,6 +1189,15 @@ async function loadCarpoolView(carpoolId) {
   const data = await res.json();
   currentCarpoolData = data;
   activeSession = data.activeSession;
+  // Restart GPS tracking after a page refresh mid-carpool: the reload wipes
+  // JS state (watchPosition + interval are gone), and without this the member
+  // never reports location again until they respond to something.
+  if (activeSession && activeSession.phase !== 'completed' && activeSession.phase !== 'cancelled') {
+    const me = activeSession.members.find(m => m.user_id === currentUser.id);
+    if (me && (me.status === 'driving' || me.status === 'riding')) {
+      startLocationTracking();
+    }
+  }
   // Reset geo-fence memory when switching to a different session
   if (data.activeSession && data.activeSession.id !== lastAutoArriveSessionId) {
     lastAutoArriveSessionId = data.activeSession.id;
