@@ -3212,11 +3212,16 @@ function startLocationTracking() {
         gpsMemberStat(currentUser.id, currentUser.username, myLocation.lat, myLocation.lng, pos.coords.accuracy, 'watch');
         gpsLog('fix', 'watch fix ±' + (pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : '?') + 'm');
         if (!activeSession || !socket) return;
-        socket.emit('location-update', {
+        // Suppress emits while disconnected — socket.io would otherwise buffer
+        // this burst and replay it on reconnect. The server's newest-fix-wins
+        // guard rejects any stale replay; the first fresh fix after reconnect
+        // carries a newer ts and lands normally.
+        if (socket.connected) socket.emit('location-update', {
           sessionId: activeSession.id,
           lat: myLocation.lat,
           lng: myLocation.lng,
-          acc: pos.coords.accuracy
+          acc: pos.coords.accuracy,
+          ts: Date.now()
         });
         // Geo-fence: auto-arrive when close to the current target
         checkGeoFence();
@@ -3271,11 +3276,13 @@ function startLocationTracking() {
           hideGpsStatus();
           gpsMemberStat(currentUser.id, currentUser.username, myLocation.lat, myLocation.lng, pos.coords.accuracy, 'poll');
           gpsLog('fix', 'poll fix ±' + (pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : '?') + 'm');
-          socket.emit('location-update', {
+          // Suppress emits while disconnected (see watchPosition above)
+          if (socket.connected) socket.emit('location-update', {
             sessionId: activeSession.id,
             lat: myLocation.lat,
             lng: myLocation.lng,
-            acc: pos.coords.accuracy
+            acc: pos.coords.accuracy,
+            ts: Date.now()
           });
           checkGeoFence();
           feedSpeedFix(currentUser.id, myLocation.lat, myLocation.lng, Date.now());
@@ -3456,10 +3463,15 @@ function connectSocket() {
   socket.on('member-location', (data) => {
     if (!activeSession) return;
     const member = activeSession.members.find(m => m.user_id === data.userId);
+    // Monotonic guard (defense in depth): drop broadcasts older than the
+    // newest one already applied for this member — never let the marker or
+    // race board regress from an out-of-order or replayed ping.
+    if (data.ts != null && member && member.lastTs != null && data.ts <= member.lastTs) return;
     if (member) {
       member.location_lat = data.lat;
       member.location_lng = data.lng;
       member.acc = data.acc;
+      member.lastTs = data.ts != null ? data.ts : Date.now();
       member.updated_at = new Date(data.timestamp).toISOString().slice(0, 19).replace('T', ' ');
     }
     gpsMemberStat(data.userId, data.username, data.lat, data.lng, data.acc, 'rx');

@@ -90,6 +90,7 @@ db.exec(`
     location_lat REAL,
     location_lng REAL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    client_ts INTEGER,
     UNIQUE(session_id, user_id)
   );
 
@@ -169,6 +170,12 @@ if (!smCols.includes('max_mph')) {
 if (!smCols.includes('avg_mph')) {
   db.exec('ALTER TABLE session_members ADD COLUMN avg_mph REAL');
 }
+// Monotonic position guard: client_ts holds the timestamp of the newest
+// accepted fix, so out-of-order pings (and replayed socket buffers after a
+// reconnect) can never overwrite a fresher position.
+if (!smCols.includes('client_ts')) {
+  db.exec('ALTER TABLE session_members ADD COLUMN client_ts INTEGER');
+}
 
 // ── Invite code generator ───────────────────────────────────────────────────
 function generateInviteCode() {
@@ -238,6 +245,18 @@ const stmts = {
   // Session Members
   addSessionMember: db.prepare('INSERT OR IGNORE INTO session_members (session_id, user_id, status) VALUES (?, ?, ?)'),
   updateSessionMember: db.prepare('UPDATE session_members SET status=COALESCE(?, status), location_lat=COALESCE(?, location_lat), location_lng=COALESCE(?, location_lng), updated_at=datetime(\'now\') WHERE session_id=? AND user_id=?'),
+  // Newest-fix-wins location write: only lands when the incoming fix timestamp
+  // is newer than the stored one (or none stored yet). Stale writes return
+  // changes=0 and are never broadcast.
+  updateLocationIfNewer: db.prepare(`
+    UPDATE session_members SET
+      location_lat = ?,
+      location_lng = ?,
+      updated_at = datetime('now'),
+      client_ts = ?
+    WHERE session_id = ? AND user_id = ?
+      AND (client_ts IS NULL OR ? > client_ts)
+  `),
   sessionMembers: db.prepare(`
     SELECT sm.*, u.username FROM session_members sm
     JOIN users u ON u.id = sm.user_id
@@ -1361,8 +1380,14 @@ io.on('connection', (socket) => {
     if (!user) return;
 
     const { sessionId, lat, lng } = data;
+    const ts = data.ts || Date.now();
+    // Monotonic guard: reject positions older than the newest already stored
+    // for this member. This neutralizes out-of-order pings and the burst of
+    // buffered emits replayed after a socket reconnect — only the freshest
+    // fix ever wins, and stale replays never reach the other members.
+    let fresh = false;
     try {
-      stmts.updateSessionMember.run(null, lat, lng, sessionId, user.userId);
+      fresh = stmts.updateLocationIfNewer.run(lat, lng, ts, sessionId, user.userId, ts).changes > 0;
     } catch (e) { /* ignore */ }
 
     // Derive the carpool from the session so updates are never dropped when
@@ -1373,7 +1398,7 @@ io.on('connection', (socket) => {
       const sess = db.prepare('SELECT carpool_id FROM carpool_sessions WHERE id = ?').get(sessionId);
       carpoolId = sess ? sess.carpool_id : null;
     }
-    if (carpoolId) {
+    if (carpoolId && fresh) {
       if (!user.currentCarpool) {
         user.currentCarpool = carpoolId;
         socket.join('carpool:' + carpoolId);
@@ -1385,6 +1410,7 @@ io.on('connection', (socket) => {
         lat,
         lng,
         acc: data.acc,
+        ts,
         timestamp: Date.now()
       });
     }
