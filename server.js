@@ -134,6 +134,17 @@ db.exec(`
     lng REAL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS proximity_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES carpool_sessions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    phase TEXT NOT NULL,
+    threshold_min REAL NOT NULL,
+    notified INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(session_id, user_id, phase)
+  );
 `);
 
 // ── Migrations (existing databases) ────────────────────────────────────────
@@ -265,6 +276,17 @@ const stmts = {
   sessionMemberByUser: db.prepare('SELECT * FROM session_members WHERE session_id=? AND user_id=?'),
   markArrivedAt: db.prepare("UPDATE session_members SET arrived_at = COALESCE(arrived_at, datetime('now')) WHERE session_id=? AND user_id=?"),
   markRaceSpeeds: db.prepare('UPDATE session_members SET max_mph = COALESCE(max_mph, ?), avg_mph = COALESCE(avg_mph, ?) WHERE session_id=? AND user_id=?'),
+
+  // Ambient proximity alerts ("ping me when the driver is X min away")
+  proximityAlerts: db.prepare('SELECT * FROM proximity_alerts WHERE session_id=? AND phase=?'),
+  proximityForUser: db.prepare('SELECT threshold_min, notified FROM proximity_alerts WHERE session_id=? AND user_id=? AND phase=?'),
+  upsertProximity: db.prepare(`
+    INSERT INTO proximity_alerts (session_id, user_id, phase, threshold_min, notified)
+    VALUES (?, ?, ?, ?, 0)
+    ON CONFLICT(session_id, user_id, phase) DO UPDATE SET threshold_min=excluded.threshold_min, notified=0
+  `),
+  deleteProximity: db.prepare('DELETE FROM proximity_alerts WHERE session_id=? AND user_id=? AND phase=?'),
+  markProximityNotified: db.prepare('UPDATE proximity_alerts SET notified=1 WHERE id=?'),
 
   // History
   addHistory: db.prepare('INSERT INTO carpool_history (carpool_id, session_id, phase, driver_id, event, coins_data, mileage, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
@@ -659,6 +681,9 @@ app.get('/api/carpools/:id', requireAuth, (req, res) => {
       ...activeSession,
       members: stmts.sessionMembers.all(activeSession.id)
     };
+    // Current user's ambient alert preference for this leg
+    const prox = stmts.proximityForUser.get(activeSession.id, req.session.userId, activeSession.phase);
+    sessionData.proximity = prox ? prox.threshold_min : null;
   }
   const history = stmts.carpoolHistory.all(carpool.id);
 
@@ -1088,6 +1113,29 @@ app.post('/api/carpools/:id/sessions/skip-member', requireAuth, (req, res) => {
   }
 });
 
+// Ambient proximity alert: "ping me when the driver is X min away" (0 = off)
+app.post('/api/carpools/:id/proximity', requireAuth, (req, res) => {
+  try {
+    const carpool = stmts.carpoolById.get(req.params.id);
+    if (!carpool) return res.status(404).json({ error: 'Not found' });
+    if (!stmts.isMember.get(carpool.id, req.session.userId)) return res.status(403).json({ error: 'Not a member' });
+    const session = stmts.activeSession.get(carpool.id);
+    if (!session || !session.driver_id) return res.status(400).json({ error: 'No active trip' });
+
+    const raw = Number(req.body.thresholdMin);
+    if (raw > 0) {
+      const t = Math.max(2, Math.min(30, raw));
+      stmts.upsertProximity.run(session.id, req.session.userId, session.phase, t);
+      res.json({ ok: true, threshold: t });
+    } else {
+      stmts.deleteProximity.run(session.id, req.session.userId, session.phase);
+      res.json({ ok: true, threshold: null });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/carpools/:id/sessions/advance-phase', requireAuth, (req, res) => {
   const advancePhase = db.transaction(() => {
     const { phase } = req.body; // 'destination' | 'back_to_meetup' | 'completed'
@@ -1289,6 +1337,37 @@ function transitionToComplete(carpool, activeSession) {
 }
 
 // Auto-advance when everyone (non-skipped) has arrived at the current stop
+// Ambient passenger alerts: when the driver's fresh position puts them within
+// a subscriber's threshold, push once per threshold per leg. Straight-line at
+// a conservative ~24mph so alerts fire early rather than late.
+const PROXIMITY_SPEED_MPM = 0.4; // miles per minute (~24 mph straight-line)
+function checkProximityAlerts(carpool, session) {
+  if (!session || !session.driver_id) return;
+  const target = session.phase === 'meetup' || session.phase === 'back_to_meetup'
+    ? { lat: carpool.meetup_lat, lng: carpool.meetup_lng }
+    : session.phase === 'destination'
+      ? { lat: carpool.destination_lat, lng: carpool.destination_lng }
+      : null;
+  if (!target || !target.lat || !target.lng) return;
+
+  const driverRow = stmts.sessionMemberByUser.get(session.id, session.driver_id);
+  if (!driverRow || !driverRow.location_lat || !driverRow.location_lng) return;
+
+  const etaMin = haversine(driverRow.location_lat, driverRow.location_lng, target.lat, target.lng) / PROXIMITY_SPEED_MPM;
+  const targetLabel = session.phase === 'meetup' ? 'the pickup'
+    : session.phase === 'destination' ? 'the destination' : 'the dropoff';
+  const alerts = stmts.proximityAlerts.all(session.id, session.phase);
+  for (const a of alerts) {
+    if (a.notified || etaMin > a.threshold_min) continue;
+    stmts.markProximityNotified.run(a.id);
+    const sub = stmts.userById.get(a.user_id);
+    const minutes = Math.max(1, Math.round(etaMin));
+    sendPush(a.user_id, 'Driver approaching 🚗',
+      `${sub ? sub.username : 'The driver'} is about ${minutes} min away from ${targetLabel}`,
+      `/?carpool=${carpool.id}`);
+  }
+}
+
 function autoAdvanceCheck(carpoolId) {
   const session = stmts.activeSession.get(carpoolId);
   if (!session || !session.driver_id) return false;
@@ -1413,6 +1492,11 @@ io.on('connection', (socket) => {
         ts,
         timestamp: Date.now()
       });
+      // Ambient passenger alerts keyed off the driver's fresh position
+      const sess = stmts.activeSession.get(carpoolId);
+      if (sess && sess.driver_id === user.userId) {
+        checkProximityAlerts(stmts.carpoolById.get(carpoolId), sess);
+      }
     }
   });
 

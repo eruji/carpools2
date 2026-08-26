@@ -290,6 +290,12 @@
       </div>
 
       <div id="session-alert" class="hidden"></div>
+
+      <!-- Ambient alert: ping me when the driver is X min away (passengers only) -->
+      <div id="proximity-row" class="hidden" style="margin-top:10px;">
+        <div class="proximity-label">🔔 Alert me when the driver is</div>
+        <div class="btn-group" id="proximity-options"></div>
+      </div>
     </div>
   </div>
   </div>
@@ -447,6 +453,8 @@ let lastGpsFixAt = 0; // epoch ms of the most recent GPS fix (watchdog)
 let pendingInviteCode = null; // invite code from URL, joined after auth
 let myCarpools = []; // carpool list for the switcher
 let lastDriverId = null; // for driver-change toasts
+let proximityPref = null; // ambient alert minutes (null = off)
+let lastProxPhase = null; // last phase we (re)subscribed the alert for
 
 // ── Section registry + master renderer ────────────────────────────────────
 // Each visual section is a self-contained component. Flip a flag to false to
@@ -522,6 +530,17 @@ function setSession(session) {
   // update — e.g. someone joining mid-drive — instead of waiting for the next
   // GPS tick to re-render.
   renderSections();
+  // Carry the ambient alert preference into a new leg (meetup → destination)
+  if (proximityPref != null && currentCarpoolId && session && session.driver_id
+      && session.phase !== 'idle' && session.phase !== 'completed' && session.phase !== 'cancelled'
+      && session.phase !== lastProxPhase) {
+    lastProxPhase = session.phase;
+    fetch(`/api/carpools/${currentCarpoolId}/proximity`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ thresholdMin: proximityPref })
+    }).catch(() => {});
+  }
 }
 
 // Remember the last carpool the user opened
@@ -1179,6 +1198,18 @@ async function declineInvitation(id) {
 }
 
 // ── Carpool View ────────────────────────────────────────────────────────────
+async function setProximity(min) {
+  proximityPref = min > 0 ? min : null;
+  try {
+    await fetch(`/api/carpools/${currentCarpoolId}/proximity`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ thresholdMin: min })
+    });
+  } catch (e) { /* offline — preference applies once the socket returns */ }
+  renderSessionUI(activeSession);
+}
+
 async function loadCarpoolView(carpoolId) {
   const res = await fetch(`/api/carpools/${carpoolId}`);
   if (!res.ok) {
@@ -1189,6 +1220,9 @@ async function loadCarpoolView(carpoolId) {
   const data = await res.json();
   currentCarpoolData = data;
   activeSession = data.activeSession;
+  // Restore the ambient alert preference for the current leg
+  proximityPref = (data.activeSession && data.activeSession.proximity) || null;
+  lastProxPhase = data.activeSession ? data.activeSession.phase : null;
   // Restart GPS tracking after a page refresh mid-carpool: the reload wipes
   // JS state (watchPosition + interval are gone), and without this the member
   // never reports location again until they respond to something.
@@ -1605,6 +1639,22 @@ function renderSessionUI(session) {
     }
   } else {
     alertEl.classList.add('hidden');
+  }
+
+  // Ambient proximity alert: passengers only, on active legs with a driver
+  const proxRow = document.getElementById('proximity-row');
+  const myProxMember = session ? session.members.find(m => m.user_id === currentUser.id) : null;
+  const showProx = !!session && !!session.driver_id
+    && (session.phase === 'meetup' || session.phase === 'destination' || session.phase === 'back_to_meetup')
+    && (!myProxMember || myProxMember.user_id !== session.driver_id);
+  if (proxRow) {
+    proxRow.classList.toggle('hidden', !showProx);
+    if (showProx) {
+      document.getElementById('proximity-options').innerHTML = [5, 10, 15, 0].map(m => {
+        const on = m === 0 ? proximityPref == null : proximityPref === m;
+        return `<button class="btn btn-sm ${on ? 'btn-primary' : 'btn-outline'}" onclick="setProximity(${m})">${m === 0 ? 'Off' : m + ' min'}</button>`;
+      }).join('');
+    }
   }
 
   if (session.phase === 'meetup') {
