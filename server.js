@@ -1358,21 +1358,35 @@ io.on('connection', (socket) => {
 
   socket.on('location-update', (data) => {
     const user = onlineUsers.get(socket.id);
-    if (!user || !user.currentCarpool) return;
+    if (!user) return;
 
     const { sessionId, lat, lng } = data;
     try {
       stmts.updateSessionMember.run(null, lat, lng, sessionId, user.userId);
     } catch (e) { /* ignore */ }
 
-    // Broadcast to carpool room
-    socket.to('carpool:' + user.currentCarpool).emit('member-location', {
-      userId: user.userId,
-      username: user.username,
-      lat,
-      lng,
-      timestamp: Date.now()
-    });
+    // Derive the carpool from the session so updates are never dropped when
+    // the socket hasn't re-joined a room after a reconnect (phones switch
+    // networks mid-drive all the time). Heals the room membership too.
+    let carpoolId = user.currentCarpool;
+    if (!carpoolId) {
+      const sess = db.prepare('SELECT carpool_id FROM carpool_sessions WHERE id = ?').get(sessionId);
+      carpoolId = sess ? sess.carpool_id : null;
+    }
+    if (carpoolId) {
+      if (!user.currentCarpool) {
+        user.currentCarpool = carpoolId;
+        socket.join('carpool:' + carpoolId);
+      }
+      // Broadcast to carpool room
+      socket.to('carpool:' + carpoolId).emit('member-location', {
+        userId: user.userId,
+        username: user.username,
+        lat,
+        lng,
+        timestamp: Date.now()
+      });
+    }
   });
 
   socket.on('disconnect', () => {

@@ -3071,6 +3071,18 @@ function startLocationTracking() {
   if (locationWatchId) return;
   showGpsStatus();
 
+  // Android Chrome/Brave silently block geolocation on insecure (HTTP)
+  // origins — surface it instead of failing silently.
+  if (!window.isSecureContext) {
+    console.warn('[GPS] insecure context — geolocation blocked (open over HTTPS)');
+    const el = document.getElementById('gps-status');
+    if (el) {
+      el.classList.remove('hidden');
+      el.innerHTML = '<span class="gps-dot"></span> GPS blocked — HTTPS required';
+    }
+    return;
+  }
+
   if ('geolocation' in navigator) {
     locationWatchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -3109,8 +3121,16 @@ function startLocationTracking() {
   locationInterval = setInterval(() => {
     if (!activeSession) return;
     // Watchdog: if GPS has gone quiet (fix lost, tab throttled, stuck cache)
-    // re-show the "Acquiring GPS" pill so staleness is obvious.
-    if (lastGpsFixAt && Date.now() - lastGpsFixAt > 45000) showGpsStatus();
+    // re-show the "Acquiring GPS" pill so staleness is obvious — and log the
+    // environment so a dead-fix report is debuggable.
+    if (lastGpsFixAt && Date.now() - lastGpsFixAt > 45000) {
+      showGpsStatus();
+      console.warn('[GPS] no fix for ' + Math.round((Date.now() - lastGpsFixAt) / 1000) + 's', {
+        socketConnected: socket ? socket.connected : false,
+        sessionActive: !!activeSession,
+        tabVisible: document.visibilityState
+      });
+    }
     if (currentCarpoolData) {
       updateSubwayETAs({ carpool: currentCarpoolData.carpool, activeSession });
     }
@@ -3263,7 +3283,12 @@ function connectSocket() {
   // This fixes the race where join-carpool arrived before authenticate,
   // and re-joins after every reconnect.
   socket.on('authenticated', () => {
-    if (currentCarpoolId) socket.emit('join-carpool', currentCarpoolId);
+    if (!currentCarpoolId) return;
+    socket.emit('join-carpool', currentCarpoolId);
+    // Reconnect (Android drops the socket on network handoffs mid-drive):
+    // resync session/member state — events may have been missed while
+    // disconnected, leaving activeSession stale or null.
+    loadCarpoolView(currentCarpoolId);
   });
 
   socket.on('session-started', (session) => {
