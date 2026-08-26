@@ -2515,18 +2515,28 @@ function updateMap(data) {
       }
     }
 
-    // Other members
+    // Other members — markers show freshness: a fix older than the 2-min
+    // threshold renders greyed with its age in the tooltip, so an old or
+    // wrong position is never mistaken for live. (The browser geolocation
+    // API falls back to IP/network positioning when GPS can't lock — Google
+    // Maps uses a far better stack, so it can disagree by miles.)
     session.members.forEach(m => {
       if (m.user_id === currentUser.id || m.status === 'skip') return;
       if (!(m.location_lat && m.location_lng)) return;
+      const ageSec = m.updated_at ? (Date.now() - new Date(m.updated_at.replace(' ', 'T') + 'Z').getTime()) / 1000 : null;
+      const stale = ageSec != null && ageSec > POSITION_STALE_SEC;
+      const accTxt = m.acc != null ? ` · ±${Math.round(m.acc)}m` : '';
+      const ageTxt = ageSec != null ? fmtDur(ageSec) : null;
       const marker = L.marker([m.location_lat, m.location_lng], {
         icon: L.divIcon({
           className: '',
-          html: `<div style="width:32px;height:32px;border-radius:50%;background:${memberColor(m.user_id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:0.02em;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(m.username))}</div>`,
+          html: `<div style="width:32px;height:32px;border-radius:50%;background:${memberColor(m.user_id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:0.02em;border:2px solid ${stale ? '#999' : '#fff'};box-shadow:0 2px 8px rgba(0,0,0,0.35);opacity:${stale ? 0.4 : 1};filter:${stale ? 'grayscale(0.8)' : 'none'};">${esc(getInitials(m.username))}</div>`,
           iconAnchor: [16, 16]
         })
-      }).addTo(map).bindTooltip(`${esc(m.username)} (${m.status})`, { direction: 'top', offset: [0, -12] });
+      }).addTo(map).bindTooltip(`${esc(m.username)} (${m.status})${accTxt}${stale && ageTxt ? ` · ⚠ fix ${ageTxt} ago` : ''}`, { direction: 'top', offset: [0, -12] });
       mapMarkers['member_' + m.user_id] = marker;
+      // Only live positions participate in map fits and pickup routing
+      if (stale) return;
       addPoint(m.location_lat, m.location_lng);
 
       if (hasPickup) {
@@ -3180,6 +3190,13 @@ function startLocationTracking() {
   if ('geolocation' in navigator) {
     locationWatchId = navigator.geolocation.watchPosition(
       (pos) => {
+        // Reject IP-grade fixes (miles off): when GPS can't lock, the browser
+        // falls back to IP/network positioning — Google Maps never does this.
+        // Log the rejection in the diag card instead of plotting it.
+        if (pos.coords.accuracy != null && pos.coords.accuracy > 2000) {
+          gpsLog('err', 'watch fix ±' + Math.round(pos.coords.accuracy) + 'm rejected (>2km — IP-based?)');
+          return;
+        }
         myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
         lastGpsFixAt = Date.now();
         hideGpsStatus();
@@ -3235,6 +3252,11 @@ function startLocationTracking() {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          // Reject IP-grade fixes (miles off) — see watchPosition above
+          if (pos.coords.accuracy != null && pos.coords.accuracy > 2000) {
+            gpsLog('err', 'poll fix ±' + Math.round(pos.coords.accuracy) + 'm rejected (>2km — IP-based?)');
+            return;
+          }
           myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
           lastGpsFixAt = Date.now();
           hideGpsStatus();
