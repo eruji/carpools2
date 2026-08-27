@@ -484,21 +484,22 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
+.gps-diag { max-height: 170px; overflow-y: auto; }
 .gps-me {
   background: var(--accent-soft);
   border: 1px solid rgba(143,174,139,0.3);
-  border-radius: 10px;
-  padding: 8px 10px;
-  margin-bottom: 10px;
+  border-radius: 8px;
+  padding: 5px 8px;
+  margin-bottom: 6px;
 }
 .gps-me-line {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.78rem;
-  padding: 1px 0;
+  font-size: 0.7rem;
+  line-height: 1.5;
   color: var(--text-2);
 }
 .gps-dot-status {
@@ -515,19 +516,19 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-3);
-  margin: 8px 0 4px;
+  margin: 5px 0 3px;
 }
 .gps-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 2px;
+  padding: 4px 2px;
   border-bottom: 1px solid var(--border);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
 }
 .gps-row-avatar {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   color: #fff;
   display: flex;
@@ -541,10 +542,10 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .gps-row-stats { color: var(--text-2); margin-left: auto; text-align: right; }
 .gps-row.stale .gps-row-stats { color: var(--accent-red, #C0504A); }
 .gps-events {
-  max-height: 130px;
+  max-height: 90px;
   overflow-y: auto;
-  font-size: 0.72rem;
-  line-height: 1.5;
+  font-size: 0.68rem;
+  line-height: 1.4;
   color: var(--text-2);
 }
 .gps-event { display: flex; gap: 8px; }
@@ -568,7 +569,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-2);
-  margin: 0 0 8px;
+  margin: 0 0 4px;
 }
 .race-header .rv-title { margin-bottom: 0; }
 /* Map theme picker (Key popup) */
@@ -596,7 +597,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   align-items: center;
   justify-content: center;
   gap: 14px;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 .rv-arrow {
   width: 30px;
@@ -630,13 +631,13 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .rv-dot.active { background: var(--accent-deep); transform: scale(1.3); }
 
 /* ── Top-down car (seating chart) ── */
-.car-topdown { width: 100%; max-width: 140px; }
+.car-topdown { width: 100%; max-width: 120px; }
 .car-body {
   position: relative;
   background: var(--surface-alt);
   border: 2px solid var(--border-strong);
   border-radius: 26px 26px 14px 14px;
-  padding: 16px 12px 12px;
+  padding: 12px 9px 9px;
 }
 .car-body::before {
   content: '';
@@ -653,10 +654,10 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   justify-content: center;
   gap: 8px;
 }
-.car-row.front { margin-bottom: 8px; }
+.car-row.front { margin-bottom: 6px; }
 .car-seat {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 10px;
   border: 2px dashed var(--border-strong);
   background: var(--surface);
@@ -762,7 +763,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 2px;
+  padding: 5px 2px;
   border-bottom: 1px solid var(--border);
 }
 /* Members who haven't accepted driving/riding yet — sleeping at the start line */
@@ -963,7 +964,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 /* ── Stops ────────────────────────────────────────────────── */
 .subway-stop {
   position: relative;
-  padding: 8px 0;
+  padding: 6px 0;
   padding-left: 12px;
 }
 .subway-stop:last-child { padding-bottom: 0; }
@@ -1251,7 +1252,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 12px;
+  padding: 8px;
   margin-bottom: 12px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
@@ -1271,14 +1272,14 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .phase-panel .phase-status .phase-text { font-size: 1rem; font-weight: 600; color: var(--accent-deep); }
 
 /* ── Member Status Cards ─────────────────────────────────────── */
-.member-list { display: flex; flex-direction: column; gap: 5px; }
+.member-list { display: flex; flex-direction: column; gap: 4px; }
 .member-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 5px 7px; background: var(--surface);
+  padding: 4px 6px; background: var(--surface);
   border: 1px solid var(--border); border-radius: 10px;
   transition: border-color 0.2s;
   gap: 6px;
-  min-height: 30px; /* stable row height — layout never pops when ETA text lands */
+  min-height: 28px; /* stable row height — layout never pops when ETA text lands */
 }
 .member-row:hover { border-color: var(--border-strong); }
 .member-row.is-driver {
