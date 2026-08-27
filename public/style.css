@@ -534,9 +534,8 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .route-visual .subway-map {
   margin-bottom: 0;
 }
-/* Occupancy inside the Route card — subtle centered title + compact car */
+/* Occupancy title matches the Route title — left aligned */
 .seating-chart .rv-title {
-  text-align: center;
   font-size: 0.7rem;
   letter-spacing: 0.06em;
   margin-bottom: 6px;
@@ -1570,43 +1569,28 @@ tr:hover td { background: rgba(0,0,0,0.015); }
     position: static;
     margin-top: 0;
   }
-  #view-carpool.dock-minimized .dock-grabber { display: none; }
-
-  /* Grabber handle at the top of the dock — the intuitive shrink spot */
-  .dock-grabber {
-    display: block;
-    width: 44px;
-    height: 5px;
-    border-radius: 999px;
-    background: var(--border-strong);
-    border: none;
-    padding: 0;
-    margin: -12px auto 8px;
-    cursor: pointer;
-  }
-  .dock-grabber:active { background: var(--text-3); }
-
-  /* Floating expand pill shown while the interface is minimized */
-  .dock-expand-bar {
-    position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    z-index: 950;
+  /* Binder-tab minimize control: down chevron on a tab at the dock's top
+     edge; the chevron flips up when the interface is minimized (the tab
+     stays put as the expand handle). */
+  .dock-tab {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 10px 18px;
-    border-radius: 999px;
-    border: 1px solid var(--border-strong);
-    background: rgba(255,255,255,0.95);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--text);
+    justify-content: center;
+    width: 84px;
+    height: 26px;
+    margin: 0 auto 6px;
+    transform: translateY(-50%);
+    border: 1.5px solid var(--border-strong);
+    border-radius: 10px 10px 4px 4px;
+    background: var(--surface);
+    color: var(--text-2);
     cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    padding: 0;
+    flex-shrink: 0;
   }
-  .dock-expand-bar:active { transform: translateX(-50%) scale(0.96); }
+  .dock-tab svg { transition: transform 0.25s; }
+  #view-carpool.dock-minimized .dock-tab svg { transform: rotate(180deg); }
 
   .profile-menu-name { display: none; }
   #btn-dashboard { display: none !important; }
