@@ -247,9 +247,9 @@
       <!-- Member avatars removed — the line and stop icons represent the route -->
       <div id="subway-progress" class="subway-progress"></div>
       </div>
+      <!-- Occupancy: the car fills as members arrive at the pickup -->
+      <div class="seating-chart" id="seating-chart" aria-label="Occupancy"></div>
     </div>
-    <!-- Occupancy: the car fills as members arrive at the pickup -->
-    <div class="seating-chart" id="seating-chart" aria-label="Occupancy"></div>
     <!-- Slide 2: Members — the roster lives in the carousel -->
     <div class="member-panel">
       <div class="rv-title">Members</div>
@@ -2471,7 +2471,6 @@ function initMap() {
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   // Attribution sits at the bottom (above the dock on mobile)
   setTimeout(positionAttribution, 300);
-  L.control.zoom({ position: 'bottomright' }).addTo(map);
 
   // When the user zooms during a live trip, snap the view back onto them —
   // zooming keeps the old map center by default, which loses the car/rider.
