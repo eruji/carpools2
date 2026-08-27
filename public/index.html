@@ -3165,6 +3165,12 @@ function startLocationTracking() {
   if (locationWatchId) return;
   showGpsStatus();
   gpsLog('start', 'tracking started');
+  // Restart-safe: never stack fallback intervals (the watch-restart path
+  // reuses this function after clearing the stalled watch).
+  if (locationInterval) {
+    clearInterval(locationInterval);
+    locationInterval = null;
+  }
 
   // Android Chrome/Brave silently block geolocation on insecure (HTTP)
   // origins — surface it instead of failing silently.
@@ -3185,8 +3191,8 @@ function startLocationTracking() {
         // Reject IP-grade fixes (miles off): when GPS can't lock, the browser
         // falls back to IP/network positioning — Google Maps never does this.
         // Log the rejection in the diag card instead of plotting it.
-        if (pos.coords.accuracy != null && pos.coords.accuracy > 2000) {
-          gpsLog('err', 'watch fix ±' + Math.round(pos.coords.accuracy) + 'm rejected (>2km — IP-based?)');
+        if (pos.coords.accuracy != null && pos.coords.accuracy > 3000) {
+          gpsLog('err', 'watch fix ±' + Math.round(pos.coords.accuracy) + 'm rejected (>3km — IP-based?)');
           return;
         }
         myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
@@ -3241,6 +3247,18 @@ function startLocationTracking() {
         tabVisible: document.visibilityState
       });
     }
+    // Android/Chromium quirk: watchPosition can deliver one fix then silently
+    // stall (seen on Galaxy devices) — the map keeps the initial position and
+    // never moves. Re-arm the watch so GPS keeps streaming; the fresh watch
+    // callback feeds the same pipeline.
+    if (lastGpsFixAt && Date.now() - lastGpsFixAt > 60000 && locationWatchId) {
+      console.warn('[GPS] watch stalled — restarting watchPosition');
+      gpsLog('err', 'watch stalled — restarting watchPosition');
+      navigator.geolocation.clearWatch(locationWatchId);
+      locationWatchId = null;
+      startLocationTracking();
+      return;
+    }
     if (currentCarpoolData) {
       updateSubwayETAs({ carpool: currentCarpoolData.carpool, activeSession });
     }
@@ -3249,8 +3267,8 @@ function startLocationTracking() {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           // Reject IP-grade fixes (miles off) — see watchPosition above
-          if (pos.coords.accuracy != null && pos.coords.accuracy > 2000) {
-            gpsLog('err', 'poll fix ±' + Math.round(pos.coords.accuracy) + 'm rejected (>2km — IP-based?)');
+          if (pos.coords.accuracy != null && pos.coords.accuracy > 3000) {
+            gpsLog('err', 'poll fix ±' + Math.round(pos.coords.accuracy) + 'm rejected (>3km — IP-based?)');
             return;
           }
           myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
