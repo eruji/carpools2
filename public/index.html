@@ -1603,11 +1603,8 @@ function renderSessionUI(session) {
   const btnArrived = document.getElementById('btn-arrived');
   const btnSkip = document.getElementById('btn-skip');
 
-  // Specific arrival label per leg
-  const arrivalLabel = session && session.phase === 'meetup' ? 'Arrived at Pickup'
-    : session && session.phase === 'destination' ? 'Arrived at Destination'
-    : 'Arrived at Dropoff';
-  btnArrived.textContent = arrivalLabel;
+  // Pickup-only flow — the one action is "I've Arrived"
+  btnArrived.textContent = "I've Arrived";
 
   if (!session || session.phase === 'completed') {
     idleDiv.classList.remove('hidden');
@@ -1700,8 +1697,8 @@ function renderSessionUI(session) {
       }
       // Riding: only while undecided
       btnRiding.classList.toggle('hidden', myStatus !== 'pending');
-      // Arrive: once you've picked a role
-      btnArrived.classList.toggle('hidden', myStatus === 'pending');
+      // Arrive: shown once you've picked a role, hidden once you've arrived
+      btnArrived.classList.toggle('hidden', myStatus === 'pending' || myStatus === 'arrived');
       // Skip: only while undecided (once a role is picked, use Skip Me in the list)
       btnSkip.classList.toggle('hidden', myStatus !== 'pending');
     }
@@ -1713,7 +1710,7 @@ function renderSessionUI(session) {
     btnDriving.classList.add('hidden');
     btnRiding.classList.add('hidden');
     btnSkip.classList.add('hidden');
-    if (myStatus2 === 'skip') btnArrived.classList.add('hidden');
+    if (myStatus2 === 'skip' || myStatus2 === 'arrived') btnArrived.classList.add('hidden');
     else btnArrived.classList.remove('hidden');
   } else if (session.phase === 'back_to_meetup') {
     // Arrival step: everyone arrives back at the dropoff (auto-complete when all in)
@@ -1723,7 +1720,7 @@ function renderSessionUI(session) {
     btnDriving.classList.add('hidden');
     btnRiding.classList.add('hidden');
     btnSkip.classList.add('hidden');
-    if (myStatus3 === 'skip') btnArrived.classList.add('hidden');
+    if (myStatus3 === 'skip' || myStatus3 === 'arrived') btnArrived.classList.add('hidden');
     else btnArrived.classList.remove('hidden');
   }
 
