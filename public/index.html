@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=13">
+<link rel="stylesheet" href="/style.css?v=14">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -248,13 +248,14 @@
       <div id="subway-progress" class="subway-progress"></div>
       </div>
     </div>
+    <!-- Occupancy: the car fills as members arrive at the pickup -->
+    <div class="seating-chart" id="seating-chart" aria-label="Occupancy"></div>
     <!-- Slide 2: Members — the roster lives in the carousel -->
     <div class="member-panel">
       <div class="rv-title">Members</div>
       <div id="member-status-list" class="member-list"></div>
     </div>
     <div class="position-board" id="position-board" aria-label="Pickup race board"></div>
-    <div class="seating-chart" id="seating-chart" aria-label="Occupancy"></div>
     <!-- GPS diagnostics — verbose per-member GPS health + recent events -->
     <div class="gps-panel">
       <div class="rv-title">GPS Diagnostics</div>
@@ -617,6 +618,7 @@ async function init() {
         t = setTimeout(() => {
           if (!map) return;
           map.invalidateSize();
+          positionAttribution();
           if (myLocation && activeSession && activeSession.phase !== 'idle' && activeSession.phase !== 'completed') {
             followMyLocation();
           }
@@ -2306,6 +2308,23 @@ function visibleMapCenterY(size) {
   const h = s ? s.y : window.innerHeight;
   return (h - mobileDockHeight()) / 2;
 }
+// Keep the Esri/OSM attribution visible at the bottom — on mobile it must
+// sit above the dock (Leaflet's default bottom-right hides behind it).
+function positionAttribution() {
+  const att = document.querySelector('.leaflet-control-attribution');
+  if (!att) return;
+  if (window.innerWidth <= 480) {
+    att.style.bottom = (mobileDockHeight() + 4) + 'px';
+    att.style.left = '10px';
+    att.style.right = 'auto';
+    att.style.zIndex = 950;
+  } else {
+    att.style.bottom = '';
+    att.style.left = '';
+    att.style.right = '';
+    att.style.zIndex = '';
+  }
+}
 function centerLocationInViewport(lat, lng, zoom) {
   if (!map) return;
   const z = zoom || map.getZoom();
@@ -2450,6 +2469,8 @@ function initMap() {
   // Keyless basemap with automatic provider fallback (Esri → OSM)
   initTileLayer(map);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
+  // Attribution sits at the bottom (above the dock on mobile)
+  setTimeout(positionAttribution, 300);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
   // When the user zooms during a live trip, snap the view back onto them —
@@ -2461,6 +2482,7 @@ function initMap() {
   window.addEventListener('resize', () => {
     if (map) map.invalidateSize();
     setTimeout(() => {
+      positionAttribution();
       if (myLocation && activeSession && activeSession.phase !== 'idle' && activeSession.phase !== 'completed') {
         followMyLocation();
       }
@@ -3237,6 +3259,7 @@ function toggleDockMinimized() {
   // trip, otherwise refit so the route/group is framed in the new viewport.
   if (map) setTimeout(() => {
     map.invalidateSize();
+    positionAttribution();
     if (myLocation && activeSession && activeSession.phase !== 'idle' && activeSession.phase !== 'completed') {
       followMyLocation();
     } else if (currentCarpoolData) {
