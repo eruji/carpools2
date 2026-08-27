@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=17">
+<link rel="stylesheet" href="/style.css?v=18">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -2663,14 +2663,12 @@ function updateMap(data) {
     addPoint(carpool.destination_lat, carpool.destination_lng);
   }
 
-  // Geo-fence radius circles around pickup and destination (visual aid)
+  // Geo-fence radius circle around the pickup (visual aid) — destination is
+  // not part of the pickup-only flow, so only the pickup circle renders.
   if (session && session.phase !== 'idle' && session.phase !== 'completed') {
     const gfRadius = carpool.arrival_radius || 400;
-    const gfTargets = [];
-    if (carpool.meetup_lat && carpool.meetup_lng) gfTargets.push([carpool.meetup_lat, carpool.meetup_lng]);
-    if (carpool.destination_lat && carpool.destination_lng) gfTargets.push([carpool.destination_lat, carpool.destination_lng]);
-    gfTargets.forEach((t, i) => {
-      mapMarkers['geofence_' + i] = L.circle(t, {
+    if (carpool.meetup_lat && carpool.meetup_lng) {
+      mapMarkers.geofence = L.circle([carpool.meetup_lat, carpool.meetup_lng], {
         radius: gfRadius,
         color: '#8FAE8B',
         weight: 1.5,
@@ -2678,7 +2676,7 @@ function updateMap(data) {
         fillColor: '#8FAE8B',
         fillOpacity: 0.08
       }).addTo(map);
-    });
+    }
   }
 
   // ── People (pickup phase) or single car (transit phases) ──
