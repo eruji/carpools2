@@ -534,21 +534,16 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .route-visual .subway-map {
   margin-bottom: 0;
 }
-/* Occupancy title matches the Route title — left aligned */
-.seating-chart .rv-title {
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  margin-bottom: 6px;
-}
+/* Occupancy sits flush under the Route card's content — same title style */
 .seating-chart {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px dashed var(--border-strong);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
 }
+.seating-chart .car-topdown { margin: 0 auto; }
 .rv-title {
   font-size: 0.8rem;
   font-weight: 700;
@@ -1558,28 +1553,49 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   /* Modals stay true overlays on top of everything (was in-flow on mobile) */
   .loc-modal { z-index: 1000; }
 
-  /* Minimized: dock hides so the map fills the screen. The grabber handle
-     on the dock collapses it; a small floating bar brings it back. */
+  /* Minimized: the dock content collapses (animated) so the map fills the
+     screen; the binder tab stays as the expand handle with an up chevron. */
+  .mobile-dock { position: relative; }
+  .route-visual, .rv-nav, .phase-panel {
+    max-height: 1000px;
+    overflow: hidden;
+    transition: max-height 0.35s ease, opacity 0.3s ease, transform 0.35s ease,
+                padding 0.35s ease, margin 0.35s ease, border-width 0.35s ease;
+  }
   #view-carpool.dock-minimized .route-visual,
   #view-carpool.dock-minimized .rv-nav,
   #view-carpool.dock-minimized .phase-panel {
-    display: none;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(16px);
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    pointer-events: none;
   }
   #view-carpool.dock-minimized .mobile-dock {
-    position: static;
     margin-top: 0;
   }
   /* Binder-tab minimize control: down chevron on a tab at the dock's top
      edge; the chevron flips up when the interface is minimized (the tab
      stays put as the expand handle). */
+  /* Binder-tab minimize control: floats on the dock's top edge (absolute,
+     no layout space) so there's no gap between it and the cards. The
+     chevron flips up when the interface is minimized. */
   .dock-tab {
+    position: absolute;
+    top: -13px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     align-items: center;
     justify-content: center;
     width: 84px;
     height: 26px;
-    margin: 0 auto 6px;
-    transform: translateY(-50%);
+    margin: 0;
     border: 1.5px solid var(--border-strong);
     border-radius: 10px 10px 4px 4px;
     background: var(--surface);
@@ -1587,7 +1603,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
     cursor: pointer;
     box-shadow: 0 2px 6px rgba(0,0,0,0.12);
     padding: 0;
-    flex-shrink: 0;
+    z-index: 3;
   }
   .dock-tab svg { transition: transform 0.25s; }
   #view-carpool.dock-minimized .dock-tab svg { transform: rotate(180deg); }

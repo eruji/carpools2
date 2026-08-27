@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=16">
+<link rel="stylesheet" href="/style.css?v=17">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -2307,17 +2307,17 @@ function visibleMapCenterY(size) {
   const h = s ? s.y : window.innerHeight;
   return (h - mobileDockHeight()) / 2;
 }
-// Keep the Esri/OSM attribution visible at the bottom — on mobile it must
-// sit above the dock (Leaflet's default bottom-right hides behind it) and
-// pinned to the viewport (its corner container is moved up for the zoom
-// control). When the dock is minimized the dock height is 0, so it sits at
-// the very bottom of the screen.
+// Keep the Esri/OSM attribution at the very bottom of the screen — the
+// layout leaves a gap there (below the dock / at the screen edge when the
+// interface is minimized), so it never covers the dock. Pinned to the
+// viewport because the Leaflet corner container is moved up for the zoom
+// control on mobile.
 function positionAttribution() {
   const att = document.querySelector('.leaflet-control-attribution');
   if (!att) return;
   if (window.innerWidth <= 480) {
     att.style.position = 'fixed';
-    att.style.bottom = (mobileDockHeight() + 4) + 'px';
+    att.style.bottom = '6px';
     att.style.left = '10px';
     att.style.right = 'auto';
     att.style.zIndex = 950;
