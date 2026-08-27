@@ -301,6 +301,26 @@ header nav span { opacity: 0.7; font-size: 0.9rem; max-width: 100px; overflow: h
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
 
+/* Session action bar: equal-size buttons in a grid (2-up mobile, 4-up
+   desktop). A lone button (e.g. only "I've Arrived" visible) spans full
+   width instead of sitting half-size. */
+#phase-meetup-controls {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 8px 0;
+  width: 100%;
+}
+#phase-meetup-controls .btn {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 6px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  margin: 0;
+}
+#phase-meetup-controls .btn:only-child { grid-column: 1 / -1; }
+
 /* ── Tables ──────────────────────────────────────────────────── */
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 12px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
@@ -1620,6 +1640,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   .header-inner {
     max-width: 720px;
   }
+  #phase-meetup-controls { grid-template-columns: repeat(4, 1fr); }
   #map-container {
     height: 360px;
   }
