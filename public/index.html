@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=12">
+<link rel="stylesheet" href="/style.css?v=13">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -179,6 +179,13 @@
         <div class="legend-item"><span class="legend-icon"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="4.5" cy="2.5" r="1.3" fill="#B07166"/><path d="M4.5 4V23" stroke="#8A5248" stroke-width="2"/><path d="M5.5 5.5h12l-3 3.2 3 3.3H5.5z" fill="#B07166" stroke="#fff" stroke-width="0.9" stroke-linejoin="round"/></svg></span>Destination</div>
         <div class="legend-item"><span class="legend-avatar">AB</span>People <span class="legend-sub">(includes you, halo ring)</span></div>
         <div class="legend-item"><span class="legend-line"></span>Route <span class="legend-sub">(dashed = member paths)</span></div>
+        <div class="legend-item legend-themes">
+          <span class="legend-icon">🗺</span>
+          <span class="theme-btn active" data-theme="light" onclick="setTileTheme('light')">Light</span>
+          <span class="theme-btn" data-theme="streets" onclick="setTileTheme('streets')">Streets</span>
+          <span class="theme-btn" data-theme="dark" onclick="setTileTheme('dark')">Dark</span>
+          <span class="theme-btn" data-theme="sat" onclick="setTileTheme('sat')">Sat</span>
+        </div>
       </div>
       <div class="map-legend-title" onclick="toggleMapLegend()">Key <span class="legend-caret">▸</span></div>
     </div>
@@ -189,6 +196,7 @@
   <div class="route-visual">
     <div class="rv-track" id="rv-track">
   <div class="subway-map" id="subway-map">
+    <div class="rv-title">Route</div>
     <div class="subway-line" id="subway-line">
       <!-- Stop 1: Start (arbitrary) -->
       <div class="subway-stop" id="subway-stop-start">
@@ -242,14 +250,14 @@
     </div>
     <!-- Slide 2: Members — the roster lives in the carousel -->
     <div class="member-panel">
-      <h4>Members</h4>
+      <div class="rv-title">Members</div>
       <div id="member-status-list" class="member-list"></div>
     </div>
     <div class="position-board" id="position-board" aria-label="Pickup race board"></div>
     <div class="seating-chart" id="seating-chart" aria-label="Occupancy"></div>
     <!-- GPS diagnostics — verbose per-member GPS health + recent events -->
     <div class="gps-panel">
-      <h4>GPS Diagnostics</h4>
+      <div class="rv-title">GPS Diagnostics</div>
       <div id="gps-diag" class="gps-diag"></div>
     </div>
     </div>
@@ -1892,7 +1900,7 @@ function renderSeatingChart(session) {
     : '';
 
   el.innerHTML = `
-    <div class="sc-title">Occupancy</div>
+    <div class="rv-title">Occupancy</div>
     <div class="car-topdown">
       <div class="car-body">
         <div class="car-row front">
@@ -2023,7 +2031,7 @@ function renderPositionBoard(session) {
       </div>`).join('');
     el.innerHTML = `
       <div class="race-header">
-        <span class="race-title">🏁 Pickup race</span>
+        <span class="rv-title" style="margin-bottom:0;">🏁 Pickup race</span>
         <span class="race-stats">no active trip</span>
       </div>
       ${rows || '<div class="car-empty-note text-xs">No members yet</div>'}`;
@@ -2200,7 +2208,7 @@ function renderPositionBoard(session) {
 
   el.innerHTML = `
     <div class="race-header">
-      <span class="race-title">🏁 Pickup race</span>
+      <span class="rv-title" style="margin-bottom:0;">🏁 Pickup race</span>
       <span class="race-stats">${raceOver ? '🏁 complete · ' : ''}${stats}</span>
     </div>
     <div class="race-target">→ ${esc(meetupLabel(carpool))}</div>
@@ -2350,66 +2358,85 @@ function toggleMapLegend() {
   const hidden = body.classList.toggle('hidden');
   caret.textContent = hidden ? '▸' : '▾';
 }
-// ── Basemap providers with automatic fallback ──────────────────
-// Esri World Street Map is keyless; if its tiles ever fail (network block,
-// provider outage), the map falls back to OSM automatically after a burst of
-// tile errors. Force a provider with ?tiles=esri|osm (persisted) or by
-// setting localStorage 'tileProvider'.
-const TILE_PROVIDERS = [
-  {
-    id: 'esri',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-    attribution: '&copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community',
-    maxZoom: 19
-  },
-  {
-    id: 'osm',
-    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19
-  }
+// ── Basemap themes with automatic fallback ─────────────────────
+// Esri styles are keyless (all verified 200). If a theme's tiles fail
+// (network block, provider outage) the map falls back to OSM automatically
+// after a burst of tile errors. Choose with ?tiles=light|streets|dark|sat
+// (persisted) or via the map's Key popup. Default: light (the original look).
+const TILE_THEMES = [
+  { id: 'light',   label: 'Light',     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', attribution: '&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors' },
+  { id: 'streets', label: 'Streets',   url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', attribution: '&copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community' },
+  { id: 'dark',    label: 'Dark',      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', attribution: '&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors' },
+  { id: 'sat',     label: 'Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attribution: '&copy; Esri, Maxar, Earthstar Geographics' }
 ];
+const OSM_TILES = { id: 'osm', url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' };
+
+let tileLayer = null;
+let currentTileThemeId = null; // null = OSM fallback active
+
+function applyTileSource(map, url, attribution, allowFallback) {
+  if (tileLayer) {
+    tileLayer.off('tileerror');
+    map.removeLayer(tileLayer);
+  }
+  tileLayer = L.tileLayer(url, { maxZoom: 19, attribution, crossOrigin: true }).addTo(map);
+  let tileErrors = 0, lastErrorAt = 0;
+  tileLayer.on('tileerror', () => {
+    const now = Date.now();
+    tileErrors = (now - lastErrorAt < 4000) ? tileErrors + 1 : 1;
+    lastErrorAt = now;
+    if (tileErrors >= 3 && allowFallback) {
+      console.warn('[tiles] ' + currentTileThemeId + ' failing — falling back to OSM');
+      currentTileThemeId = null;
+      applyTileSource(map, OSM_TILES.url, OSM_TILES.attribution, false);
+      syncThemeButtons();
+    }
+  });
+}
+
+function applyTileTheme(map, id) {
+  const t = TILE_THEMES.find(x => x.id === id);
+  if (!t) return;
+  currentTileThemeId = id;
+  applyTileSource(map, t.url, t.attribution, true);
+  syncThemeButtons();
+}
+
+function setTileTheme(id) {
+  localStorage.setItem('tileTheme', id);
+  if (!map) return;
+  if (id === 'osm') {
+    currentTileThemeId = null;
+    applyTileSource(map, OSM_TILES.url, OSM_TILES.attribution, false);
+    syncThemeButtons();
+  } else {
+    applyTileTheme(map, id);
+  }
+}
 
 function initTileLayer(map) {
-  // Provider choice: ?tiles= param > localStorage > default (esri first)
+  // ?tiles= param > localStorage (tileTheme, legacy tileProvider) > light
   const forced = new URLSearchParams(window.location.search).get('tiles');
-  let start = 0;
+  let chosen = 'light';
   if (forced) {
-    const fi = TILE_PROVIDERS.findIndex(p => p.id === forced);
-    if (fi >= 0) start = fi;
-    localStorage.setItem('tileProvider', TILE_PROVIDERS[start].id);
+    chosen = (forced === 'osm' || TILE_THEMES.some(t => t.id === forced)) ? forced : 'light';
+    localStorage.setItem('tileTheme', chosen);
   } else {
-    const si = TILE_PROVIDERS.findIndex(p => p.id === localStorage.getItem('tileProvider'));
-    if (si >= 0) start = si;
+    chosen = localStorage.getItem('tileTheme') || localStorage.getItem('tileProvider') || 'light';
+    if (chosen !== 'osm' && !TILE_THEMES.some(t => t.id === chosen)) chosen = 'light';
   }
+  if (chosen === 'osm') {
+    currentTileThemeId = null;
+    applyTileSource(map, OSM_TILES.url, OSM_TILES.attribution, false);
+  } else {
+    applyTileTheme(map, chosen);
+  }
+}
 
-  let tileLayer = null;
-  let tileErrors = 0;
-  let lastErrorAt = 0;
-
-  const apply = (idx) => {
-    if (tileLayer) {
-      tileLayer.off('tileerror');
-      map.removeLayer(tileLayer);
-    }
-    const p = TILE_PROVIDERS[idx];
-    tileLayer = L.tileLayer(p.url, {
-      maxZoom: p.maxZoom,
-      attribution: p.attribution,
-      crossOrigin: true
-    }).addTo(map);
-    // Fall back after a burst of failed tiles (never on a single 404)
-    tileLayer.on('tileerror', () => {
-      const now = Date.now();
-      tileErrors = (now - lastErrorAt < 4000) ? tileErrors + 1 : 1;
-      lastErrorAt = now;
-      if (tileErrors >= 3 && idx < TILE_PROVIDERS.length - 1) {
-        console.warn('[tiles] ' + p.id + ' failing — falling back to ' + TILE_PROVIDERS[idx + 1].id);
-        apply(idx + 1);
-      }
-    });
-  };
-  apply(start);
+function syncThemeButtons() {
+  document.querySelectorAll('.theme-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.theme === currentTileThemeId);
+  });
 }
 
 function initMap() {
