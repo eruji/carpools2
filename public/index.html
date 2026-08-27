@@ -129,7 +129,7 @@
         <label>Carpool Name</label>
         <input type="text" id="new-carpool-name" required placeholder="e.g., Work Commute">
       </div>
-      <p class="text-xs text-muted mb-1">Add pickup and destination locations once inside the carpool.</p>
+      <p class="text-xs text-muted mb-1">Add the pickup location once inside the carpool.</p>
       <div class="btn-group">
         <button type="submit" class="btn btn-success">Create</button>
         <button type="button" class="btn btn-outline" onclick="hideCreateCarpool()">Cancel</button>
@@ -218,29 +218,6 @@
             <div class="stop-eta hidden" id="subway-meetup-eta"></div>
           </div>
           <div class="stop-detail" id="subway-meetup-addr"></div>
-        </div>
-      </div>
-      <!-- Stop 3: Destination (name only) — clickable to edit/swap -->
-      <div class="subway-stop" id="subway-stop-dest" onclick="openLocConfig('destination')">
-        <div class="dot"></div>
-        <div class="stop-content">
-          <div class="stop-row">
-            <span class="stop-icon" title="Destination"><svg viewBox="0 0 24 24" width="18" height="18"><circle cx="4.5" cy="2.5" r="1.3" fill="#B07166"/><path d="M4.5 4V23" stroke="#8A5248" stroke-width="2" stroke-linecap="round"/><path d="M5.5 5.5h12l-3 3.2 3 3.3H5.5z" fill="#B07166" stroke="#fff" stroke-width="0.9" stroke-linejoin="round"/></svg></span>
-            <div class="stop-name" id="subway-dest-name">Destination</div>
-            <div class="stop-eta hidden" id="subway-dest-eta"></div>
-          </div>
-          <div class="stop-detail" id="subway-dest-addr"></div>
-        </div>
-      </div>
-      <!-- Stop 4: Pickup again (dropoff) — return leg disabled: trip ends at the destination -->
-      <div class="subway-stop" id="subway-stop-return" style="display:none;">
-        <div class="dot"></div>
-        <div class="stop-content">
-          <div class="stop-row">
-            <div class="stop-name" id="subway-return-name">Dropoff</div>
-            <div class="stop-eta hidden" id="subway-return-eta"></div>
-          </div>
-          <div class="stop-detail" id="subway-return-addr"></div>
         </div>
       </div>
       <!-- Member avatars removed — the line and stop icons represent the route -->
@@ -343,7 +320,7 @@
         <input type="number" id="edit-arrival-radius" min="50" max="2000" step="50" placeholder="400">
         <p class="text-xs text-muted">How close GPS must be to auto-arrive. 400m covers a block or two (parking garages).</p>
       </div>
-      <p class="text-xs text-muted mb-1">Pickup and destination are set from the subway stops.</p>
+      <p class="text-xs text-muted mb-1">The pickup location is set from the subway stops.</p>
     </form>
 
     <h4>Members</h4>
@@ -1368,41 +1345,28 @@ function updateSubwayMap(data) {
 
   // Stop names: nickname if set, else first comma part; prompt when unset
   const hasMeetup = carpool.meetup_lat && carpool.meetup_lng;
-  const hasDest = carpool.destination_lat && carpool.destination_lng;
   const meetupName = hasMeetup ? meetupLabel(carpool) : 'Click to add pickup';
-  const destName = hasDest ? destLabel(carpool) : 'Click to add destination';
 
   document.getElementById('subway-start-name').textContent = 'Start';
   document.getElementById('subway-start-addr').textContent = 'Your location';
   document.getElementById('subway-meetup-name').textContent = meetupName;
   document.getElementById('subway-meetup-addr').textContent = hasMeetup ? '' : 'Tap to set the pickup location';
-  document.getElementById('subway-dest-name').textContent = destName;
-  document.getElementById('subway-dest-addr').textContent = hasDest ? '' : 'Tap to set the drop-off';
 
   // Reset all stops (the return/dropoff stop is disabled — the trip ends at the destination)
   const stopStart = document.getElementById('subway-stop-start');
   const stopMeetup = document.getElementById('subway-stop-meetup');
-  const stopDest = document.getElementById('subway-stop-dest');
-  const stopReturn = document.getElementById('subway-stop-return');
   const subwayLine = document.getElementById('subway-line');
-  [stopStart, stopMeetup, stopDest, stopReturn].forEach(s => s.className = 'subway-stop');
-  // Pickup-only flow: the destination stop is never part of the trip — the
-  // session completes when everyone arrives at the pickup. Hiding it also
-  // truncates the track line (the ::before spans the container height).
-  stopReturn.style.display = 'none';
-  stopDest.style.display = 'none';
+  [stopStart, stopMeetup].forEach(s => s.className = 'subway-stop');
   subwayLine.className = 'subway-line';
 
   // Reset ETAs
-  ['subway-start-eta', 'subway-meetup-eta', 'subway-dest-eta', 'subway-return-eta'].forEach(id => {
+  ['subway-start-eta', 'subway-meetup-eta'].forEach(id => {
     document.getElementById(id).classList.add('hidden');
   });
 
   if (!session || session.phase === 'idle') {
     stopStart.classList.add('is-current');
     stopMeetup.classList.add('is-future');
-    stopDest.classList.add('is-future');
-    stopReturn.classList.add('is-future');
   } else if (session.phase === 'meetup') {
     // When the user arrives at the pickup, the leg turns green and the dot fills in
     const myMember = session.members ? session.members.find(m => m.user_id === currentUser.id) : null;
@@ -1411,28 +1375,13 @@ function updateSubwayMap(data) {
     if (arrivedMeetup) {
       stopStart.classList.add('is-past');
       stopMeetup.classList.add('is-current');
-      stopDest.classList.add('is-future');
     } else {
       stopStart.classList.add('is-current');
       stopMeetup.classList.add('is-future');
-      stopDest.classList.add('is-future');
     }
-  } else if (session.phase === 'destination') {
-    // The destination is the final stop — everyone arriving here completes the trip
-    subwayLine.classList.add('phase-destination');
-    stopStart.classList.add('is-past');
-    stopMeetup.classList.add('is-past');
-    stopDest.classList.add('is-current');
-  } else if (session.phase === 'back_to_meetup') {
-    // Legacy sessions only — the return leg is disabled for new trips
-    subwayLine.classList.add('phase-dropoff');
-    stopStart.classList.add('is-past');
-    stopMeetup.classList.add('is-past');
-    stopDest.classList.add('is-past');
-    stopReturn.classList.add('is-current');
   } else if (session.phase === 'completed') {
     subwayLine.classList.add('phase-completed');
-    [stopStart, stopMeetup, stopDest, stopReturn].forEach(s => s.classList.add('is-past'));
+    [stopStart, stopMeetup].forEach(s => s.classList.add('is-past'));
   }
 
   // ETAs
@@ -1453,9 +1402,6 @@ function positionSubwayProgress() {
     if (session.phase === 'meetup') {
       const myMember = session.members.find(m => m.user_id === currentUser.id);
       if (myMember && myMember.status === 'arrived') { fromId = 'subway-stop-start'; toId = 'subway-stop-meetup'; }
-    } else if (session.phase === 'destination') {
-      // Final leg: pickup → destination. The trip ends here — no return leg.
-      fromId = 'subway-stop-meetup'; toId = 'subway-stop-dest';
     }
   }
 
@@ -1554,7 +1500,6 @@ function updateSubwayETAs(data) {
   const carpool = data.carpool;
   const startEta = document.getElementById('subway-start-eta');
   const meetupEta = document.getElementById('subway-meetup-eta');
-  const destEta = document.getElementById('subway-dest-eta');
 
   if (!session || session.phase === 'completed' || session.phase === 'idle') return;
 
@@ -1575,27 +1520,13 @@ function updateSubwayETAs(data) {
   };
 
   const has = (lat, lng) => lat && lng;
-  const mL = myLocation, mk = carpool.meetup_lat, ml = carpool.meetup_lng, dk = carpool.destination_lat, dl = carpool.destination_lng;
+  const mL = myLocation, mk = carpool.meetup_lat, ml = carpool.meetup_lng;
 
   if (session.phase === 'meetup') {
     show(startEta, 'Now');
     if (mL && has(mk, ml)) {
       pair(mL.lat, mL.lng, mk, ml, (a) => {
         show(meetupEta, fmt(a.dist, a.min));
-        if (has(dk, dl)) {
-          pair(mk, ml, dk, dl, (leg) => {
-            show(destEta, fmt(a.dist + leg.dist, a.min + leg.min));
-          });
-        } else {
-          show(destEta, fmt(a.dist, a.min));
-        }
-      });
-    }
-  } else if (session.phase === 'destination') {
-    hide(meetupEta);
-    if (mL && has(dk, dl)) {
-      pair(mL.lat, mL.lng, dk, dl, (a) => {
-        show(destEta, fmt(a.dist, a.min));
       });
     }
   }
@@ -2626,7 +2557,6 @@ function updateMap(data) {
   };
 
   const hasPickup = carpool.meetup_lat && carpool.meetup_lng;
-  const hasDest = carpool.destination_lat && carpool.destination_lng;
 
   // ── Pickup marker (home base / dropoff point) ──
   if (hasPickup) {
@@ -2759,50 +2689,7 @@ function updateMap(data) {
     }
   }
 
-  // ── Route for the current segment only ──
-  if (hasPickup && hasDest && phase !== 'meetup') {
-    // Direction: current location → target (re-routes as the car moves)
-    const isReturn = phase === 'back_to_meetup';
-    const targetLat = isReturn ? carpool.meetup_lat : carpool.destination_lat;
-    const targetLng = isReturn ? carpool.meetup_lng : carpool.destination_lng;
-    const fallbackLat = isReturn ? carpool.destination_lat : carpool.meetup_lat;
-    const fallbackLng = isReturn ? carpool.destination_lng : carpool.meetup_lng;
-    const lat1 = (inTransit && myLocation && myLocation.lat) ? myLocation.lat : fallbackLat;
-    const lng1 = (inTransit && myLocation && myLocation.lng) ? myLocation.lng : fallbackLng;
-
-    // Draw immediately with the best route we have (cached → last known →
-    // straight) and upgrade silently when the fresh route resolves.
-    const routeId = 'route_' + (isReturn ? 'back' : 'dest');
-    const style = {
-      color: '#5F7D5B',
-      weight: inTransit ? 5 : 3,
-      opacity: inTransit ? 0.95 : 0.5,
-      dashArray: inTransit ? null : '7,7'
-    };
-    const coords = bestLegCoords(routeId, lat1, lng1, targetLat, targetLng)
-      || [[lat1, lng1], [targetLat, targetLng]];
-    mapPolylines.route = L.polyline(coords, style).addTo(map);
-
-    fetchLegRoute(lat1, lng1, targetLat, targetLng, (route) => {
-      if (!map || seq !== mapUpdateSeq) return;
-      if (route && route.coords) {
-        lastLegRoutes[routeId] = route;
-        if (mapPolylines.route) map.removeLayer(mapPolylines.route);
-        mapPolylines.route = L.polyline(route.coords, style).addTo(map);
-      }
-
-      if (inTransit && shouldFit) {
-        // Overview of the whole route first…
-        fitBounds(route ? route.coords : coords, 14);
-        // …then zoom into street level around the user
-        setTimeout(() => {
-          if (map && myLocation) centerLocationInViewport(myLocation.lat, myLocation.lng, 15);
-        }, 1400);
-      }
-    });
-  }
-
-  // Fit the current segment once (transit fits via the route callback above)
+  // Fit the current segment once
   if (shouldFit && !inTransit) {
     fitBounds(bounds, 15);
     setTimeout(() => {
@@ -3626,11 +3513,6 @@ function connectSocket() {
   });
 
   socket.on('phase-changed', (data) => {
-    if (data.to === 'destination') {
-      if (currentCarpoolId) {
-        setTimeout(() => loadCarpoolView(currentCarpoolId), 300);
-      }
-    }
     if (data.to === 'completed') {
       stopLocationTracking();
     }
