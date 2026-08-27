@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=22">
+<link rel="stylesheet" href="/style.css?v=23">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -172,21 +172,6 @@
       <div id="map"></div>
     </div>
     <button class="map-recenter" onclick="recenterMap()" title="Recenter map"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
-    <div id="map-legend" class="map-legend">
-      <div id="map-legend-body" class="map-legend-body hidden">
-        <div class="legend-item"><span class="legend-icon"><svg width="14" height="18" viewBox="0 0 24 32"><path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="#fff"/></svg></span>Pickup</div>
-        <div class="legend-item"><span class="legend-avatar">AB</span>People <span class="legend-sub">(includes you, halo ring)</span></div>
-        <div class="legend-item"><span class="legend-line"></span>Route <span class="legend-sub">(dashed = member paths)</span></div>
-        <div class="legend-item legend-themes">
-          <span class="legend-icon">🗺</span>
-          <span class="theme-btn active" data-theme="light" onclick="setTileTheme('light')">Light</span>
-          <span class="theme-btn" data-theme="streets" onclick="setTileTheme('streets')">Streets</span>
-          <span class="theme-btn" data-theme="dark" onclick="setTileTheme('dark')">Dark</span>
-          <span class="theme-btn" data-theme="sat" onclick="setTileTheme('sat')">Sat</span>
-        </div>
-      </div>
-      <div class="map-legend-title" onclick="toggleMapLegend()">Key <span class="legend-caret">▸</span></div>
-    </div>
   </div>
 
   <!-- ═══════ SUBWAY-STYLE TRANSIT LINE + SEATING CHART (swipeable) ═══════ -->
@@ -345,6 +330,20 @@
       <div class="btn-group">
         <button class="btn btn-outline btn-sm" onclick="rotateInviteCode()">Replace Link</button>
         <span id="invite-link-result" class="text-xs text-muted" style="align-self:center;"></span>
+      </div>
+    </div>
+
+    <h4 class="mt-2">Map Key</h4>
+    <div class="map-key-items">
+      <div class="legend-item"><span class="legend-icon"><svg width="14" height="18" viewBox="0 0 24 32"><path d="M12 1C6.5 1 2 5.5 2 11c0 6 10 20 10 20s10-14 10-20C22 5.5 17.5 1 12 1z" fill="#7C9A77" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="11" r="4" fill="#fff"/></svg></span>Pickup</div>
+      <div class="legend-item"><span class="legend-avatar">AB</span>People <span class="legend-sub">(includes you, halo ring)</span></div>
+      <div class="legend-item"><span class="legend-line"></span>Route <span class="legend-sub">(dashed = member paths)</span></div>
+      <div class="legend-item legend-themes">
+        <span class="legend-icon">🗺</span>
+        <span class="theme-btn active" data-theme="light" onclick="setTileTheme('light')">Light</span>
+        <span class="theme-btn" data-theme="streets" onclick="setTileTheme('streets')">Streets</span>
+        <span class="theme-btn" data-theme="dark" onclick="setTileTheme('dark')">Dark</span>
+        <span class="theme-btn" data-theme="sat" onclick="setTileTheme('sat')">Sat</span>
       </div>
     </div>
 
@@ -2317,12 +2316,6 @@ function arrivalPlaceLabel() {
   return `${ord} place!${medal}`;
 }
 
-function toggleMapLegend() {
-  const body = document.getElementById('map-legend-body');
-  const caret = document.querySelector('.legend-caret');
-  const hidden = body.classList.toggle('hidden');
-  caret.textContent = hidden ? '▸' : '▾';
-}
 // ── Basemap themes with automatic fallback ─────────────────────
 // Esri styles are keyless (all verified 200). If a theme's tiles fail
 // (network block, provider outage) the map falls back to OSM automatically
@@ -3162,6 +3155,7 @@ function closeHistoryModal() {
 function openSetupModal() {
   document.getElementById('carpool-menu-dropdown').classList.add('hidden');
   document.getElementById('setup-modal').classList.remove('hidden');
+  syncThemeButtons();
   if (currentCarpoolData) {
     renderSetupMembers(currentCarpoolData.members, currentCarpoolData.isOwner);
   }

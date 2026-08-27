@@ -1,13 +1,13 @@
 /* VroomMates service worker — cached app shell, live API, push-ready.
  * Bump CACHE_VERSION whenever you ship asset changes (e.g. /style.css?v=6). */
-const CACHE_VERSION = 'vroommates-v18';
+const CACHE_VERSION = 'vroommates-v19';
 const SHELL_CACHE = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 
 const PRECACHE = [
   '/',
   '/index.html',
-  '/style.css?v=22',
+  '/style.css?v=23',
   '/logo.png',
   '/favicon.svg',
   '/favicon.png',
