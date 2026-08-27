@@ -2343,7 +2343,9 @@ function initMap() {
   }).setView([40.78, -73.97], 12);
   // Keyless basemap: CARTO's basemaps now require an API key (renders
   // "api key required" error tiles), so use OpenStreetMap's standard server.
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}{r}.png', {
+  // Note: no {r} retina placeholder — OSM's tile server 400s on @2x, which
+  // blanked the basemap on phones.
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
