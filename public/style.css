@@ -375,8 +375,9 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 /* ── Map legend overlay ─────────────────────────────────────── */
 .map-legend {
   position: absolute;
+  top: 10px;
+  bottom: auto;
   left: 10px;
-  bottom: 10px;
   z-index: 500;
   background: rgba(255,255,255,0.94);
   backdrop-filter: blur(6px);
@@ -1559,7 +1560,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   }
   /* Map controls stack under the toolbar, clear of the bottom dock */
   .map-recenter { position: fixed; top: 70px; right: 12px; z-index: 950; pointer-events: auto; }
-  .map-legend { position: fixed; top: 116px; left: 10px; bottom: auto; z-index: 950; pointer-events: auto; }
+  .map-legend { position: fixed; top: 62px; left: 10px; bottom: auto; z-index: 950; pointer-events: auto; }
   .leaflet-bottom.leaflet-right {
     top: 116px;
     bottom: auto;
