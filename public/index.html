@@ -1851,28 +1851,25 @@ function renderSeatingChart(session) {
   const el = document.getElementById('seating-chart');
   if (!el) return;
 
-  if (!session || session.phase === 'completed' || session.phase === 'idle') {
-    el.innerHTML = '<div class="sc-title">Occupancy</div><div class="car-empty-note text-xs">No active trip</div>';
-    return;
-  }
-
-  const members = session.members || [];
-  const isMeetup = session.phase === 'meetup';
-  const driver = members.find(m => m.user_id === session.driver_id && m.status !== 'skip');
+  // The car graphic always renders — empty seats show what this card is even
+  // before a trip starts. Occupancy boards only people actually on the trip:
+  // during meetup, only members who have arrived at the pickup.
+  const hasTrip = !!session && (session.phase === 'meetup' || session.phase === 'destination' || session.phase === 'back_to_meetup');
+  const members = (session && session.members) || [];
+  const isMeetup = hasTrip && session.phase === 'meetup';
+  const driver = hasTrip ? members.find(m => m.user_id === session.driver_id && m.status !== 'skip') : null;
   const driverId = driver ? driver.user_id : null;
 
-  // Occupancy boards only people actually on the trip: during meetup, only
-  // members who have arrived at the pickup; en route, everyone non-skipped.
   const passengers = members
     .filter(m => m.status !== 'skip' && m.user_id !== driverId)
     .filter(m => !isMeetup || m.status === 'arrived');
 
+  // 2x2 car: driver + shotgun up front, two seats in the back
   const seats = [
     { key: 'driver', person: driver, isDriver: true },
     { key: 'shotgun', person: passengers[0] || null },
     { key: 'back-l', person: passengers[1] || null },
-    { key: 'back-m', person: passengers[2] || null },
-    { key: 'back-r', person: passengers[3] || null }
+    { key: 'back-r', person: passengers[2] || null }
   ];
 
   const seatHTML = (s) => {
@@ -1886,8 +1883,8 @@ function renderSeatingChart(session) {
     </div>`;
   };
 
-  // Riders beyond the 5 seats are listed under the car.
-  const overflow = passengers.slice(4);
+  // Riders beyond the 4 seats are listed under the car.
+  const overflow = passengers.slice(3);
   const overflowHTML = overflow.length
     ? `<div class="car-overflow"><span class="car-overflow-label">${isMeetup ? 'arrived' : 'in the car'}</span>${overflow.map(p =>
         `<span class="seat-avatar" title="${esc(p.username)}" style="background:${memberColor(p.user_id)}">${esc(getInitials(p.username))}</span>`
@@ -1905,10 +1902,10 @@ function renderSeatingChart(session) {
         <div class="car-row back">
           ${seatHTML(seats[2])}
           ${seatHTML(seats[3])}
-          ${seatHTML(seats[4])}
         </div>
       </div>
     </div>
+    ${hasTrip ? '' : '<div class="car-empty-note text-xs">No active trip — seats fill as members arrive at the pickup</div>'}
     ${overflowHTML}`;
 }
 
@@ -2009,7 +2006,27 @@ function renderPositionBoard(session) {
   const carpool = currentCarpoolData ? currentCarpoolData.carpool : null;
 
   if (!session || !carpool || session.phase === 'idle') {
-    el.innerHTML = '<div class="car-empty-note text-xs">No active trip</div>';
+    // The lineup is always visible — even before a session starts, everyone
+    // in the pool shows as "not driving yet" so the card reads clearly.
+    const roster = (currentCarpoolData ? currentCarpoolData.members : []) || [];
+    const rows = roster.map(m => `
+      <div class="race-row pending" id="race-row-${m.id}">
+        <span class="race-pos">—</span>
+        <div class="race-lane">
+          <div class="race-lane-track"><span class="race-lane-fill" style="width:0%"></span></div>
+          <span class="race-lane-avatar" style="left:4%;background:${memberColor(m.id)};">${esc(getInitials(m.username))}</span>
+        </div>
+        <div class="race-eta">
+          <span class="race-eta-min">💤</span>
+          <span class="race-eta-sub">not driving yet</span>
+        </div>
+      </div>`).join('');
+    el.innerHTML = `
+      <div class="race-header">
+        <span class="race-title">🏁 Pickup race</span>
+        <span class="race-stats">no active trip</span>
+      </div>
+      ${rows || '<div class="car-empty-note text-xs">No members yet</div>'}`;
     return;
   }
   const mk = carpool.meetup_lat, ml = carpool.meetup_lng;
