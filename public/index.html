@@ -1565,8 +1565,11 @@ function renderSessionUI(session) {
   const phaseTarget = session.phase === 'destination' ? 'the destination'
     : session.phase === 'back_to_meetup' ? 'the dropoff' : 'the pickup';
   if (driver) {
-    document.getElementById('session-info').textContent =
-      `Driver: ${esc(driver.username)} — en route to ${phaseTarget}`;
+    // Status-aware: 'arrived' driver is at the pickup, not en route
+    const driverArrived = driver.status === 'arrived';
+    document.getElementById('session-info').textContent = driverArrived
+      ? `Driver: ${esc(driver.username)} — arrived at ${phaseTarget}`
+      : `Driver: ${esc(driver.username)} — en route to ${phaseTarget}`;
   } else {
     document.getElementById('session-info').textContent =
       'No driver yet — tap I\'ll Drive to claim it';
@@ -1603,7 +1606,9 @@ function renderSessionUI(session) {
   // Ambient proximity alert: passengers only, on active legs with a driver
   const proxRow = document.getElementById('proximity-row');
   const myProxMember = session ? session.members.find(m => m.user_id === currentUser.id) : null;
+  const proxDriver = session ? session.members.find(m => m.user_id === session.driver_id) : null;
   const showProx = !!session && !!session.driver_id
+    && proxDriver && proxDriver.status !== 'arrived' // driver already here — no ETA alert
     && (session.phase === 'meetup' || session.phase === 'destination' || session.phase === 'back_to_meetup')
     && (!myProxMember || myProxMember.user_id !== session.driver_id);
   if (proxRow) {
@@ -2605,7 +2610,7 @@ function updateMap(data) {
           html: `<div style="width:32px;height:32px;border-radius:50%;background:${memberColor(currentUser.id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:0.02em;border:3px solid #fff;box-shadow:0 0 0 3px #8FAE8B, 0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(currentUser.username))}</div>`,
           iconAnchor: [16, 16]
         })
-      }).addTo(map).bindTooltip('<b>You</b> — heading to pickup', { direction: 'top', offset: [0, -12] });
+      }).addTo(map).bindTooltip(`<b>You</b> — ${(session.members.find(m => m.user_id === currentUser.id) || {}).status === 'arrived' ? 'at the pickup' : 'heading to pickup'}`, { direction: 'top', offset: [0, -12] });
       mapMarkers.myLocation = marker;
       addPoint(myLocation.lat, myLocation.lng);
 
