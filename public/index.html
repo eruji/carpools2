@@ -2333,6 +2333,68 @@ function toggleMapLegend() {
   const hidden = body.classList.toggle('hidden');
   caret.textContent = hidden ? '▸' : '▾';
 }
+// ── Basemap providers with automatic fallback ──────────────────
+// Esri World Street Map is keyless; if its tiles ever fail (network block,
+// provider outage), the map falls back to OSM automatically after a burst of
+// tile errors. Force a provider with ?tiles=esri|osm (persisted) or by
+// setting localStorage 'tileProvider'.
+const TILE_PROVIDERS = [
+  {
+    id: 'esri',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    maxZoom: 19
+  },
+  {
+    id: 'osm',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }
+];
+
+function initTileLayer(map) {
+  // Provider choice: ?tiles= param > localStorage > default (esri first)
+  const forced = new URLSearchParams(window.location.search).get('tiles');
+  let start = 0;
+  if (forced) {
+    const fi = TILE_PROVIDERS.findIndex(p => p.id === forced);
+    if (fi >= 0) start = fi;
+    localStorage.setItem('tileProvider', TILE_PROVIDERS[start].id);
+  } else {
+    const si = TILE_PROVIDERS.findIndex(p => p.id === localStorage.getItem('tileProvider'));
+    if (si >= 0) start = si;
+  }
+
+  let tileLayer = null;
+  let tileErrors = 0;
+  let lastErrorAt = 0;
+
+  const apply = (idx) => {
+    if (tileLayer) {
+      tileLayer.off('tileerror');
+      map.removeLayer(tileLayer);
+    }
+    const p = TILE_PROVIDERS[idx];
+    tileLayer = L.tileLayer(p.url, {
+      maxZoom: p.maxZoom,
+      attribution: p.attribution,
+      crossOrigin: true
+    }).addTo(map);
+    // Fall back after a burst of failed tiles (never on a single 404)
+    tileLayer.on('tileerror', () => {
+      const now = Date.now();
+      tileErrors = (now - lastErrorAt < 4000) ? tileErrors + 1 : 1;
+      lastErrorAt = now;
+      if (tileErrors >= 3 && idx < TILE_PROVIDERS.length - 1) {
+        console.warn('[tiles] ' + p.id + ' failing — falling back to ' + TILE_PROVIDERS[idx + 1].id);
+        apply(idx + 1);
+      }
+    });
+  };
+  apply(start);
+}
+
 function initMap() {
   if (map) {
     map.invalidateSize();
@@ -2341,14 +2403,9 @@ function initMap() {
   map = L.map('map', {
     zoomControl: false
   }).setView([40.78, -73.97], 12);
-  // Keyless basemap: CARTO's basemaps now require an API key (renders
-  // "api key required" error tiles), so use OpenStreetMap's standard server.
-  // Note: no {r} retina placeholder — OSM's tile server 400s on @2x, which
-  // blanked the basemap on phones.
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map);
+  // Keyless basemap with automatic provider fallback (Esri → OSM)
+  initTileLayer(map);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
   // When the user zooms during a live trip, snap the view back onto them —
