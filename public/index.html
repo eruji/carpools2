@@ -320,6 +320,11 @@
         <input type="number" id="edit-arrival-radius" min="50" max="2000" step="50" placeholder="400">
         <p class="text-xs text-muted">How close GPS must be to auto-arrive. 400m covers a block or two (parking garages).</p>
       </div>
+      <div class="form-group">
+        <label>Starting Coins for New Members</label>
+        <input type="number" id="edit-start-coins" min="0" max="100" step="1" placeholder="0">
+        <p class="text-xs text-muted">Each member who joins starts with this many credits.</p>
+      </div>
       <p class="text-xs text-muted mb-1">The pickup location is set from the subway stops.</p>
     </form>
 
@@ -1241,6 +1246,7 @@ async function loadCarpoolView(carpoolId) {
   // Settings tab
   document.getElementById('edit-carpool-name').value = data.carpool.name || '';
   document.getElementById('edit-arrival-radius').value = data.carpool.arrival_radius || 400;
+  document.getElementById('edit-start-coins').value = data.carpool.start_coins ?? 0;
 
   // History
   renderHistory(data.trips || []);
@@ -3087,6 +3093,7 @@ async function handleUpdateCarpool(e) {
   const body = {
     name: document.getElementById('edit-carpool-name').value.trim(),
     arrival_radius: parseFloat(document.getElementById('edit-arrival-radius').value) || 400,
+    start_coins: parseInt(document.getElementById('edit-start-coins').value) || 0
   };
   const res = await fetch(`/api/carpools/${currentCarpoolId}`, {
     method: 'PUT',
