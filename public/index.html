@@ -2640,25 +2640,7 @@ function updateMap(data) {
     addPoint(carpool.meetup_lat, carpool.meetup_lng);
   }
 
-  // ── Destination marker — hidden during pickup (a future segment) ──
-  if (hasDest && phase !== 'meetup') {
-    const marker = L.marker([carpool.destination_lat, carpool.destination_lng], {
-      icon: L.divIcon({
-        className: '',
-        html: `<div style="display:flex;flex-direction:column;align-items:center;">
-          <svg width="22" height="24" viewBox="0 0 24 24" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
-            <circle cx="4.5" cy="2.5" r="1.3" fill="#B07166"/>
-            <path d="M4.5 4V23" stroke="#8A5248" stroke-width="2" stroke-linecap="round"/>
-            <path d="M5.5 5.5h12l-3 3.2 3 3.3H5.5z" fill="#B07166" stroke="#fff" stroke-width="0.9" stroke-linejoin="round"/>
-          </svg>
-          <div style="background:#fff;color:#8A5248;padding:3px 10px;border-radius:10px;font-weight:800;font-size:13px;white-space:nowrap;border:1.5px solid #B07166;box-shadow:0 2px 8px rgba(0,0,0,0.2);margin-top:2px;">${esc(destLabel(carpool))}</div>
-        </div>`,
-        iconAnchor: [11, 24]
-      })
-    }).addTo(map).bindPopup('<b>Destination:</b> ' + (carpool.destination_name || ''));
-    mapMarkers.destination = marker;
-    addPoint(carpool.destination_lat, carpool.destination_lng);
-  }
+  // ── Destination marker — not part of the pickup-only flow, never shown ──
 
   // Geo-fence radius circle around the pickup (visual aid) — destination is
   // not part of the pickup-only flow, so only the pickup circle renders.
