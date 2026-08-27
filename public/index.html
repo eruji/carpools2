@@ -615,6 +615,11 @@ async function init() {
     renderGpsDiag();
   }, 2500);
 
+  // Auto-update: poll for a new build and reload when one ships (no manual
+  // refresh needed — the SW shell + session resync handle the transition).
+  checkForUpdate();
+  setInterval(checkForUpdate, 60000);
+
   // Check for an invite link (?invite=CODE)
   const params = new URLSearchParams(window.location.search);
   const inviteCode = params.get('invite');
@@ -657,12 +662,32 @@ async function loadVersion() {
     const buildNum = data.buildNum ? '#' + data.buildNum : '';
     const sha = data.build ? data.build.slice(0, 7) : '';
     const builtAt = data.builtAt || '';
+    loadedBuild = data.build || null;
     const el = document.getElementById('app-version');
     if (el) el.textContent = buildNum;
   } catch (e) {
     const el = document.getElementById('app-version');
     if (el) el.textContent = '?';
   }
+}
+
+// ── Auto-update: silently reload when a new build ships ───────
+let loadedBuild = null;
+async function checkForUpdate() {
+  try {
+    const res = await fetch('/api/version', { cache: 'no-store' });
+    const data = await res.json();
+    const build = data.build || '';
+    if (loadedBuild && build && loadedBuild !== build && document.visibilityState === 'visible') {
+      console.log('[update] new build ' + build.slice(0, 7) + ' — reloading');
+      // Let in-flight requests finish, then reload. The app auto-recovers:
+      // session resync + GPS tracking restart happen on load.
+      setTimeout(() => location.reload(), 400);
+      return true;
+    }
+    loadedBuild = build;
+  } catch (e) { /* offline — try again next tick */ }
+  return false;
 }
 
 // ── View Switching ──────────────────────────────────────────────────────────
