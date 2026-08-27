@@ -882,21 +882,6 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.race-mph {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--accent-dark);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.race-eta-speed {
-  display: block;
-  font-size: 0.8rem;
-  color: var(--text-2);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
 
 .subway-line {
   position: relative;

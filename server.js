@@ -177,14 +177,6 @@ if (!smCols.includes('auto_arrived')) {
 if (!smCols.includes('arrived_at')) {
   db.exec('ALTER TABLE session_members ADD COLUMN arrived_at DATETIME');
 }
-// Pickup-race speed results (fastest + average mph) stored on arrival so the
-// end results survive reloads
-if (!smCols.includes('max_mph')) {
-  db.exec('ALTER TABLE session_members ADD COLUMN max_mph REAL');
-}
-if (!smCols.includes('avg_mph')) {
-  db.exec('ALTER TABLE session_members ADD COLUMN avg_mph REAL');
-}
 // Monotonic position guard: client_ts holds the timestamp of the newest
 // accepted fix, so out-of-order pings (and replayed socket buffers after a
 // reconnect) can never overwrite a fresher position.
@@ -282,7 +274,6 @@ const stmts = {
   `),
   sessionMemberByUser: db.prepare('SELECT * FROM session_members WHERE session_id=? AND user_id=?'),
   markArrivedAt: db.prepare("UPDATE session_members SET arrived_at = COALESCE(arrived_at, datetime('now')) WHERE session_id=? AND user_id=?"),
-  markRaceSpeeds: db.prepare('UPDATE session_members SET max_mph = COALESCE(max_mph, ?), avg_mph = COALESCE(avg_mph, ?) WHERE session_id=? AND user_id=?'),
 
   // Ambient proximity alerts ("ping me when the driver is X min away")
   proximityAlerts: db.prepare('SELECT * FROM proximity_alerts WHERE session_id=? AND phase=?'),
@@ -985,7 +976,7 @@ app.post('/api/carpools/:id/sessions/start', requireAuth, (req, res) => {
 
 app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
   try {
-    const { status, auto, maxMph, avgMph } = req.body; // 'driving' | 'riding' | 'skip' | 'arrived' | 'pending'; auto = geo-fence arrival
+    const { status, auto } = req.body; // 'driving' | 'riding' | 'skip' | 'arrived' | 'pending'; auto = geo-fence arrival
     const validStatuses = ['driving', 'riding', 'skip', 'arrived', 'pending'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status. Must be: ' + validStatuses.join(', ') });
@@ -1036,14 +1027,6 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
       stmts.updateSessionMember.run(status, null, null, activeSession.id, req.session.userId);
       if (status === 'arrived') {
         stmts.markArrivedAt.run(activeSession.id, req.session.userId);
-        // Store the pickup-race speed results sent by the client on arrival
-        if (Number.isFinite(maxMph) || Number.isFinite(avgMph)) {
-          stmts.markRaceSpeeds.run(
-            Number.isFinite(maxMph) ? maxMph : null,
-            Number.isFinite(avgMph) ? avgMph : null,
-            activeSession.id, req.session.userId
-          );
-        }
       }
     }
 
