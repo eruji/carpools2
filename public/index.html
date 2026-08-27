@@ -1369,7 +1369,11 @@ function updateSubwayMap(data) {
   const stopReturn = document.getElementById('subway-stop-return');
   const subwayLine = document.getElementById('subway-line');
   [stopStart, stopMeetup, stopDest, stopReturn].forEach(s => s.className = 'subway-stop');
+  // Pickup-only flow: the destination stop is never part of the trip — the
+  // session completes when everyone arrives at the pickup. Hiding it also
+  // truncates the track line (the ::before spans the container height).
   stopReturn.style.display = 'none';
+  stopDest.style.display = 'none';
   subwayLine.className = 'subway-line';
 
   // Reset ETAs
@@ -1443,6 +1447,11 @@ function positionSubwayProgress() {
   const fromEl = document.getElementById(fromId);
   const toEl = document.getElementById(toId);
   if (!fromEl || !toEl) return;
+  // Hidden stops (pickup-only mode hides the destination) can't anchor the bar
+  if (getComputedStyle(fromEl).display === 'none' || getComputedStyle(toEl).display === 'none') {
+    bar.style.opacity = 0;
+    return;
+  }
 
   const lineRect = line.getBoundingClientRect();
   const fromDot = fromEl.querySelector('.dot').getBoundingClientRect();
@@ -2759,8 +2768,8 @@ async function advancePhase(phase) {
   // Guard against stale buttons: only allow the valid next step from the current phase.
   // The trip ends at the destination — no return leg.
   const validNext = {
-    meetup: ['destination'],
-    destination: ['completed'],
+    meetup: ['completed'],      // pickup-only: all arrived at the pickup = done
+    destination: ['completed'], // legacy sessions still finish normally
     back_to_meetup: ['completed'] // legacy sessions already on the return leg
   };
   if (!validNext[activeSession.phase] || !validNext[activeSession.phase].includes(phase)) {

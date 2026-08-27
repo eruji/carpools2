@@ -699,8 +699,8 @@ app.get('/api/carpools/:id', requireAuth, (req, res) => {
     const riders = sm.filter(m => m.status !== 'skip' && m.user_id !== s.driver_id).map(m => m.username);
     const skipped = sm.filter(m => m.status === 'skip').map(m => m.username);
     const coinsRow = db.prepare(
-      'SELECT coins_data FROM carpool_history WHERE session_id = ? AND phase = ? ORDER BY id LIMIT 1'
-    ).get(s.id, 'destination');
+      "SELECT coins_data FROM carpool_history WHERE session_id = ? AND coins_data <> '{}' ORDER BY id LIMIT 1"
+    ).get(s.id);
     let deltas = {};
     if (coinsRow) { try { deltas = JSON.parse(coinsRow.coins_data || '{}'); } catch (e) {} }
     for (const uid of Object.keys(deltas)) {
@@ -1154,7 +1154,11 @@ app.post('/api/carpools/:id/sessions/advance-phase', requireAuth, (req, res) => 
     let mileage = 0;
 
     // Phase transitions
-    if (phase === 'destination' && activeSession.phase === 'meetup') {
+    if (phase === 'completed' && activeSession.phase === 'meetup') {
+      // Pickup-only flow: complete the trip when everyone's at the pickup
+      mileage = transitionToPickupComplete(carpool, activeSession);
+    } else if (phase === 'destination' && activeSession.phase === 'meetup') {
+      // Legacy manual advance — new pickup-only sessions complete instead
       mileage = transitionToDestination(carpool, activeSession);
     } else if (phase === 'completed' && activeSession.phase === 'destination') {
       // No return leg — arriving at the destination ends the trip
@@ -1185,7 +1189,7 @@ app.post('/api/carpools/:id/sessions/advance-phase', requireAuth, (req, res) => 
     io.to('carpool:' + carpool.id).emit('phase-changed', {
       from: activeSession.phase,
       to: phase,
-      coinsDistributed: phase === 'destination',
+      coinsDistributed: phase === 'destination' || (phase === 'completed' && activeSession.phase === 'meetup'),
       mileage
     });
 
@@ -1316,8 +1320,37 @@ function transitionToDestination(carpool, activeSession) {
   return mileage;
 }
 
-// Destination → Completed: everyone's arrived at the destination, trip ends
-function transitionToComplete(carpool, activeSession) {
+  // Pickup leg completes the trip: everyone's arrived at the pickup → credits
+  // applied by arrival participation + session done. (Mileage is meaningless
+  // without a destination leg, so 0.)
+  function transitionToPickupComplete(carpool, activeSession) {
+    const members = stmts.sessionMembers.all(activeSession.id);
+    const driver = members.find(m => m.status === 'driving');
+    const actualDriverId = driver ? driver.user_id : activeSession.driver_id;
+    // Riders: anyone riding OR arrived at the pickup (excluding the driver)
+    const riders = members.filter(m =>
+      (m.status === 'riding' || m.status === 'arrived') && m.user_id !== actualDriverId
+    );
+
+    const coinsData = {};
+    for (const rider of riders) {
+      stmts.updateCoins.run(-1, carpool.id, rider.user_id);
+      coinsData[rider.user_id] = -1;
+    }
+    if (actualDriverId) {
+      stmts.updateCoins.run(riders.length, carpool.id, actualDriverId);
+      coinsData[actualDriverId] = riders.length;
+    }
+    stmts.updateSessionDriver.run(actualDriverId, activeSession.id);
+    stmts.addHistory.run(carpool.id, activeSession.id, 'completed', actualDriverId, 'carpool_complete',
+      JSON.stringify(coinsData), 0,
+      'Everyone arrived at the pickup. Credits applied by arrival.');
+    stmts.updateSessionPhase.run('completed', 'completed', activeSession.id);
+    return 0;
+  }
+
+  // Destination → Completed: everyone's arrived at the destination, trip ends
+  function transitionToComplete(carpool, activeSession) {
   // Track miles only when the carpool had at least one rider (miles "saved"
   // by carpooling). A solo driver saves nothing, so record 0 miles.
   const members = stmts.sessionMembers.all(activeSession.id);
@@ -1378,9 +1411,10 @@ function autoAdvanceCheck(carpoolId) {
 
   let mileage;
   if (session.phase === 'meetup') {
-    mileage = transitionToDestination(stmts.carpoolById.get(carpoolId), session);
+    // Pickup-only flow: everyone arrived at the pickup → credits + trip done
+    mileage = transitionToPickupComplete(stmts.carpoolById.get(carpoolId), session);
   } else if (session.phase === 'destination') {
-    // Arriving at the destination ends the trip — no return leg
+    // Legacy sessions already en route still finish normally
     mileage = transitionToComplete(stmts.carpoolById.get(carpoolId), session);
   } else if (session.phase === 'back_to_meetup') {
     // Legacy sessions already on the return leg still finish normally
