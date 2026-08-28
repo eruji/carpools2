@@ -3132,11 +3132,20 @@ function gpsMemberStat(userId, username, lat, lng, acc, source) {
 }
 const fmtDur = (sec) => sec < 90 ? Math.round(sec) + 's' : Math.round(sec / 60) + 'm';
 
-function renderGpsDiag() {
+async function renderGpsDiag() {
   if (!FEATURES.gps) return;
   const el = document.getElementById('gps-diag');
   if (!el) return;
   const now = Date.now();
+
+  // Geolocation permission state (Android 12+ can be 'approximate' — the
+  // web can't see precision, but denied/prompt is a hard block to surface)
+  let permState = 'unknown';
+  if (navigator.permissions && navigator.permissions.query) {
+    try {
+      permState = (await navigator.permissions.query({ name: 'geolocation' })).state;
+    } catch (e) { /* some browsers don't support the query */ }
+  }
 
   // Self status: socket / secure context / tracking state
   const selfStat = currentUser ? gpsDiag.members[currentUser.id] : null;
@@ -3145,6 +3154,7 @@ function renderGpsDiag() {
   const meHtml = `<div class="gps-me">
     <div class="gps-me-line"><span class="gps-dot-status ${socketOk ? 'ok' : 'bad'}"></span> socket ${socketOk ? 'connected' : 'DISCONNECTED'}</div>
     <div class="gps-me-line"><span class="gps-dot-status ${window.isSecureContext ? 'ok' : 'bad'}"></span> HTTPS ${window.isSecureContext ? 'ok' : 'BLOCKED — geolocation unavailable'}</div>
+    <div class="gps-me-line"><span class="gps-dot-status ${permState === 'granted' ? 'ok' : permState === 'denied' ? 'bad' : 'idle'}"></span> location permission: ${permState}${permState === 'denied' ? ' — allow in browser settings' : ''}${permState === 'granted' ? ' (Android: must be PRECISE, not approximate)' : ''}</div>
     <div class="gps-me-line"><span class="gps-dot-status ${trackingOn ? 'ok' : 'idle'}"></span> tracking ${trackingOn ? 'active' : 'off — start a session or respond'}</div>
     ${selfStat
       ? `<div class="gps-me-line">last fix ${fmtDur((now - selfStat.lastAt) / 1000)} ago · ±${selfStat.acc != null ? selfStat.acc : '?'}m · ${selfStat.count} fixes</div>`
@@ -3254,7 +3264,7 @@ function startLocationTracking() {
         }
       },
       (err) => { gpsLog('err', 'watch error: ' + (err.message || err.code)); console.log('Geolocation error:', err.message); },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
     );
   }
 
@@ -3329,7 +3339,7 @@ function startLocationTracking() {
           gpsLog('err', 'poll error: ' + (err.message || err.code));
           console.log('GPS fallback:', err.message);
         },
-        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
       );
     }
   }, 10000);
