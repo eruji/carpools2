@@ -599,9 +599,6 @@ async function init() {
           if (!map) return;
           map.invalidateSize();
           positionAttribution();
-          if (myLocation && activeSession && activeSession.phase !== 'idle' && activeSession.phase !== 'completed') {
-            followMyLocation();
-          }
         }, 200);
       }).observe(dock);
     }
@@ -2127,8 +2124,14 @@ let pendingLocFit = false;
 
 function recenterMap() {
   if (!map || !lastMapData) return;
-  lastMapFitKey = null; // force a refit on the next update
-  updateMap(lastMapData);
+  if (myLocation) {
+    // The locate button: center on me at street level (dock-aware center).
+    centerLocationInViewport(myLocation.lat, myLocation.lng, 15);
+  } else {
+    // No fix yet — frame the route/group instead.
+    lastMapFitKey = null;
+    updateMap(lastMapData);
+  }
 }
 
 // Fit the map to the pickup point and every member's current location
@@ -2228,12 +2231,6 @@ function centerLocationInViewport(lat, lng, zoom) {
 }
 
 // Keep my current location centered while a trip is active.
-function followMyLocation() {
-  if (!map || !myLocation || !activeSession) return;
-  if (activeSession.phase === 'idle' || activeSession.phase === 'completed') return;
-  centerLocationInViewport(myLocation.lat, myLocation.lng);
-}
-
 // Full-screen arrival flash. During the pickup race, "message" is the
 // finisher's place (e.g. "1st place! 🥇") — destination arrivals stay plain.
 let arrivalTimer = null;
@@ -2356,20 +2353,11 @@ function initMap() {
   // Attribution sits at the bottom (above the dock on mobile)
   setTimeout(positionAttribution, 300);
 
-  // When the user zooms during a live trip, snap the view back onto them —
-  // zooming keeps the old map center by default, which loses the car/rider.
-  map.on('zoomend', followMyLocation);
-
-  // Keep the full-bleed map sized correctly on orientation/resize, and
-  // recompute the visible center when the viewport/browser chrome changes.
+  // Keep the full-bleed map sized correctly on orientation/resize — the
+  // view is otherwise free to pan/zoom (no auto-follow after the initial fit).
   window.addEventListener('resize', () => {
     if (map) map.invalidateSize();
-    setTimeout(() => {
-      positionAttribution();
-      if (myLocation && activeSession && activeSession.phase !== 'idle' && activeSession.phase !== 'completed') {
-        followMyLocation();
-      }
-    }, 150);
+    setTimeout(positionAttribution, 150);
   });
 }
 
@@ -3074,17 +3062,12 @@ function toggleDockMinimized() {
   view.classList.toggle('dock-minimized');
   const minimized = view.classList.contains('dock-minimized');
   localStorage.setItem('dockMinimized', minimized ? '1' : '0');
-  // Dock collapsed/expanded (or desktop map box resized) — the visible map
-  // area changed, so recompute the center: keep following me on an active
-  // trip, otherwise refit so the route/group is framed in the new viewport.
+  // Dock collapsed/expanded — the visible map area changed. Keep the map
+  // where the user left it (no auto-recenter); just re-measure + move the
+  // attribution above the dock.
   if (map) setTimeout(() => {
     map.invalidateSize();
     positionAttribution();
-    if (myLocation && activeSession && activeSession.phase !== 'idle' && activeSession.phase !== 'completed') {
-      followMyLocation();
-    } else if (currentCarpoolData) {
-      recenterMap();
-    }
   }, 60);
 }
 
@@ -3257,7 +3240,6 @@ function startLocationTracking() {
           me.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
         }
         onLocationsChanged();
-        followMyLocation();
         if (pendingLocFit) {
           pendingLocFit = false;
           fitMapToConverge();
@@ -3327,7 +3309,6 @@ function startLocationTracking() {
             me.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
           }
           onLocationsChanged();
-          followMyLocation();
           if (pendingLocFit) {
             pendingLocFit = false;
             fitMapToConverge();
