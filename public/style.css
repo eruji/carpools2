@@ -591,6 +591,26 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   border-color: var(--accent-dark);
   color: #fff;
 }
+/* Map theme picker in the carpool gear menu (all members) */
+.theme-menu {
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+  padding: 6px 2px 4px;
+}
+.theme-menu-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  margin: 0 6px 6px;
+}
+.theme-menu-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 6px 4px;
+}
 
 /* ── Carousel nav: arrows + dots ── */
 .rv-nav {
