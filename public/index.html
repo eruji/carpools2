@@ -3179,6 +3179,109 @@ async function renderGpsDiag() {
     <div class="gps-events">${eventsHtml || '<div class="text-xs text-muted">No events yet — GPS events appear here once tracking starts</div>'}</div>`;
 }
 
+// ── Shared GPS fix pipeline ────────────────────────────────────────────────
+// Every geolocation source — watchPosition callbacks, the 10s fallback poll,
+// and the resume ping after the tab comes back — funnels through applyFix()
+// so the accuracy filter, member-row sync and socket emit happen exactly
+// once per accepted fix, identically everywhere.
+let pollInFlight = false; // never stack overlapping getCurrentPosition calls
+let lastEmitTs = 0;       // last client_ts sent — see nextFixTs() below
+
+// The server's newest-fix-wins guard rejects any update whose ts isn't
+// strictly newer than the stored one. Raw Date.now() can step backwards
+// (carrier time re-sync mid-drive, manual clock change) — that would freeze
+// the whole stream with silent rejections. Emit a locally monotonic ts so
+// the guard only ever sees strictly increasing values from this device.
+function nextFixTs() {
+  const now = Date.now();
+  lastEmitTs = now > lastEmitTs ? now : lastEmitTs + 1;
+  return lastEmitTs;
+}
+
+function applyFix(pos, source) {
+  // Reject IP-grade fixes (miles off): when GPS can't lock, the browser
+  // falls back to IP/network positioning — Google Maps never does this.
+  // Log the rejection in the diag card instead of plotting it.
+  if (pos.coords.accuracy != null && pos.coords.accuracy > 3000) {
+    gpsLog('err', source + ' fix ±' + Math.round(pos.coords.accuracy) + 'm rejected (>3km — IP-based?)');
+    return;
+  }
+  myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+  lastGpsFixAt = Date.now();
+  hideGpsStatus();
+  gpsMemberStat(currentUser.id, currentUser.username, myLocation.lat, myLocation.lng, pos.coords.accuracy, source);
+  gpsLog('fix', source + ' fix ±' + (pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : '?') + 'm');
+  if (!activeSession || !socket) return;
+  // Suppress emits while disconnected — socket.io would otherwise buffer
+  // this burst and replay it on reconnect. The server's newest-fix-wins
+  // guard rejects any stale replay; the first fresh fix after reconnect
+  // carries a newer ts and lands normally.
+  if (socket.connected) socket.emit('location-update', {
+    sessionId: activeSession.id,
+    lat: myLocation.lat,
+    lng: myLocation.lng,
+    acc: pos.coords.accuracy,
+    ts: nextFixTs()
+  });
+  // Geo-fence: auto-arrive when close to the current target
+  checkGeoFence();
+  // Keep my own member row in sync (server only broadcasts to others)
+  const me = activeSession.members.find(m => m.user_id === currentUser.id);
+  if (me) {
+    me.location_lat = myLocation.lat;
+    me.location_lng = myLocation.lng;
+    me.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  }
+  onLocationsChanged();
+  if (pendingLocFit) {
+    pendingLocFit = false;
+    fitMapToConverge();
+  }
+}
+
+// One-shot fix request. High accuracy first; if that errors or times out
+// (no GPS lock, Android 'approximate' permission, phone in a bag), retry
+// ONCE with low accuracy — cell/WiFi answers fast, so phones that can't
+// lock GPS still stream coarse updates instead of falling silent.
+function requestPositionOnce(source, highAccuracy) {
+  if (!('geolocation' in navigator)) return;
+  if (pollInFlight) return; // never stack overlapping requests
+  pollInFlight = true;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => { pollInFlight = false; applyFix(pos, source); },
+    (err) => {
+      pollInFlight = false;
+      gpsLog('err', source + ' error: ' + (err.message || err.code) + (highAccuracy ? ' — retrying coarse' : ''));
+      if (highAccuracy) requestPositionOnce(source + '/coarse', false);
+    },
+    { enableHighAccuracy: !!highAccuracy, maximumAge: 0, timeout: highAccuracy ? 8000 : 6000 }
+  );
+}
+
+// Browsers suspend geolocation AND throttle/suspend timers the moment the
+// page is hidden — screen locked, app switch, phone pocketed. When the user
+// comes back (which is exactly when they report a lone "check-in"), re-arm
+// the watch and grab an instant fix instead of waiting for the next 10s tick
+// or up to 60s for the stall watchdog.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    gpsLog('net', 'tab hidden — browser suspends GPS (screen off / app switch?)');
+    return;
+  }
+  const tracking = locationWatchId != null || locationInterval != null;
+  if (!tracking || !activeSession) return;
+  const quietSec = lastGpsFixAt ? (Date.now() - lastGpsFixAt) / 1000 : 999;
+  if (quietSec < 20) return; // stream never stopped — nothing to repair
+  gpsLog('net', 'tab visible — GPS quiet ' + Math.round(quietSec) + 's, re-arming');
+  // Hidden tabs often come back with a silently-dead watch; re-arm it.
+  if (locationWatchId) {
+    navigator.geolocation.clearWatch(locationWatchId);
+    locationWatchId = null;
+  }
+  startLocationTracking();           // restart-safe: replaces watch + interval
+  requestPositionOnce('resume', true); // instant fix, don't wait for a tick
+});
+
 function startLocationTracking() {
   if (locationWatchId) return;
   showGpsStatus();
@@ -3205,46 +3308,7 @@ function startLocationTracking() {
 
   if ('geolocation' in navigator) {
     locationWatchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        // Reject IP-grade fixes (miles off): when GPS can't lock, the browser
-        // falls back to IP/network positioning — Google Maps never does this.
-        // Log the rejection in the diag card instead of plotting it.
-        if (pos.coords.accuracy != null && pos.coords.accuracy > 3000) {
-          gpsLog('err', 'watch fix ±' + Math.round(pos.coords.accuracy) + 'm rejected (>3km — IP-based?)');
-          return;
-        }
-        myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
-        lastGpsFixAt = Date.now();
-        hideGpsStatus();
-        gpsMemberStat(currentUser.id, currentUser.username, myLocation.lat, myLocation.lng, pos.coords.accuracy, 'watch');
-        gpsLog('fix', 'watch fix ±' + (pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : '?') + 'm');
-        if (!activeSession || !socket) return;
-        // Suppress emits while disconnected — socket.io would otherwise buffer
-        // this burst and replay it on reconnect. The server's newest-fix-wins
-        // guard rejects any stale replay; the first fresh fix after reconnect
-        // carries a newer ts and lands normally.
-        if (socket.connected) socket.emit('location-update', {
-          sessionId: activeSession.id,
-          lat: myLocation.lat,
-          lng: myLocation.lng,
-          acc: pos.coords.accuracy,
-          ts: Date.now()
-        });
-        // Geo-fence: auto-arrive when close to the current target
-        checkGeoFence();
-        // Keep my own member row in sync (server only broadcasts to others)
-        const me = activeSession.members.find(m => m.user_id === currentUser.id);
-        if (me) {
-          me.location_lat = myLocation.lat;
-          me.location_lng = myLocation.lng;
-          me.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        }
-        onLocationsChanged();
-        if (pendingLocFit) {
-          pendingLocFit = false;
-          fitMapToConverge();
-        }
-      },
+      (pos) => { applyFix(pos, 'watch'); },
       (err) => { gpsLog('err', 'watch error: ' + (err.message || err.code)); console.log('Geolocation error:', err.message); },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
     );
@@ -3280,50 +3344,18 @@ function startLocationTracking() {
       updateSubwayETAs({ carpool: currentCarpoolData.carpool, activeSession });
     }
     if (!socket) return;
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          // Reject IP-grade fixes (miles off) — see watchPosition above
-          if (pos.coords.accuracy != null && pos.coords.accuracy > 3000) {
-            gpsLog('err', 'poll fix ±' + Math.round(pos.coords.accuracy) + 'm rejected (>3km — IP-based?)');
-            return;
-          }
-          myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
-          lastGpsFixAt = Date.now();
-          hideGpsStatus();
-          gpsMemberStat(currentUser.id, currentUser.username, myLocation.lat, myLocation.lng, pos.coords.accuracy, 'poll');
-          gpsLog('fix', 'poll fix ±' + (pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : '?') + 'm');
-          // Suppress emits while disconnected (see watchPosition above)
-          if (socket.connected) socket.emit('location-update', {
-            sessionId: activeSession.id,
-            lat: myLocation.lat,
-            lng: myLocation.lng,
-            acc: pos.coords.accuracy,
-            ts: Date.now()
-          });
-          checkGeoFence();
-          const me = activeSession.members.find(m => m.user_id === currentUser.id);
-          if (me) {
-            me.location_lat = myLocation.lat;
-            me.location_lng = myLocation.lng;
-            me.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-          }
-          onLocationsChanged();
-          if (pendingLocFit) {
-            pendingLocFit = false;
-            fitMapToConverge();
-          }
-        },
-        (err) => {
-          // Fix failed/timed out — surface it instead of silently going stale
-          if (lastGpsFixAt && Date.now() - lastGpsFixAt > 15000) showGpsStatus();
-          gpsLog('err', 'poll error: ' + (err.message || err.code));
-          console.log('GPS fallback:', err.message);
-        },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
-      );
-    }
+    // Re-show the "Acquiring GPS" pill if we're already past the freshness
+    // threshold (the >45s watchdog above only fires later).
+    if (lastGpsFixAt && Date.now() - lastGpsFixAt > 15000) showGpsStatus();
+    // Poll for a fresh fix. High accuracy first; requestPositionOnce falls
+    // back to a coarse cell/WiFi fix when high accuracy times out (no GPS
+    // lock / Android 'approximate' permission), so the stream never dies.
+    requestPositionOnce('poll', true);
   }, 10000);
+
+  // Kick off an immediate fix rather than waiting up to 10s for the first
+  // interval tick (or indefinitely for a silently-stalled watch).
+  requestPositionOnce('start', true);
 }
 
 // ── Geo-fenced arrivals ─────────────────────────────────────────────────────
@@ -3353,6 +3385,10 @@ function checkGeoFence() {
 
   // Per-carpool radius (default 400m) so garages/parking a block over still count
   const radius = carpool.arrival_radius || GEO_FENCE_M;
+  // Never auto-arrive on a sloppy fix: if the reported accuracy is worse than
+  // the fence radius, the position can't reliably tell "inside" from "outside"
+  // (a coarse cell/WiFi fix ±800m would otherwise fake an arrival blocks early).
+  if (myLocation.accuracy != null && myLocation.accuracy > radius) return;
   const distM = haversine(myLocation.lat, myLocation.lng, targetLat, targetLng) * 1609.34;
   if (distM <= radius) {
     // Don't auto-arrive the next stop while still parked at the previous one
