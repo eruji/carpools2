@@ -1232,6 +1232,9 @@ async function loadCarpoolView(carpoolId) {
   const data = await res.json();
   currentCarpoolData = data;
   activeSession = data.activeSession;
+  // Resume the per-member GPS fix totals from the DB so the diagnostics
+  // card doesn't reset to zero on every page refresh.
+  if (activeSession) gpsSeedCounts(activeSession);
   // Restore the ambient alert preference for the current leg
   proximityPref = (data.activeSession && data.activeSession.proximity) || null;
   lastProxPhase = data.activeSession ? data.activeSession.phase : null;
@@ -3113,6 +3116,23 @@ function gpsMemberStat(userId, username, lat, lng, acc, source) {
   if (username) s.username = username;
   gpsDiag.members[userId] = s;
 }
+
+// Seed each member's fix total from the DB after a (re)load. fix_count is
+// persisted per session_member server-side, so the GPS card resumes its
+// "N updates" counts across a pull-to-refresh instead of starting at zero.
+// Live fixes then keep counting up from the seeded base.
+function gpsSeedCounts(session) {
+  if (!session || !session.members) return;
+  for (const m of session.members) {
+    if (!m.fix_count) continue;
+    const existing = gpsDiag.members[m.user_id];
+    // Never clobber a member we're actively receiving live fixes for —
+    // their local count already continues from the seeded base.
+    if (existing && existing.lastAt) continue;
+    gpsDiag.members[m.user_id] = { count: m.fix_count };
+    if (m.username) gpsDiag.members[m.user_id].username = m.username;
+  }
+}
 const fmtDur = (sec) => sec < 90 ? Math.round(sec) + 's' : Math.round(sec / 60) + 'm';
 
 async function renderGpsDiag() {
@@ -3139,9 +3159,11 @@ async function renderGpsDiag() {
     <div class="gps-me-line"><span class="gps-dot-status ${window.isSecureContext ? 'ok' : 'bad'}"></span> HTTPS ${window.isSecureContext ? 'ok' : 'BLOCKED — geolocation unavailable'}</div>
     <div class="gps-me-line"><span class="gps-dot-status ${permState === 'granted' ? 'ok' : permState === 'denied' ? 'bad' : 'idle'}"></span> location permission: ${permState}${permState === 'denied' ? ' — allow in browser settings' : ''}${permState === 'granted' ? ' (Android: must be PRECISE, not approximate)' : ''}</div>
     <div class="gps-me-line"><span class="gps-dot-status ${trackingOn ? 'ok' : 'idle'}"></span> tracking ${trackingOn ? 'active' : 'off — start a session or respond'}</div>
-    ${selfStat
+    ${selfStat && selfStat.lastAt
       ? `<div class="gps-me-line">last fix ${fmtDur((now - selfStat.lastAt) / 1000)} ago · ±${selfStat.acc != null ? selfStat.acc : '?'}m · ${selfStat.count} fixes</div>`
-      : '<div class="gps-me-line">no fix received yet</div>'}
+      : selfStat
+        ? `<div class="gps-me-line">${selfStat.count} total fixes (server) — waiting for first live fix</div>`
+        : '<div class="gps-me-line">no fix received yet</div>'}
   </div>`;
 
   // One row per member of the carpool
@@ -3149,12 +3171,12 @@ async function renderGpsDiag() {
   const rowsHtml = members.map((m) => {
     const st = gpsDiag.members[m.user_id];
     const isMe = m.user_id === currentUser.id;
-    const liveSec = st ? (now - st.lastAt) / 1000 : null;
+    const liveSec = st && st.lastAt ? (now - st.lastAt) / 1000 : null;
     const dbAgeMin = m.updated_at ? minutesAgo(m.updated_at) : null;
     const age = liveSec != null ? fmtDur(liveSec) : (dbAgeMin != null ? fmtDur(dbAgeMin * 60) : 'no fix');
     const stale = (liveSec != null && liveSec > POSITION_STALE_SEC) || (dbAgeMin != null && dbAgeMin * 60 > POSITION_STALE_SEC);
     const acc = st && st.acc != null ? '±' + st.acc + 'm' : '—';
-    const src = st ? (st.source === 'rx' ? 'broadcast' : st.source) : '—';
+    const src = st ? (st.source === 'rx' ? 'broadcast' : (st.source || 'persisted')) : '—';
     const cnt = st ? st.count : 0;
     return `<div class="gps-row${stale ? ' stale' : ''}">
       <span class="gps-row-avatar" style="background:${memberColor(m.user_id)}">${esc(getInitials(m.username))}</span>

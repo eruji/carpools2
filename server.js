@@ -92,6 +92,7 @@ db.exec(`
     location_lng REAL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     client_ts INTEGER,
+    fix_count INTEGER DEFAULT 0,
     UNIQUE(session_id, user_id)
   );
 
@@ -183,6 +184,12 @@ if (!smCols.includes('arrived_at')) {
 if (!smCols.includes('client_ts')) {
   db.exec('ALTER TABLE session_members ADD COLUMN client_ts INTEGER');
 }
+// Lifetime fix counter (per session member): survives reloads so the GPS
+// Diagnostics card can resume its "N updates" total instead of resetting
+// to zero every time the page is refreshed.
+if (!smCols.includes('fix_count')) {
+  db.exec('ALTER TABLE session_members ADD COLUMN fix_count INTEGER DEFAULT 0');
+}
 
 // ── Invite code generator ───────────────────────────────────────────────────
 function generateInviteCode() {
@@ -263,7 +270,8 @@ const stmts = {
       location_lat = ?,
       location_lng = ?,
       updated_at = datetime('now'),
-      client_ts = ?
+      client_ts = ?,
+      fix_count = fix_count + 1
     WHERE session_id = ? AND user_id = ?
       AND (client_ts IS NULL OR ? > client_ts)
   `),
