@@ -463,14 +463,31 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 8px 10px;
+  /* Every slide stretches to the tallest one; lay the card out as a column
+     so the diag window below the title can flex-fill the full height
+     instead of leaving dead space at the bottom of the card. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
-.gps-diag { max-height: 170px; overflow-y: auto; }
+.gps-panel .rv-title { flex-shrink: 0; }
+.gps-diag {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  /* Bounds the dock when this slide is the tallest, but lets the content
+     use all the card's vertical space (taller than the old 170px cap). */
+  max-height: min(52vh, 420px);
+}
 .gps-me {
   background: var(--accent-soft);
   border: 1px solid rgba(143,174,139,0.3);
   border-radius: 8px;
   padding: 5px 8px;
   margin-bottom: 6px;
+  flex-shrink: 0;
 }
 .gps-me-line {
   display: flex;
@@ -495,6 +512,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   letter-spacing: 0.06em;
   color: var(--text-3);
   margin: 5px 0 3px;
+  flex-shrink: 0;
 }
 .gps-row {
   display: flex;
@@ -503,6 +521,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   padding: 4px 2px;
   border-bottom: 1px solid var(--border);
   font-size: 0.74rem;
+  flex-shrink: 0;
 }
 .gps-row-avatar {
   width: 22px;
@@ -520,7 +539,11 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .gps-row-stats { color: var(--text-2); margin-left: auto; text-align: right; }
 .gps-row.stale .gps-row-stats { color: var(--accent-red, #C0504A); }
 .gps-events {
-  max-height: 90px;
+  /* Grow to fill whatever vertical room the card has left (the reason the
+     card used to show empty space under the content) and scroll when the
+     log outgrows it. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   font-size: 0.68rem;
   line-height: 1.4;
