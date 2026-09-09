@@ -2135,11 +2135,20 @@ let lastMapFitKey = null;
 let mapUpdateSeq = 0;
 let pendingLocFit = false;
 
+// Always follow the target (my location) during a live trip, but never
+// alter the zoom level — centerLocationInViewport pans only, keeping
+// whatever zoom the user set.
+function followMyLocation() {
+  if (!map || !myLocation || !activeSession) return;
+  if (activeSession.phase === 'idle' || activeSession.phase === 'completed') return;
+  centerLocationInViewport(myLocation.lat, myLocation.lng);
+}
+
 function recenterMap() {
   if (!map || !lastMapData) return;
   if (myLocation) {
-    // The locate button: center on me at street level (dock-aware center).
-    centerLocationInViewport(myLocation.lat, myLocation.lng, 15);
+    // Locate: center on me, preserving the current zoom (pan only).
+    centerLocationInViewport(myLocation.lat, myLocation.lng);
   } else {
     // No fix yet — frame the route/group instead.
     lastMapFitKey = null;
@@ -3265,6 +3274,9 @@ function applyFix(pos, source) {
     me.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
   }
   onLocationsChanged();
+  // Always follow the target on every fix — pan to keep me centered while
+  // leaving the user's zoom untouched.
+  followMyLocation();
   if (pendingLocFit) {
     pendingLocFit = false;
     fitMapToConverge();
