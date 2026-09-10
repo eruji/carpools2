@@ -529,6 +529,12 @@ function setSession(session) {
   // update — e.g. someone joining mid-drive — instead of waiting for the next
   // GPS tick to re-render.
   renderSections();
+  // Arrived at the pickup? I'm done moving — stop broadcasting location
+  // (keeping my last position on screen) and just wait for the rest.
+  if (session && currentUser && session.members) {
+    const me = session.members.find(m => m.user_id === currentUser.id);
+    if (me && me.status === 'arrived') stopLocationTracking(true);
+  }
   // Carry the ambient alert preference into a new leg (meetup → destination)
   if (proximityPref != null && currentCarpoolId && session && session.driver_id
       && session.phase !== 'idle' && session.phase !== 'completed' && session.phase !== 'cancelled'
@@ -1645,7 +1651,7 @@ function renderSessionUI(session) {
   const showProx = !!session && !!session.driver_id
     && proxDriver && proxDriver.status !== 'arrived' // driver already here — no ETA alert
     && (session.phase === 'meetup' || session.phase === 'destination' || session.phase === 'back_to_meetup')
-    && (!myProxMember || myProxMember.user_id !== session.driver_id);
+    && (!myProxMember || (myProxMember.user_id !== session.driver_id && myProxMember.status !== 'arrived'));
   if (proxRow) {
     proxRow.classList.toggle('hidden', !showProx);
     if (showProx) {
@@ -1798,13 +1804,13 @@ function renderMemberStatus(session) {
         </div>
         <div class="member-actions">
           <span class="member-eta text-xs text-muted" id="member-eta-${m.user_id}"></span>
-          ${!noSkip && m.status !== 'skip' && m.user_id !== currentUser.id
+          ${!noSkip && m.status !== 'skip' && m.status !== 'arrived' && m.user_id !== currentUser.id
             ? `<button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip</button>`
             : ''}
           ${!noSkip && m.user_id === currentUser.id && m.status === 'skip'
             ? `<button class="btn btn-outline btn-sm" onclick="respondToSession('pending')">Changed my mind</button>`
             : ''}
-          ${!noSkip && m.status !== 'skip' && m.user_id === currentUser.id && m.status !== 'pending'
+          ${!noSkip && m.status !== 'skip' && m.status !== 'arrived' && m.user_id === currentUser.id && m.status !== 'pending'
             ? `<button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip Me</button>`
             : ''}
         </div>
@@ -3488,7 +3494,9 @@ function hideGpsStatus() {
   if (el) el.classList.add('hidden');
 }
 
-function stopLocationTracking() {
+// Stop streaming my location. preserveLocation keeps the last known fix on
+// screen (used on arrival — I'm parked at the pickup, not gone).
+function stopLocationTracking(preserveLocation) {
   if (locationWatchId) {
     navigator.geolocation.clearWatch(locationWatchId);
     locationWatchId = null;
@@ -3497,7 +3505,7 @@ function stopLocationTracking() {
     clearInterval(locationInterval);
     locationInterval = null;
   }
-  myLocation = null;
+  if (!preserveLocation) myLocation = null;
   hideGpsStatus();
 }
 
