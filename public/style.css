@@ -510,7 +510,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   flex-direction: column;
   /* Bounds the dock when this slide is the tallest, but lets the content
      use all the card's vertical space (taller than the old 170px cap). */
-  max-height: min(52vh, 420px);
+  max-height: min(34vh, 230px);
 }
 .gps-me {
   background: var(--accent-soft);
@@ -588,8 +588,8 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   margin-bottom: 0;
 }
 .seating-chart {
-  margin-top: 6px;
-  padding-top: 6px;
+  margin-top: 4px;
+  padding-top: 4px;
   border-top: 1px dashed var(--border-strong);
   display: flex;
   flex-direction: column;
@@ -649,7 +649,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   align-items: center;
   justify-content: center;
   gap: 14px;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 .rv-arrow {
   width: 30px;
@@ -683,13 +683,13 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .rv-dot.active { background: var(--accent-deep); transform: scale(1.3); }
 
 /* ── Top-down car (seating chart) ── */
-.car-topdown { width: 100%; max-width: 120px; }
+.car-topdown { width: 100%; max-width: 92px; }
 .car-body {
   position: relative;
   background: var(--surface-alt);
   border: 2px solid var(--border-strong);
   border-radius: 26px 26px 14px 14px;
-  padding: 12px 9px 9px;
+  padding: 9px 7px 7px;
 }
 .car-body::before {
   content: '';
@@ -706,10 +706,10 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   justify-content: center;
   gap: 8px;
 }
-.car-row.front { margin-bottom: 6px; }
+.car-row.front { margin-bottom: 4px; }
 .car-seat {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 10px;
   border: 2px dashed var(--border-strong);
   background: var(--surface);
@@ -814,8 +814,8 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .race-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 5px 2px;
+  gap: 8px;
+  padding: 3px 2px;
   border-bottom: 1px solid var(--border);
 }
 /* Members who haven't accepted driving/riding yet — sleeping at the start line */
@@ -1001,7 +1001,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 /* ── Stops ────────────────────────────────────────────────── */
 .subway-stop {
   position: relative;
-  padding: 6px 0;
+  padding: 3px 0;
   padding-left: 12px;
 }
 .subway-stop:last-child { padding-bottom: 0; }
@@ -1297,7 +1297,23 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   align-items: center;
   min-height: 56px;
 }
-.phase-panel > div { width: 100%; }
+.phase-panel > div { flex: 1 1 auto; min-width: 0; }
+.bar-icon-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  font-size: 1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.bar-icon-btn:active { transform: scale(0.94); }
 /* No-action state (arrived, waiting) — keeps the bar one row tall */
 .bar-status {
   font-size: 0.85rem;
@@ -1340,11 +1356,11 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .member-list { display: flex; flex-direction: column; gap: 4px; }
 .member-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 4px 6px; background: var(--surface);
+  padding: 3px 6px; background: var(--surface);
   border: 1px solid var(--border); border-radius: 10px;
   transition: border-color 0.2s;
   gap: 6px;
-  min-height: 28px; /* stable row height — layout never pops when ETA text lands */
+  min-height: 26px; /* stable row height — layout never pops when ETA text lands */
 }
 .member-row:hover { border-color: var(--border-strong); }
 .member-row.is-driver {
@@ -1654,6 +1670,9 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   #view-carpool.dock-minimized .mobile-dock {
     margin-top: 0;
   }
+  /* Collapsed: drop the bottom gap and pull the tab flush to the edge */
+  #view-carpool.dock-minimized { padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
+  #view-carpool.dock-minimized .dock-tab { top: -26px; }
   /* Binder-tab minimize control: down chevron on a tab at the dock's top
      edge; the chevron flips up when the interface is minimized (the tab
      stays put as the expand handle). */

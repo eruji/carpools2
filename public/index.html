@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=25">
+<link rel="stylesheet" href="/style.css?v=26">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -263,6 +263,9 @@
       <!-- Shown when no action applies (arrived) so the bar is never blank -->
       <div id="bar-status" class="bar-status hidden"></div>
     </div>
+
+    <!-- Test aid: force a fresh GPS fix (compact icon keeps the bar one row) -->
+    <button id="btn-gps-refresh" class="bar-icon-btn" onclick="manualGpsUpdate()" title="Update GPS now" aria-label="Update GPS now">📍</button>
   </div>
   </div>
 </div>
@@ -378,7 +381,6 @@
 <div class="profile-dropdown hidden" id="carpool-menu-dropdown">
   <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openHistoryModal()">History</button>
   <button id="btn-menu-setup" class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openSetupModal()">Setup</button>
-  <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="manualGpsUpdate()">📍 Update GPS now</button>
   <div id="proximity-section" class="hidden">
     <div class="theme-menu-title">🔔 Driver alert</div>
     <div class="btn-group" id="proximity-options" style="padding:0 8px 8px;"></div>
