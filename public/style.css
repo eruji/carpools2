@@ -354,6 +354,26 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 /* The carpool view positions the floating map controls over the map area */
 #view-carpool { position: relative; }
 
+/* Tiny ETA caption under a live map bubble */
+.map-bubble-eta {
+  margin-top: 1px;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+}
+.map-bubble-eta.stale {
+  opacity: 0.6;
+  color: var(--text-3);
+}
+
 /* ── Zoom buttons (stacked under the locate button) ─────────── */
 .map-zoom {
   position: absolute;

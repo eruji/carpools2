@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=30">
+<link rel="stylesheet" href="/style.css?v=31">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -2719,14 +2719,26 @@ function updateMap(data) {
     }
   }
 
-  // ── People (pickup phase) or single car (transit phases) ──
+  // Tiny ETA caption under a map bubble (straight-line @ 30mph, matching the
+// race card's fallback). Returns '' when there's nothing useful to show.
+function bubbleEtaText(lat, lng, tLat, tLng, arrived) {
+  if (arrived) return 'here';
+  if (!lat || !lng || !tLat || !tLng) return '';
+  const min = haversine(lat, lng, tLat, tLng) / 0.5;
+  if (min < 1) return 'Now';
+  return Math.round(min) + 'm';
+}
+
+// ── People (pickup phase) or single car (transit phases) ──
   if (inMeetup && session.members) {
     // Me (halo ring) converging on the pickup point
     if (myLocation) {
+      const meRow = session.members.find(m => m.user_id === currentUser.id) || {};
+      const myEta = hasPickup ? bubbleEtaText(myLocation.lat, myLocation.lng, carpool.meetup_lat, carpool.meetup_lng, meRow.status === 'arrived') : '';
       const marker = L.marker([myLocation.lat, myLocation.lng], {
         icon: L.divIcon({
           className: '',
-          html: `<div style="width:32px;height:32px;border-radius:50%;background:${memberColor(currentUser.id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:0.02em;border:3px solid #fff;box-shadow:0 0 0 3px #8FAE8B, 0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(currentUser.username))}</div>`,
+          html: `<div style="display:flex;flex-direction:column;align-items:center;"><div style="width:32px;height:32px;border-radius:50%;background:${memberColor(currentUser.id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:0.02em;border:3px solid #fff;box-shadow:0 0 0 3px #8FAE8B, 0 2px 8px rgba(0,0,0,0.35);">${esc(getInitials(currentUser.username))}</div>${myEta ? `<span class="map-bubble-eta">${esc(myEta)}</span>` : ''}</div>`,
           iconAnchor: [16, 16]
         })
       }).addTo(map).bindTooltip(`<b>You</b> — ${(session.members.find(m => m.user_id === currentUser.id) || {}).status === 'arrived' ? 'at the pickup' : 'heading to pickup'}`, { direction: 'top', offset: [0, -12] });
@@ -2766,7 +2778,7 @@ function updateMap(data) {
       const marker = L.marker([m.location_lat, m.location_lng], {
         icon: L.divIcon({
           className: '',
-          html: `<div style="width:32px;height:32px;border-radius:50%;background:${memberColor(m.user_id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:0.02em;border:2px solid ${stale ? '#999' : '#fff'};box-shadow:0 2px 8px rgba(0,0,0,0.35);opacity:${stale ? 0.4 : 1};filter:${stale ? 'grayscale(0.8)' : 'none'};">${esc(getInitials(m.username))}</div>`,
+          html: `<div style="display:flex;flex-direction:column;align-items:center;"><div style="width:32px;height:32px;border-radius:50%;background:${memberColor(m.user_id)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:0.02em;border:2px solid ${stale ? '#999' : '#fff'};box-shadow:0 2px 8px rgba(0,0,0,0.35);opacity:${stale ? 0.4 : 1};filter:${stale ? 'grayscale(0.8)' : 'none'};">${esc(getInitials(m.username))}</div>${(() => { const t = hasPickup ? bubbleEtaText(m.location_lat, m.location_lng, carpool.meetup_lat, carpool.meetup_lng, m.status === 'arrived') : ''; return t ? `<span class="map-bubble-eta${stale ? ' stale' : ''}">${esc(t)}</span>` : ''; })()}</div>`,
           iconAnchor: [16, 16]
         })
       }).addTo(map).bindTooltip(`${esc(m.username)} (${m.status})${accTxt}${stale && ageTxt ? ` · ⚠ fix ${ageTxt} ago` : ''}`, { direction: 'top', offset: [0, -12] });
