@@ -1921,6 +1921,45 @@ let raceStartSessionId = null;   // reset race state when the session changes
 let raceFinishSeqCounter = 0;    // next arrival sequence number
 
 
+// ── Share race results (device share sheet, clipboard fallback) ──
+let lastRaceShareText = '';
+
+function buildRaceShareText(carpool, racers, finishSeq, finishTime) {
+  const ord = (n) => n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th';
+  const done = racers.filter(r => r.finished)
+    .sort((a, b) => (finishSeq[a.m.user_id] ?? 99) - (finishSeq[b.m.user_id] ?? 99));
+  const onWay = racers.filter(r => !r.finished);
+  const lines = [`🏁 Pickup race — ${carpool.name}`];
+  done.forEach((r) => {
+    const t = finishTime[r.m.user_id];
+    const clock = t ? ' — arrived ' + new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+    lines.push(`${ord(finishSeq[r.m.user_id] || 1)} ${r.m.username}${clock}`);
+  });
+  if (onWay.length) {
+    lines.push(`${onWay.length} still on the way: ${onWay.map(r => r.m.username).join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
+async function shareRaceResults() {
+  const text = lastRaceShareText || 'Pickup race results';
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'VroomMates pickup race', text });
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // user dismissed the sheet
+    }
+  }
+  // Fallback: copy to clipboard, then plain alert as a last resort
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Results copied to clipboard');
+  } catch (e) {
+    alert(text);
+  }
+}
+
 function renderPositionBoard(session) {
   if (!FEATURES.positionBoard) return;
   const el = document.getElementById('position-board');
@@ -2109,6 +2148,14 @@ function renderPositionBoard(session) {
     counts.waiting ? `${counts.waiting} waiting` : ''
   ].filter(Boolean).join(' · ');
 
+  // Share the standings once I've arrived at the pickup
+  const myMember = session.members.find(m => m.user_id === currentUser.id);
+  const iArrived = !!myMember && myMember.status === 'arrived';
+  lastRaceShareText = buildRaceShareText(carpool, racers, raceFinishSeq, raceFinishTime);
+  const shareBtn = iArrived
+    ? `<button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%;" onclick="shareRaceResults()">📤 Share results</button>`
+    : '';
+
   el.innerHTML = `
     <div class="race-header">
       <span class="rv-title" style="margin-bottom:0;">🏁 Pickup race</span>
@@ -2116,6 +2163,7 @@ function renderPositionBoard(session) {
     </div>
     <div class="race-target">→ ${esc(meetupLabel(carpool))}</div>
     ${rows.join('')}
+    ${shareBtn}
   `;
 
   // Upgrade each racing row's ETA to road routing when it resolves (cached 60s).
@@ -2144,9 +2192,17 @@ let pendingLocFit = false;
 // Always follow the target (my location) during a live trip, but never
 // alter the zoom level — centerLocationInViewport pans only, keeping
 // whatever zoom the user set.
+// ── Keep-center behaviour ──────────────────────────────────────
+// The live map keeps the user's bubble centered (drop-invisible area aware).
+// A manual pan pauses that for 5s so the map doesn't fight a deliberate
+// look-around. Zooming always re-centers on the bubble at the new zoom.
+let followPausedUntil = 0;
+const FOLLOW_PAUSE_MS = 5000;
+
 function followMyLocation() {
   if (!map || !myLocation || !activeSession) return;
   if (activeSession.phase === 'idle' || activeSession.phase === 'completed') return;
+  if (Date.now() < followPausedUntil) return; // user is panning — hands off
   centerLocationInViewport(myLocation.lat, myLocation.lng);
 }
 
@@ -2378,6 +2434,15 @@ function initMap() {
   // Keyless basemap with automatic provider fallback (Esri → OSM)
   initTileLayer(map);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
+  // Manual pan → pause the keep-center behaviour for 5s
+  map.on('dragstart', () => { followPausedUntil = Date.now() + FOLLOW_PAUSE_MS; });
+  // Zoom (buttons or pinch) → always re-center on the bubble at the new zoom
+  map.on('zoomend', () => {
+    if (!myLocation || !activeSession) return;
+    if (activeSession.phase === 'idle' || activeSession.phase === 'completed') return;
+    followPausedUntil = 0; // zooming is an explicit re-center request
+    setTimeout(() => centerLocationInViewport(myLocation.lat, myLocation.lng), 60);
+  });
   // Attribution sits at the bottom (above the dock on mobile)
   setTimeout(positionAttribution, 300);
 
