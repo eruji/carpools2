@@ -1478,8 +1478,36 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   border-radius: 8px;
   background: var(--surface);
 }
-.setup-member-row { flex-wrap: wrap; gap: 6px; }
-.setup-member-row .member-actions { flex-wrap: wrap; gap: 6px; }
+/* Setup rows stack: member on line 1, credit controls on line 2 */
+.setup-member-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px 10px;
+}
+.setup-member-row .member-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+.setup-member-row .member-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 8px;
+  width: 100%;
+}
+.credit-adjust-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  margin-right: 2px;
+}
 .history-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .history-table {
   width: 100%;

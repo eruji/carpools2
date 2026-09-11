@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=29">
+<link rel="stylesheet" href="/style.css?v=30">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -1320,6 +1320,7 @@ function renderSetupMembers(members, isOwner) {
       <div class="member-actions">
         ${isOwner ? `
           <div class="credit-adjust">
+            <span class="credit-adjust-label">Credits</span>
             <button class="btn btn-outline btn-sm" title="Subtract" onclick="adjustCredits(${m.id}, -creditAdjustValue(${m.id}))">−</button>
             <input type="number" class="credit-adj-input" id="credit-adj-${m.id}" value="1" min="1" step="1" inputmode="numeric" aria-label="Adjustment amount">
             <button class="btn btn-outline btn-sm" title="Add" onclick="adjustCredits(${m.id}, creditAdjustValue(${m.id}))">+</button>
