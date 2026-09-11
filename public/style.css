@@ -1298,6 +1298,10 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   min-height: 56px;
 }
 .phase-panel > div { flex: 1 1 auto; min-width: 0; }
+/* Active bar row: action buttons flex, GPS icon pinned right */
+#session-active { display: flex; align-items: center; gap: 6px; width: 100%; }
+#session-active > #phase-meetup-controls,
+#session-active > .bar-status { flex: 1 1 auto; min-width: 0; }
 .bar-icon-btn {
   flex: 0 0 auto;
   width: 40px;

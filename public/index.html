@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=26">
+<link rel="stylesheet" href="/style.css?v=27">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -262,10 +262,9 @@
       </div>
       <!-- Shown when no action applies (arrived) so the bar is never blank -->
       <div id="bar-status" class="bar-status hidden"></div>
+      <!-- Test aid: force a fresh GPS fix (only during an active session) -->
+      <button id="btn-gps-refresh" class="bar-icon-btn" onclick="manualGpsUpdate()" title="Update GPS now" aria-label="Update GPS now">📍</button>
     </div>
-
-    <!-- Test aid: force a fresh GPS fix (compact icon keeps the bar one row) -->
-    <button id="btn-gps-refresh" class="bar-icon-btn" onclick="manualGpsUpdate()" title="Update GPS now" aria-label="Update GPS now">📍</button>
   </div>
   </div>
 </div>
