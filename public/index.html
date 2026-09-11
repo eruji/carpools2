@@ -266,6 +266,9 @@
         <div class="proximity-label">🔔 Alert me when the driver is</div>
         <div class="btn-group" id="proximity-options"></div>
       </div>
+
+      <!-- Test aid: force a fresh GPS fix through the normal pipeline -->
+      <button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%;" onclick="manualGpsUpdate()">📍 Update GPS now</button>
     </div>
   </div>
   </div>
@@ -1958,6 +1961,36 @@ async function shareRaceResults() {
   } catch (e) {
     alert(text);
   }
+}
+
+// Manual GPS refresh (testing aid): forces one fresh fix through the normal
+// applyFix pipeline — same path the watch/poll use, so if this moves the
+// marker the streaming path works too.
+function manualGpsUpdate() {
+  if (!('geolocation' in navigator)) { showToast('Geolocation unavailable in this browser'); return; }
+  gpsLog('start', 'manual fix requested');
+  showToast('Updating GPS…');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      applyFix(pos, 'manual');
+      showToast('GPS updated' + (pos.coords.accuracy != null ? ' ±' + Math.round(pos.coords.accuracy) + 'm' : ''));
+    },
+    (err) => {
+      gpsLog('err', 'manual error: ' + (err.message || err.code) + ' — retrying coarse');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          applyFix(pos, 'manual/coarse');
+          showToast('GPS updated (coarse)' + (pos.coords.accuracy != null ? ' ±' + Math.round(pos.coords.accuracy) + 'm' : ''));
+        },
+        (e2) => {
+          gpsLog('err', 'manual/coarse error: ' + (e2.message || e2.code));
+          showToast('GPS failed: ' + (e2.message || e2.code));
+        },
+        { enableHighAccuracy: false, maximumAge: 0, timeout: 8000 }
+      );
+    },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
+  );
 }
 
 function renderPositionBoard(session) {
