@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=23">
+<link rel="stylesheet" href="/style.css?v=24">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -172,6 +172,10 @@
       <div id="map"></div>
     </div>
     <button class="map-recenter" onclick="recenterMap()" title="Recenter map"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+    <div class="map-zoom">
+      <button class="map-zoom-btn" onclick="zoomOnMe(1)" aria-label="Zoom in" title="Zoom in">+</button>
+      <button class="map-zoom-btn" onclick="zoomOnMe(-1)" aria-label="Zoom out" title="Zoom out">−</button>
+    </div>
   </div>
 
   <!-- ═══════ SUBWAY-STYLE TRANSIT LINE + SEATING CHART (swipeable) ═══════ -->
@@ -181,6 +185,7 @@
     <div class="rv-track" id="rv-track">
   <div class="subway-map" id="subway-map">
     <div class="rv-title">Route</div>
+    <p id="session-info" class="trip-status"></p>
     <div class="subway-line" id="subway-line">
       <!-- Stop 1: Start (arbitrary) -->
       <div class="subway-stop" id="subway-stop-start">
@@ -210,6 +215,7 @@
       </div>
       <!-- Occupancy: the car fills as members arrive at the pickup -->
       <div class="seating-chart" id="seating-chart" aria-label="Occupancy"></div>
+      <div id="session-alert" class="trip-status hidden"></div>
     </div>
     <!-- Slide 2: Members — the roster lives in the carousel -->
     <div class="member-panel">
@@ -241,16 +247,13 @@
     </div>
   </div>
 
-  <!-- Session Controls + Members (combined) -->
+  <!-- Session action bar — always exactly one row tall -->
   <div id="session-panel" class="phase-panel">
     <div id="session-idle">
-      <p class="text-muted mb-1 text-sm">No active session. Start one to begin tracking!</p>
-      <button class="btn btn-primary btn-lg" onclick="startSession()" style="width:100%;">Start Carpool</button>
+      <button class="btn btn-primary" onclick="startSession()" style="width:100%;">Start Carpool</button>
     </div>
 
     <div id="session-active" class="hidden">
-      <p id="session-info" class="text-sm text-muted mb-1"></p>
-
       <!-- Phase 1: Pickup Controls -->
       <div id="phase-meetup-controls" class="btn-group hidden">
         <button id="btn-driving" class="btn btn-primary btn-sm" onclick="respondToSession('driving')">I'll Drive</button>
@@ -258,17 +261,6 @@
         <button id="btn-arrived" class="btn btn-success btn-sm" onclick="respondToSession('arrived')">Arrived</button>
         <button id="btn-skip" class="btn btn-outline btn-sm" onclick="respondToSession('skip')">Skip</button>
       </div>
-
-      <div id="session-alert" class="hidden"></div>
-
-      <!-- Ambient alert: ping me when the driver is X min away (passengers only) -->
-      <div id="proximity-row" class="hidden" style="margin-top:10px;">
-        <div class="proximity-label">🔔 Alert me when the driver is</div>
-        <div class="btn-group" id="proximity-options"></div>
-      </div>
-
-      <!-- Test aid: force a fresh GPS fix through the normal pipeline -->
-      <button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%;" onclick="manualGpsUpdate()">📍 Update GPS now</button>
     </div>
   </div>
   </div>
@@ -385,6 +377,11 @@
 <div class="profile-dropdown hidden" id="carpool-menu-dropdown">
   <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openHistoryModal()">History</button>
   <button id="btn-menu-setup" class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="openSetupModal()">Setup</button>
+  <button class="btn btn-outline btn-sm" style="width:100%;justify-content:flex-start;" onclick="manualGpsUpdate()">📍 Update GPS now</button>
+  <div id="proximity-section" class="hidden">
+    <div class="theme-menu-title">🔔 Driver alert</div>
+    <div class="btn-group" id="proximity-options" style="padding:0 8px 8px;"></div>
+  </div>
   <!-- Map theme picker — available to every member (Setup's Key popup is owner-only) -->
   <div class="theme-menu">
     <div class="theme-menu-title">🗺 Map Theme</div>
@@ -1638,7 +1635,7 @@ function renderSessionUI(session) {
       : session.phase === 'destination' ? 'the destination' : 'the dropoff';
     if (myMember && myMember.status === 'arrived' && !allArrived) {
       alertEl.textContent = 'Waiting for all members to arrive ' + targetName + '...';
-      alertEl.className = 'alert alert-info';
+      alertEl.className = 'trip-status warn';
       alertEl.classList.remove('hidden');
     } else {
       alertEl.classList.add('hidden');
@@ -1648,7 +1645,7 @@ function renderSessionUI(session) {
   }
 
   // Ambient proximity alert: passengers only, on active legs with a driver
-  const proxRow = document.getElementById('proximity-row');
+  const proxRow = document.getElementById('proximity-section');
   const myProxMember = session ? session.members.find(m => m.user_id === currentUser.id) : null;
   const proxDriver = session ? session.members.find(m => m.user_id === session.driver_id) : null;
   const showProx = !!session && !!session.driver_id
@@ -2226,16 +2223,49 @@ let pendingLocFit = false;
 // alter the zoom level — centerLocationInViewport pans only, keeping
 // whatever zoom the user set.
 // ── Keep-center behaviour ──────────────────────────────────────
-// The live map keeps the user's bubble centered (drop-invisible area aware).
-// A manual pan pauses that for 5s so the map doesn't fight a deliberate
-// look-around. Zooming always re-centers on the bubble at the new zoom.
+// The live map keeps the user's bubble centered (visible-area aware). A manual
+// pan or pinch pauses that, then re-centers 2 seconds later.
 let followPausedUntil = 0;
-const FOLLOW_PAUSE_MS = 5000;
+let followResumeTimer = null;
+let selfMoving = false; // true while we animate the view ourselves
+const FOLLOW_PAUSE_MS = 2000;
+const FOLLOW_VISIBLE = () => myLocation && activeSession
+  && activeSession.phase !== 'idle' && activeSession.phase !== 'completed';
+
+function markSelfMoving() {
+  selfMoving = true;
+  clearTimeout(markSelfMoving._t);
+  markSelfMoving._t = setTimeout(() => { selfMoving = false; }, 800);
+}
+
+// Any deliberate user movement: pause following, resume (re-center) after 2s
+function userMovedMap() {
+  followPausedUntil = Date.now() + FOLLOW_PAUSE_MS;
+  clearTimeout(followResumeTimer);
+  followResumeTimer = setTimeout(() => {
+    followPausedUntil = 0;
+    if (FOLLOW_VISIBLE()) centerLocationInViewport(myLocation.lat, myLocation.lng);
+  }, FOLLOW_PAUSE_MS);
+}
+
+// Zoom in/out centered on my bubble in a single animated motion
+function zoomOnMe(delta) {
+  if (!map) return;
+  const z = Math.max(3, Math.min(19, map.getZoom() + delta));
+  if (FOLLOW_VISIBLE()) {
+    followPausedUntil = 0;
+    clearTimeout(followResumeTimer);
+    centerLocationInViewport(myLocation.lat, myLocation.lng, z);
+  } else {
+    markSelfMoving();
+    map.setZoom(z, { animate: true });
+  }
+}
 
 function followMyLocation() {
   if (!map || !myLocation || !activeSession) return;
   if (activeSession.phase === 'idle' || activeSession.phase === 'completed') return;
-  if (Date.now() < followPausedUntil) return; // user is panning — hands off
+  if (Date.now() < followPausedUntil) return; // user is looking around — hands off
   centerLocationInViewport(myLocation.lat, myLocation.lng);
 }
 
@@ -2344,6 +2374,7 @@ function centerLocationInViewport(lat, lng, zoom) {
   const cy = visibleMapCenterY(size);
   const userPt = map.project([lat, lng], z);
   const centerPt = userPt.add(L.point(0, size.y / 2 - cy));
+  markSelfMoving();
   map.setView(map.unproject(centerPt, z), z, { animate: true, duration: 0.4 });
 }
 
@@ -2466,16 +2497,12 @@ function initMap() {
   }).setView([40.78, -73.97], 12);
   // Keyless basemap with automatic provider fallback (Esri → OSM)
   initTileLayer(map);
-  L.control.zoom({ position: 'bottomright' }).addTo(map);
-  // Manual pan → pause the keep-center behaviour for 5s
-  map.on('dragstart', () => { followPausedUntil = Date.now() + FOLLOW_PAUSE_MS; });
-  // Zoom (buttons or pinch) → always re-center on the bubble at the new zoom
-  map.on('zoomend', () => {
-    if (!myLocation || !activeSession) return;
-    if (activeSession.phase === 'idle' || activeSession.phase === 'completed') return;
-    followPausedUntil = 0; // zooming is an explicit re-center request
-    setTimeout(() => centerLocationInViewport(myLocation.lat, myLocation.lng), 60);
-  });
+  // Custom zoom buttons (replaces Leaflet's control): they perform ONE
+  // animated setView centered on the bubble, instead of zooming about the
+  // frame center and then panning.
+  // User movement (pan or pinch) pauses following, then re-centers after 2s.
+  map.on('dragstart', userMovedMap);
+  map.on('zoomstart', () => { if (!selfMoving) userMovedMap(); });
   // Attribution sits at the bottom (above the dock on mobile)
   setTimeout(positionAttribution, 300);
 
