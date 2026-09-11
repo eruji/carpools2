@@ -1297,17 +1297,16 @@ function renderSetupMembers(members, isOwner) {
   const container = document.getElementById('setup-members-list');
   if (!container) return;
   const ownerId = currentCarpoolData.carpool.owner_id;
-  // Lowest credits = next driver (ties broken alphabetically)
-  const sorted = [...members].sort((a, b) =>
+  // Next driver is still the lowest-credit member (badge only)
+  const byCredit = [...members].sort((a, b) =>
     (a.coins_balance - b.coins_balance) || a.username.localeCompare(b.username)
   );
-  const nextDriverId = sorted.length ? sorted[0].id : null;
-  // Display order: owner pinned to the top, everyone else keeps credit order
-  // (stable sort preserves the credit sort for the rest).
-  const display = [...sorted].sort((a, b) => {
+  const nextDriverId = byCredit.length ? byCredit[0].id : null;
+  // Display order: owner first, then alphabetical — NOT sorted by credits
+  const display = [...members].sort((a, b) => {
     if (a.id === ownerId) return -1;
     if (b.id === ownerId) return 1;
-    return 0;
+    return a.username.localeCompare(b.username, undefined, { sensitivity: 'base' });
   });
   container.innerHTML = display.map(m => `
     <div class="member-row setup-member-row">
@@ -3218,8 +3217,10 @@ async function handleUpdateCarpool(e) {
   });
   if (res.ok) {
     await refreshMyCarpools();
-    alert('Carpool updated!');
+    // Saved — close the Setup card instead of leaving it open
+    closeSetupModal();
     loadCarpoolView(currentCarpoolId);
+    showToast('Carpool updated');
   }
 }
 
