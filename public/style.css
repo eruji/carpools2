@@ -1455,10 +1455,26 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .carpool-card:hover { border-color: var(--border-strong); }
 
 /* ── History ─────────────────────────────────────────────────── */
+.history-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .history-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.85rem;
+}
+/* Date cell: two tidy lines (day over time/miles), never wraps ragged */
+.history-date { white-space: nowrap; }
+.history-date-day {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.history-date-time {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .history-table th {
   text-align: left;
@@ -1658,8 +1674,7 @@ tr:hover td { background: rgba(0,0,0,0.015); }
                 padding 0.35s ease, margin 0.35s ease, border-width 0.35s ease;
   }
   #view-carpool.dock-minimized .route-visual,
-  #view-carpool.dock-minimized .rv-nav,
-  #view-carpool.dock-minimized .phase-panel {
+  #view-carpool.dock-minimized .rv-nav {
     max-height: 0;
     opacity: 0;
     transform: translateY(16px);
@@ -1674,9 +1689,6 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   #view-carpool.dock-minimized .mobile-dock {
     margin-top: 0;
   }
-  /* Collapsed: drop the bottom gap and pull the tab flush to the edge */
-  #view-carpool.dock-minimized { padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
-  #view-carpool.dock-minimized .dock-tab { top: -26px; }
   /* Binder-tab minimize control: down chevron on a tab at the dock's top
      edge; the chevron flips up when the interface is minimized (the tab
      stays put as the expand handle). */
