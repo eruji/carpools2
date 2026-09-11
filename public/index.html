@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=28">
+<link rel="stylesheet" href="/style.css?v=29">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -302,11 +302,6 @@
         <label>Arrival Radius (meters)</label>
         <input type="number" id="edit-arrival-radius" min="50" max="2000" step="50" placeholder="400">
         <p class="text-xs text-muted">How close GPS must be to auto-arrive. 400m covers a block or two (parking garages).</p>
-      </div>
-      <div class="form-group">
-        <label>Starting Coins for New Members</label>
-        <input type="number" id="edit-start-coins" min="0" max="100" step="1" placeholder="0">
-        <p class="text-xs text-muted">Each member who joins starts with this many credits.</p>
       </div>
       <p class="text-xs text-muted mb-1">The pickup location is set from the subway stops.</p>
     </form>
@@ -1290,7 +1285,6 @@ async function loadCarpoolView(carpoolId) {
   // Settings tab
   document.getElementById('edit-carpool-name').value = data.carpool.name || '';
   document.getElementById('edit-arrival-radius').value = data.carpool.arrival_radius || 400;
-  document.getElementById('edit-start-coins').value = data.carpool.start_coins ?? 0;
 
   // History
   renderHistory(data.trips || []);
@@ -1316,20 +1310,56 @@ function renderSetupMembers(members, isOwner) {
     return 0;
   });
   container.innerHTML = display.map(m => `
-    <div class="member-row">
+    <div class="member-row setup-member-row">
       <div class="member-info">
         <span class="member-avatar" style="background:${memberColor(m.id)};">${esc(getInitials(m.username))}</span>
         <span class="member-name">${esc(m.username)} ${m.id === currentCarpoolData.carpool.owner_id ? '<span class="badge badge-blue">Owner</span>' : ''}</span>
         ${m.id === nextDriverId ? '<span class="badge badge-yellow">Next Driver</span>' : ''}
-        <span class="text-xs text-muted">joined ${new Date(m.joined_at).toLocaleDateString()}</span>
+        <span class="member-coin" title="credits">${m.coins_balance}</span>
       </div>
       <div class="member-actions">
+        ${isOwner ? `
+          <div class="credit-adjust">
+            <button class="btn btn-outline btn-sm" title="Subtract" onclick="adjustCredits(${m.id}, -creditAdjustValue(${m.id}))">−</button>
+            <input type="number" class="credit-adj-input" id="credit-adj-${m.id}" value="1" min="1" step="1" inputmode="numeric" aria-label="Adjustment amount">
+            <button class="btn btn-outline btn-sm" title="Add" onclick="adjustCredits(${m.id}, creditAdjustValue(${m.id}))">+</button>
+          </div>
+        ` : ''}
         ${isOwner && m.id !== currentUser.id
           ? `<button class="btn btn-danger btn-sm" onclick="removeMember(${m.id})">Remove</button>`
           : ''}
       </div>
     </div>
   `).join('');
+}
+
+// Amount typed next to a member's credit −/+ buttons (always positive)
+function creditAdjustValue(userId) {
+  const el = document.getElementById('credit-adj-' + userId);
+  const n = parseInt(el && el.value, 10);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+// Owner adjustment: add or subtract credits from any member, any time
+async function adjustCredits(userId, delta) {
+  const d = parseInt(delta, 10);
+  if (!currentCarpoolId || !d) return;
+  try {
+    const res = await fetch(`/api/carpools/${currentCarpoolId}/credits`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, delta: d })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Failed to adjust credits'); return; }
+    // Keep local state in sync so the member card + setup list update at once
+    if (currentCarpoolData) currentCarpoolData.members = data.members;
+    renderSetupMembers(data.members, currentCarpoolData && currentCarpoolData.isOwner);
+    renderSections();
+    showToast((d > 0 ? '+' : '') + d + ' credits');
+  } catch (e) {
+    alert('Network error: ' + e.message);
+  }
 }
 
 function renderHistory(trips) {
@@ -3178,8 +3208,7 @@ async function handleUpdateCarpool(e) {
   e.preventDefault();
   const body = {
     name: document.getElementById('edit-carpool-name').value.trim(),
-    arrival_radius: parseFloat(document.getElementById('edit-arrival-radius').value) || 400,
-    start_coins: parseInt(document.getElementById('edit-start-coins').value) || 0
+    arrival_radius: parseFloat(document.getElementById('edit-arrival-radius').value) || 400
   };
   const res = await fetch(`/api/carpools/${currentCarpoolId}`, {
     method: 'PUT',

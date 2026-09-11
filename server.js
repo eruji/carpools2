@@ -228,14 +228,11 @@ const stmts = {
     WHERE cm.user_id = ?
     ORDER BY c.created_at DESC
   `),
-  updateCarpool: db.prepare('UPDATE carpools SET name=?, meetup_name=?, meetup_lat=?, meetup_lng=?, meetup_nickname=?, destination_name=?, destination_lat=?, destination_lng=?, destination_nickname=?, arrival_radius=?, start_coins=? WHERE id=?'),
+  updateCarpool: db.prepare('UPDATE carpools SET name=?, meetup_name=?, meetup_lat=?, meetup_lng=?, meetup_nickname=?, destination_name=?, destination_lat=?, destination_lng=?, destination_nickname=?, arrival_radius=? WHERE id=?'),
   deleteCarpool: db.prepare('DELETE FROM carpools WHERE id=?'),
 
   // Members
-  addMember: db.prepare(`
-    INSERT OR IGNORE INTO carpool_members (carpool_id, user_id, coins_balance)
-    VALUES (?, ?, COALESCE((SELECT start_coins FROM carpools WHERE id = ?), 0))
-  `),
+  addMember: db.prepare('INSERT OR IGNORE INTO carpool_members (carpool_id, user_id) VALUES (?, ?)'),
   removeMember: db.prepare('DELETE FROM carpool_members WHERE carpool_id=? AND user_id=?'),
   carpoolMembers: db.prepare(`
     SELECT u.id, u.username, u.email, cm.coins_balance, cm.joined_at
@@ -667,7 +664,7 @@ app.post('/api/carpools', requireAuth, (req, res) => {
       generateInviteCode()
     );
     const carpoolId = result.lastInsertRowid;
-    stmts.addMember.run(carpoolId, req.session.userId, carpoolId);
+    stmts.addMember.run(carpoolId, req.session.userId);
     res.json({ ok: true, carpool: stmts.carpoolById.get(carpoolId) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -743,7 +740,7 @@ app.put('/api/carpools/:id', requireAuth, (req, res) => {
   const carpool = stmts.carpoolById.get(req.params.id);
   if (!carpool) return res.status(404).json({ error: 'Not found' });
   if (carpool.owner_id !== req.session.userId) return res.status(403).json({ error: 'Only owner can edit' });
-  const { name, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname, arrival_radius, start_coins } = req.body;
+  const { name, meetup_name, meetup_lat, meetup_lng, meetup_nickname, destination_name, destination_lat, destination_lng, destination_nickname, arrival_radius } = req.body;
   stmts.updateCarpool.run(
     name || carpool.name,
     meetup_name ?? carpool.meetup_name, meetup_lat ?? carpool.meetup_lat, meetup_lng ?? carpool.meetup_lng,
@@ -751,10 +748,35 @@ app.put('/api/carpools/:id', requireAuth, (req, res) => {
     destination_name ?? carpool.destination_name, destination_lat ?? carpool.destination_lat, destination_lng ?? carpool.destination_lng,
     destination_nickname ?? carpool.destination_nickname,
     arrival_radius ?? carpool.arrival_radius,
-    start_coins != null ? Math.max(0, parseInt(start_coins) || 0) : carpool.start_coins,
     carpool.id
   );
   res.json({ ok: true, carpool: stmts.carpoolById.get(carpool.id) });
+});
+
+// Owner-only credit adjustment (positive or negative) for correcting balances
+app.post('/api/carpools/:id/credits', requireAuth, (req, res) => {
+  try {
+    const carpool = stmts.carpoolById.get(req.params.id);
+    if (!carpool) return res.status(404).json({ error: 'Not found' });
+    if (carpool.owner_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Only the owner can adjust credits' });
+    }
+    const userId = parseInt(req.body.userId, 10);
+    const delta = parseInt(req.body.delta, 10);
+    if (!userId || !Number.isFinite(delta) || delta === 0) {
+      return res.status(400).json({ error: 'A member and a non-zero amount are required' });
+    }
+    if (!stmts.isMember.get(carpool.id, userId)) {
+      return res.status(400).json({ error: 'Not a member of this carpool' });
+    }
+    stmts.updateCoins.run(delta, carpool.id, userId);
+    const members = stmts.carpoolMembers.all(carpool.id);
+    // Let everyone's roster/member card pick up the new balance
+    io.to('carpool:' + carpool.id).emit('carpool-updated', { carpoolId: carpool.id });
+    res.json({ ok: true, members });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.delete('/api/carpools/:id', requireAuth, (req, res) => {
@@ -785,7 +807,7 @@ app.post('/api/carpools/:id/members', requireAuth, (req, res) => {
   if (user.id === req.session.userId) return res.status(400).json({ error: 'Cannot add yourself' });
   const member = stmts.isMember.get(carpool.id, user.id);
   if (member) return res.status(409).json({ error: 'Already a member' });
-  stmts.addMember.run(carpool.id, user.id, carpool.id);
+  stmts.addMember.run(carpool.id, user.id);
   // Also create an invitation record
   stmts.createInvitation.run(carpool.id, user.id, req.session.userId);
   // Notify the invited user
@@ -849,7 +871,7 @@ app.post('/api/carpools/join', requireAuth, (req, res) => {
     if (member) {
       return res.json({ ok: true, carpool, alreadyMember: true });
     }
-    stmts.addMember.run(carpool.id, req.session.userId, carpool.id);
+    stmts.addMember.run(carpool.id, req.session.userId);
     stmts.createInvitation.run(carpool.id, req.session.userId, carpool.owner_id);
     // If a session is already active, add the new member to it as pending
     const active = stmts.activeSession.get(carpool.id);
@@ -1267,7 +1289,7 @@ app.post('/api/invitations/:id/accept', requireAuth, (req, res) => {
   if (result.changes === 0) return res.status(404).json({ error: 'Invitation not found' });
   // Get the invitation to know carpool_id
   const inv = db.prepare('SELECT * FROM invitations WHERE id=?').get(req.params.id);
-  stmts.addMember.run(inv.carpool_id, req.session.userId, inv.carpool_id);
+  stmts.addMember.run(inv.carpool_id, req.session.userId);
   // If a session is already active, add the new member to it as pending
   const active = stmts.activeSession.get(inv.carpool_id);
   if (active) stmts.addSessionMember.run(active.id, req.session.userId, 'pending');

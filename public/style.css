@@ -1455,6 +1455,31 @@ tr:hover td { background: rgba(0,0,0,0.015); }
 .carpool-card:hover { border-color: var(--border-strong); }
 
 /* ── History ─────────────────────────────────────────────────── */
+.credit-adjust {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.credit-adjust .btn {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+  height: 30px;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.credit-adj-input {
+  width: 46px;
+  height: 30px;
+  text-align: center;
+  padding: 2px 4px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.setup-member-row { flex-wrap: wrap; gap: 6px; }
+.setup-member-row .member-actions { flex-wrap: wrap; gap: 6px; }
 .history-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .history-table {
   width: 100%;
