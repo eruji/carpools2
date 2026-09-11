@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=24">
+<link rel="stylesheet" href="/style.css?v=25">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -215,7 +215,6 @@
       </div>
       <!-- Occupancy: the car fills as members arrive at the pickup -->
       <div class="seating-chart" id="seating-chart" aria-label="Occupancy"></div>
-      <div id="session-alert" class="trip-status hidden"></div>
     </div>
     <!-- Slide 2: Members — the roster lives in the carousel -->
     <div class="member-panel">
@@ -261,6 +260,8 @@
         <button id="btn-arrived" class="btn btn-success btn-sm" onclick="respondToSession('arrived')">Arrived</button>
         <button id="btn-skip" class="btn btn-outline btn-sm" onclick="respondToSession('skip')">Skip</button>
       </div>
+      <!-- Shown when no action applies (arrived) so the bar is never blank -->
+      <div id="bar-status" class="bar-status hidden"></div>
     </div>
   </div>
   </div>
@@ -1625,23 +1626,17 @@ function renderSessionUI(session) {
   }
   if (!session.driver_id) lastDriverId = null;
 
-  // Waiting message: arrived at the current stop but others haven't yet
-  const alertEl = document.getElementById('session-alert');
-  if (session.phase === 'meetup' || session.phase === 'destination' || session.phase === 'back_to_meetup') {
-    const myMember = session.members.find(m => m.user_id === currentUser.id);
-    const active = session.members.filter(m => m.status !== 'skip');
-    const allArrived = active.length > 0 && active.every(m => m.status === 'arrived');
-    const targetName = session.phase === 'meetup' ? 'the pickup'
-      : session.phase === 'destination' ? 'the destination' : 'the dropoff';
-    if (myMember && myMember.status === 'arrived' && !allArrived) {
-      alertEl.textContent = 'Waiting for all members to arrive ' + targetName + '...';
-      alertEl.className = 'trip-status warn';
-      alertEl.classList.remove('hidden');
-    } else {
-      alertEl.classList.add('hidden');
+  // Bottom bar fallback: when no action button applies (I've arrived and am
+  // waiting), show a one-line status so the bar is never blank.
+  const barStatus = document.getElementById('bar-status');
+  const meNow = session.members.find(m => m.user_id === currentUser.id);
+  const waitingOn = session.members.filter(m => m.status !== 'skip' && m.status !== 'arrived');
+  const showBarStatus = !!meNow && meNow.status === 'arrived' && waitingOn.length > 0;
+  if (barStatus) {
+    barStatus.classList.toggle('hidden', !showBarStatus);
+    if (showBarStatus) {
+      barStatus.textContent = '⏳ Waiting on ' + waitingOn.map(m => m.username).join(', ');
     }
-  } else {
-    alertEl.classList.add('hidden');
   }
 
   // Ambient proximity alert: passengers only, on active legs with a driver

@@ -313,10 +313,13 @@ header nav span { opacity: 0.7; font-size: 0.9rem; max-width: 100px; overflow: h
 }
 #phase-meetup-controls .btn {
   width: 100%;
+  min-width: 0; /* let grid tracks shrink so all four always fit */
   min-height: 40px;
-  padding: 10px 2px;
-  font-size: 0.8rem;
+  padding: 10px 3px;
+  font-size: 0.76rem;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin: 0;
 }
 #phase-meetup-controls .btn:only-child { grid-column: 1 / -1; }
@@ -1295,6 +1298,17 @@ tr:hover td { background: rgba(0,0,0,0.015); }
   min-height: 56px;
 }
 .phase-panel > div { width: 100%; }
+/* No-action state (arrived, waiting) — keeps the bar one row tall */
+.bar-status {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-deep);
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 #phase-meetup-controls { margin: 0; }
 #session-idle .btn, #session-active .btn { min-height: 40px; }
 
