@@ -525,6 +525,7 @@ function setSession(session) {
     lastAutoArriveAt = 0;
   }
   activeSession = session;
+  gpsResetForSession(session);
   renderSessionUI(session);
   // Refresh every card (race, occupancy, members) immediately on any session
   // update — e.g. someone joining mid-drive — instead of waiting for the next
@@ -1249,6 +1250,7 @@ async function loadCarpoolView(carpoolId) {
   const data = await res.json();
   currentCarpoolData = data;
   activeSession = data.activeSession;
+  gpsResetForSession(data.activeSession);
   // Resume the per-member GPS fix totals from the DB so the diagnostics
   // card doesn't reset to zero on every page refresh.
   if (activeSession) gpsSeedCounts(activeSession);
@@ -3277,6 +3279,23 @@ function gpsSeedCounts(session) {
     gpsDiag.members[m.user_id] = { count: m.fix_count };
     if (m.username) gpsDiag.members[m.user_id].username = m.username;
   }
+}
+
+// A new carpool start = fresh diagnostics: wipe the previous trip's event log
+// and per-member fix counts, then seed from the new session's rows. Keyed on
+// session id so it runs once per session (and again after the trip ends).
+let diagSessionId = null;
+function gpsResetForSession(session) {
+  const id = session ? session.id : null;
+  if (id === diagSessionId) {
+    gpsSeedCounts(session);
+    return;
+  }
+  diagSessionId = id;
+  gpsDiag.entries = [];
+  gpsDiag.members = {};
+  gpsLog('start', id ? ('session ' + id + ' started — GPS diagnostics reset') : 'session ended — GPS diagnostics reset');
+  gpsSeedCounts(session);
 }
 const fmtDur = (sec) => sec < 90 ? Math.round(sec) + 's' : Math.round(sec / 60) + 'm';
 
