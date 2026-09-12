@@ -1843,7 +1843,8 @@ function renderMemberStatus(session) {
         <div class="member-actions">
           <span class="member-eta text-xs text-muted" id="member-eta-${m.user_id}"></span>
           ${!noSkip && m.status !== 'skip' && m.status !== 'arrived' && m.user_id !== currentUser.id
-            ? `<button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip</button>`
+            ? `<button class="btn btn-success btn-sm" onclick="markMemberArrived(${m.user_id})">Arrived</button>
+               <button class="btn btn-outline btn-sm" onclick="skipMember(${m.user_id})">Skip</button>`
             : ''}
           ${!noSkip && m.user_id === currentUser.id && m.status === 'skip'
             ? `<button class="btn btn-outline btn-sm" onclick="respondToSession('pending')">Changed my mind</button>`
@@ -2909,6 +2910,24 @@ async function respondToSession(status) {
   }
   if (status === 'skip') {
     stopLocationTracking();
+  }
+}
+
+async function markMemberArrived(userId) {
+  if (!currentCarpoolId) return;
+  try {
+    const res = await fetch(`/api/carpools/${currentCarpoolId}/sessions/arrive-member`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Failed to check member in'); return; }
+    setSession(data.session);
+    renderSections();
+    showToast('Checked in ✓');
+  } catch (e) {
+    alert('Network error: ' + e.message);
   }
 }
 

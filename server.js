@@ -1103,6 +1103,39 @@ app.post('/api/carpools/:id/sessions/respond', requireAuth, (req, res) => {
   }
 });
 
+app.post('/api/carpools/:id/sessions/arrive-member', requireAuth, (req, res) => {
+  try {
+    const { userId } = req.body;
+    const carpool = stmts.carpoolById.get(req.params.id);
+    if (!carpool) return res.status(404).json({ error: 'Not found' });
+
+    const activeSession = stmts.activeSession.get(carpool.id);
+    if (!activeSession) return res.status(400).json({ error: 'No active session' });
+    // Any session member may check another member in (e.g. they don't have
+    // the app open / no phone on them) — mirrors the skip-member trust model
+    const checker = stmts.sessionMemberByUser.get(activeSession.id, req.session.userId);
+    if (!checker) return res.status(403).json({ error: 'Not in session' });
+    if (!stmts.isMember.get(carpool.id, userId)) return res.status(400).json({ error: 'Not a carpool member' });
+
+    stmts.updateSessionMember.run('arrived', null, null, activeSession.id, userId);
+    stmts.markArrivedAt.run(activeSession.id, userId);
+
+    const updatedSession = {
+      ...stmts.latestSession.get(carpool.id),
+      members: stmts.sessionMembers.all(activeSession.id)
+    };
+    io.to('carpool:' + carpool.id).emit('session-updated', updatedSession);
+    autoAdvanceCheck(carpool.id);
+    const finalSession = {
+      ...stmts.latestSession.get(carpool.id),
+      members: stmts.sessionMembers.all(activeSession.id)
+    };
+    res.json({ ok: true, session: finalSession });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/carpools/:id/sessions/skip-member', requireAuth, (req, res) => {
   try {
     const { userId } = req.body;
