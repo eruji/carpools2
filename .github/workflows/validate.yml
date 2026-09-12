@@ -1,0 +1,47 @@
+name: Validate
+
+# Fail fast on broken client JS / server syntax BEFORE the Docker build runs.
+# (The Docker build itself doesn't parse the JS, so a syntax error would ship.)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check server.js
+        run: node --check server.js
+
+      - name: Check inline <script> blocks in public/index.html
+        run: |
+          node -e '
+          const fs = require("fs");
+          const { execSync } = require("child_process");
+          const html = fs.readFileSync("public/index.html", "utf8");
+          const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+          if (!blocks.length) { console.error("No inline script blocks found — did the file change shape?"); process.exit(1); }
+          let bad = 0;
+          blocks.forEach((b, i) => {
+            const f = `/tmp/block-${i}.js`;
+            fs.writeFileSync(f, b);
+            try { execSync("node --check " + f); }
+            catch (e) { bad++; console.error("index.html script block " + i + " has a syntax error:\n" + (e.stderr || e.message)); }
+          });
+          console.log(blocks.length + " inline script block(s) checked");
+          if (bad) process.exit(1);
+          '
+
+      - name: Check service worker + other client scripts
+        run: |
+          for f in public/sw.js; do
+            if [ -f "$f" ]; then node --check "$f"; echo "OK $f"; fi
+          done
