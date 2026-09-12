@@ -3582,7 +3582,7 @@ function startLocationTracking() {
   if ('geolocation' in navigator) {
     locationWatchId = navigator.geolocation.watchPosition(
       (pos) => { applyFix(pos, 'watch'); },
-      gpsLog('err', 'watch error [' + (err.code || '?') + ']: ' + gpsErrorText(err)); console.log('Geolocation error:', err.message); },
+      (err) => { gpsLog('err', 'watch error [' + (err.code || '?') + ']: ' + gpsErrorText(err)); console.log('Geolocation error:', err.message); },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
     );
   }
