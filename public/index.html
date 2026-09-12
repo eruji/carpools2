@@ -2001,31 +2001,61 @@ async function shareRaceResults() {
 // Manual GPS refresh (testing aid): forces one fresh fix through the normal
 // applyFix pipeline — same path the watch/poll use, so if this moves the
 // marker the streaming path works too.
+// Plain-English cause for a geolocation error — Android browsers fail at
+// several layers (site permission, app permission, precise vs approximate,
+// Location services off), so name the actual one instead of a raw code.
+function gpsErrorText(err) {
+  const code = err && err.code;
+  if (code === 1) return 'BLOCKED — allow Location for this site in the browser';
+  if (code === 2) return 'UNAVAILABLE — turn on Android Location + set Precise';
+  if (code === 3) return 'TIMED OUT — no GPS lock yet (try again, ideally outside)';
+  return (err && err.message) || 'unknown error';
+}
+
 function manualGpsUpdate() {
   if (!('geolocation' in navigator)) { showToast('Geolocation unavailable in this browser'); return; }
+  if (!window.isSecureContext) {
+    gpsLog('err', 'manual: insecure context (need HTTPS)');
+    showToast('GPS blocked — this page must be HTTPS');
+    return;
+  }
   gpsLog('start', 'manual fix requested');
   showToast('Updating GPS…');
-  navigator.geolocation.getCurrentPosition(
+  // Pre-check the permission so a hard block is distinguishable from "no fix"
+  const request = () => navigator.geolocation.getCurrentPosition(
     (pos) => {
       applyFix(pos, 'manual');
       showToast('GPS updated' + (pos.coords.accuracy != null ? ' ±' + Math.round(pos.coords.accuracy) + 'm' : ''));
     },
     (err) => {
-      gpsLog('err', 'manual error: ' + (err.message || err.code) + ' — retrying coarse');
+      gpsLog('err', 'manual error [' + (err.code || '?') + ']: ' + gpsErrorText(err) + ' — retrying coarse');
+      // Coarse retry: allow a recent cached network fix (better than nothing)
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           applyFix(pos, 'manual/coarse');
           showToast('GPS updated (coarse)' + (pos.coords.accuracy != null ? ' ±' + Math.round(pos.coords.accuracy) + 'm' : ''));
         },
         (e2) => {
-          gpsLog('err', 'manual/coarse error: ' + (e2.message || e2.code));
-          showToast('GPS failed: ' + (e2.message || e2.code));
+          gpsLog('err', 'manual/coarse error [' + (e2.code || '?') + ']: ' + gpsErrorText(e2));
+          showToast('GPS failed: ' + gpsErrorText(e2));
         },
-        { enableHighAccuracy: false, maximumAge: 0, timeout: 8000 }
+        { enableHighAccuracy: false, maximumAge: 30000, timeout: 15000 }
       );
     },
-    { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
   );
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'geolocation' }).then((st) => {
+      if (st.state === 'denied') {
+        gpsLog('err', 'manual: permission denied at site level');
+        showToast('Location is BLOCKED for this site — enable it in browser site settings');
+      } else {
+        request();
+      }
+    }).catch(request);
+  } else {
+    request();
+  }
 }
 
 function renderPositionBoard(session) {
@@ -3552,7 +3582,7 @@ function startLocationTracking() {
   if ('geolocation' in navigator) {
     locationWatchId = navigator.geolocation.watchPosition(
       (pos) => { applyFix(pos, 'watch'); },
-      (err) => { gpsLog('err', 'watch error: ' + (err.message || err.code)); console.log('Geolocation error:', err.message); },
+      gpsLog('err', 'watch error [' + (err.code || '?') + ']: ' + gpsErrorText(err)); console.log('Geolocation error:', err.message); },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
     );
   }
